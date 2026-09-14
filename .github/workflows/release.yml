@@ -20,6 +20,8 @@ jobs:
   build:
     name: build (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
+    env:
+      STRIKERS_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -102,7 +104,7 @@ jobs:
       - name: Configure and build (Linux, in Ubuntu 22.04)
         if: runner.os == 'Linux'
         run: |
-          docker run --rm -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+          docker run --rm -e STRIKERS_VERSION -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
             -w "$GITHUB_WORKSPACE/smstrikers-port" ubuntu:22.04 sh -c '
               set -e
               export DEBIAN_FRONTEND=noninteractive
