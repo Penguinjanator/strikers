@@ -101,18 +101,36 @@ jobs:
         shell: bash
         run: ./tools/rebuild.sh build-aur
 
-      - name: Configure and build (Linux, in Ubuntu 22.04)
+      - name: Start the Ubuntu 22.04 container (Linux)
         if: runner.os == 'Linux'
         run: |
-          docker run --rm -e STRIKERS_VERSION -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
-            -w "$GITHUB_WORKSPACE/smstrikers-port" ubuntu:22.04 sh -c '
-              set -e
-              export DEBIAN_FRONTEND=noninteractive
-              ./tools/install-linux-deps.sh
-              ./tools/build-ffmpeg.sh
-              ./tools/configure.sh build-aur Release
-              ./tools/rebuild.sh build-aur
-              chown -R '"$(id -u):$(id -g)"' .'
+          docker run -d --name build -e STRIKERS_VERSION -e DEBIAN_FRONTEND=noninteractive \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE/smstrikers-port" \
+            ubuntu:22.04 sleep infinity
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: docker exec build ./tools/install-linux-deps.sh
+
+      - name: Build ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: docker exec build ./tools/build-ffmpeg.sh
+
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
+        run: docker exec build ./tools/configure.sh build-aur Release
+
+      - name: Build Dawn (Linux)
+        if: runner.os == 'Linux'
+        run: docker exec build cmake --build build-aur --target webgpu_dawn -j10
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: docker exec build ./tools/rebuild.sh build-aur
+
+      - name: Return the tree to the runner user (Linux)
+        if: runner.os == 'Linux'
+        run: docker exec build chown -R "$(id -u):$(id -g)" .
 
       - name: Package
         working-directory: smstrikers-port
