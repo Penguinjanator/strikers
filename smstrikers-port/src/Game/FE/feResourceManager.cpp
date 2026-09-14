@@ -1,3 +1,4 @@
+#include "port/prompts.h"
 #include "Game/FE/feFontResource.h"
 #include "Game/FE/feResourceManager.h"
 #include "Game/FE/feScene.h"
@@ -162,6 +163,7 @@ void FEResourceManager::LoadPermanentTextures()
             PlaceHolderForceTextureValid(pTextureResource);
         }
     }
+    PortPromptsLegendsLoaded(); // PORT: button prompts
 }
 
 /**
@@ -224,6 +226,7 @@ void FEResourceManager::UnloadResource(FEResourceHandle* pFeResourceHandle)
  */
 void FEResourceManager::UnloadPermanentResourceBundle()
 {
+    PortPromptsLegendsUnloading(); // PORT: button prompts
     s_pPermanentBundle = new (nlMalloc(sizeof(BundleFile), 8, false)) BundleFile();
     s_pPermanentBundle->Open(m_szPermanentBundleFileName);
 

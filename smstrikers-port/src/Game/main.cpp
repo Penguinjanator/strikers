@@ -1,3 +1,4 @@
+#include "port/prompts.h"
 #include "port/region.h"  // PORT: one binary, three discs
 #include "types.h"
 #include "NL/nlBind.h"
@@ -662,6 +663,9 @@ static void PortPumpAuroraEvents()
                                  ev->sdl.type == SDL_EVENT_KEY_DOWN ? 1 : 0);
         }
 
+        if (ev->type == AURORA_SDL_EVENT)
+            PortPromptsEvent(&ev->sdl); // PORT: button prompts
+
         // PORT: the limiter follows the display the window is on, which can move or change mode.
         if (ev->type == AURORA_SDL_EVENT
             && (ev->sdl.type == SDL_EVENT_WINDOW_DISPLAY_CHANGED
@@ -838,6 +842,7 @@ int main(int argc, char* argv[])
         if (!aurora_begin_frame())
             continue;              // minimised or surface lost; nothing to draw
 
+        PortPromptsFrame(); // PORT: button prompts
         PortBenchFrameBegin();
 
         // Sample the pad before the tasks that read it. main() registers VBlankPadUpdate through PADSetSamplingCallback.

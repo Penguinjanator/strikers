@@ -61,6 +61,9 @@
 
 # keyboard = 1            ; 0 disables the keyboard pad
 
+# Button art: auto follows the last input device; a named family overrides the art.
+# button_prompts = auto
+
 # Keyboard, player 1. SDL scancode names as SDL_GetScancodeName spells them: "A", "Return", "Space",
 # "Left Shift", "F1", "Keypad 0". STRIKERS_PROBE_PAD=1 prints the whole effective table.
 # key_a = X

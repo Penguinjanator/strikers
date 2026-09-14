@@ -4,6 +4,8 @@
 #if !defined(PORT_USE_AURORA)
 
 extern "C" void PortInstallKeyboardBindings(void) {}
+extern "C" int PortInputPadSetting(unsigned int) { return -1; }
+extern "C" int PortInputKeyboardEnabled(void) { return 0; }
 extern "C" void PortNoteSceneEntered(int scene) { (void)scene; }
 extern "C" void PortUpdateSyntheticInput(unsigned long frame) { (void)frame; }
 
@@ -433,13 +435,9 @@ void apply_gamepad(u32 port, bool report)
 
     for (unsigned i = 0; i < kPadButtonCount; i++)
     {
-        const char* v = input_cfg(kPadButtons[i].env);
-        if (v == nullptr)
-            continue;   // the file said nothing; the device default stands
-
-        const int native = parse_pad_button(v);
-        if (native == kPadNativeBad)
-            continue;   // named at init by check_pad_config, once, not per port
+        const int native = PortInputPadSetting(kPadButtons[i].pad);
+        if (native == kPadNativeInvalid)
+            continue;
 
         PADButtonMapping m;
         m.padButton = kPadButtons[i].pad;
@@ -626,6 +624,32 @@ void poll_controllers(bool report)
 }
 
 }   // namespace
+
+extern "C" int PortInputKeyboardEnabled(void)
+{
+    const char* v = input_cfg("STRIKERS_KEYBOARD");
+    return v == nullptr || !cfg_off(v);
+}
+
+extern "C" int PortInputPadSetting(unsigned int pad)
+{
+    for (unsigned i = 0; i < kPadButtonCount; i++)
+    {
+        if (kPadButtons[i].pad != pad)
+            continue;
+        const char* v = input_cfg(kPadButtons[i].env);
+        if (v == nullptr)
+            return kPadNativeInvalid;
+        const int native = parse_pad_button(v);
+        if (native == kPadNativeBad)
+            return kPadNativeInvalid;
+        if ((native == kPadNativeLeftTrigger || native == kPadNativeRightTrigger) &&
+            pad != PAD_TRIGGER_L && pad != PAD_TRIGGER_R)
+            return kPadNativeInvalid;
+        return native;
+    }
+    return kPadNativeInvalid;
+}
 
 extern "C" void PortInstallKeyboardBindings(void)
 {

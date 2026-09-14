@@ -15,6 +15,7 @@ Built on the community decompilation by the excellent [Yannick Suter](https://gi
 - Higher-resolution rendering with adjustable internal resolution, 4x MSAA and up to 16x anisotropic filtering.
 - Modern graphics backends through Metal, Vulkan and Direct3D 12 via [Aurora](https://github.com/encounter/aurora). Vulkan is personally recommended on non-macOS systems.
 - Controller support for Xbox, PlayStation, Switch Pro and compatible GameCube adapters through SDL.
+- Button prompts follow the active keyboard or controller and its bindings with selectable controller artwork.
 - Customisable controls, including keyboard and gamepad bindings, stick deadzones and rumble.
 - Faster loading compared with original hardware.
 - Direct disc-image loading from ISO/GCM, CISO and GCZ files, alongside extracted game folders.
@@ -48,6 +49,7 @@ The main distinctions are:
 - Reconstructed game code: this is an unofficial source reconstruction, not an official source release. Reconstructed material may remain subject to third-party rights; this project claims no ownership of those rights and grants no permission on behalf of their holders.
 - MusyX audio middleware: the upstream decompilation carries an MIT licence, which is preserved here. That notice does not, by itself, establish that its licensors hold all rights in the reconstructed middleware.
 - ODE physics: upstream ODE portions use the historical BSD-style licence preserved in the repository. That licence does not, by itself, establish the licensing status of independently copyrightable game-specific modifications.
+- Button prompt artwork: [Input Prompts](https://kenney.nl/assets/input-prompts) by Kenney, under CC0 1.0. 
 - Other third-party material and dependencies: these retain their applicable licences and notices. FFmpeg's terms depend on its build configuration.
 
 The project's current distribution policy is source-only. This is a project policy, not a claim that all reconstructed source is cleared for redistribution. Public availability does not itself grant permission to reuse or redistribute third-party material.

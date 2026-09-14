@@ -117,6 +117,9 @@ fi
 
 cp strikers.ini.example "$OUT/"
 
+rm -rf "$OUT/input-prompts"
+cp -R assets/input-prompts "$OUT/input-prompts"
+
 if [ "$WINDOWS" = "1" ]; then
     BENCHMARK=benchmark.ps1
 else
@@ -222,7 +225,7 @@ if [ -n "$SETTINGS_ARTEFACT" ]; then
 fi
 
 # What the archive has to contain, by name, checked before it is made and again after.
-NEEDED_FILES="$(basename "$BIN") strikers.ini.example $BENCHMARK
+NEEDED_FILES="$(basename "$BIN") strikers.ini.example $BENCHMARK input-prompts/LICENSE-Kenney.txt
               LICENSE-BSD.TXT LICENSE-CC0.txt LICENSE-GPL-2.0.txt LICENSE-MUSYX.txt"
 if [ "$FFMPEG_SHIPPED" = 1 ]; then
     NEEDED_FILES="$NEEDED_FILES LICENSE-LGPL-2.1.txt"
