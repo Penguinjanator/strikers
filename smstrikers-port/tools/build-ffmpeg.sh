@@ -10,7 +10,12 @@ URL="https://ffmpeg.org/releases/ffmpeg-$VERSION.tar.xz"
 WANT_SHA="cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635"
 STAMP="$DEST/.strikers-ffmpeg"
 
-if [ -f "$DEST/lib/libavcodec.a" ] && [ -f "$STAMP" ] &&
+case "$(uname -s)" in
+MINGW*|MSYS*|CYGWIN*) WINDOWS=1; AVCODEC_LIB=avcodec.lib ;;
+*)                    WINDOWS=0; AVCODEC_LIB=libavcodec.a ;;
+esac
+
+if [ -f "$DEST/lib/$AVCODEC_LIB" ] && [ -f "$STAMP" ] &&
    [ "$(cat "$STAMP")" = "$WANT_SHA  $URL" ]; then
     echo "==> ffmpeg $VERSION already built in $DEST"
     exit 0
@@ -38,10 +43,18 @@ if [ "$GOT_SHA" != "$WANT_SHA" ]; then
 fi
 tar -xJf "$WORK/ffmpeg.tar.xz" -C "$WORK"
 
-# --disable-autodetect keeps host libraries (VA-API, zlib, iconv) out; x86-64 needs nasm.
+# --disable-autodetect keeps host libraries (VA-API, zlib, iconv) out; x86-64 needs nasm except on Windows.
+if [ "$WINDOWS" = 1 ]; then
+    set -- --toolchain=msvc --target-os=win64 --arch=x86_64 \
+        --cc="${CC:-clang-cl}" --ld=lld-link --ar=llvm-ar \
+        --disable-x86asm --extra-cflags=-MT
+else
+    set -- --cc="${CC:-cc}" --enable-pic
+fi
+
 cd "$WORK/ffmpeg-$VERSION"
-./configure --prefix="$DEST" --cc="${CC:-cc}" \
-    --enable-static --disable-shared --enable-pic \
+./configure --prefix="$DEST" "$@" \
+    --enable-static --disable-shared \
     --disable-autodetect --disable-programs --disable-doc --disable-network \
     --disable-avformat --disable-avfilter --disable-avdevice \
     --disable-swscale --disable-swresample \

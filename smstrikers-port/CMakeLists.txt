@@ -374,7 +374,7 @@ set(_ff_static "${CMAKE_CURRENT_SOURCE_DIR}/extern/ffmpeg-static")
 if(STRIKERS_FFMPEG)
     find_package(PkgConfig QUIET)
     if(PKG_CONFIG_FOUND AND NOT STRIKERS_FFMPEG_ROOT AND NOT DEFINED ENV{STRIKERS_FFMPEG_ROOT}
-       AND NOT EXISTS "${_ff_static}/lib/libavcodec.a")
+       AND NOT EXISTS "${_ff_static}/lib/libavcodec.a" AND NOT EXISTS "${_ff_static}/lib/avcodec.lib")
         if(APPLE AND EXISTS "/opt/homebrew/opt/ffmpeg/lib/pkgconfig")
             set(ENV{PKG_CONFIG_PATH}
                 "/opt/homebrew/opt/ffmpeg/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
@@ -446,14 +446,22 @@ elseif(STRIKERS_FFMPEG)
         target_include_directories(strikers_platform PRIVATE "${STRIKERS_FFMPEG_INCLUDE_DIR}")
         target_link_libraries(strikers PRIVATE
             "${STRIKERS_FFMPEG_AVCODEC}" "${STRIKERS_FFMPEG_AVUTIL}")
-        if(STRIKERS_FFMPEG_AVCODEC MATCHES "\\.a$")
+        string(FIND "${STRIKERS_FFMPEG_AVCODEC}" "${_ff_static}/" _ff_static_at)
+        if(STRIKERS_FFMPEG_AVCODEC MATCHES "\\.a$" OR _ff_static_at EQUAL 0)
+            set(_ff_is_static TRUE)
+        else()
+            set(_ff_is_static FALSE)
+        endif()
+        if(_ff_is_static AND WIN32)
+            target_link_libraries(strikers PRIVATE bcrypt)
+        elseif(_ff_is_static)
             # A static libavcodec leaves its libm and thread references for the executable to resolve.
             find_package(Threads REQUIRED)
             target_link_libraries(strikers PRIVATE m Threads::Threads)
         endif()
         message(STATUS "THP movies: libavcodec ${_ff_version} (${STRIKERS_FFMPEG_AVCODEC})")
 
-        if(WIN32)
+        if(WIN32 AND NOT _ff_is_static)
             # An import library is not a runtime: linking avcodec.lib without avcodec-NN.dll beside
             # it does not start. Copied at build time, and package.sh takes the same files. These
             # three, from avcodec's import table.

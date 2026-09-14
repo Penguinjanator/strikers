@@ -137,7 +137,7 @@ FFMPEG_SHIPPED=0
 for _lib in "$OUT"/av*.[Dd][Ll][Ll] "$OUT"/libav*.dylib "$OUT"/libav*.so*; do
     if [ -f "$_lib" ]; then FFMPEG_SHIPPED=1; fi
 done
-if grep -q '^STRIKERS_FFMPEG_AVCODEC:FILEPATH=.*\.a$' "$BUILD/CMakeCache.txt" 2>/dev/null; then
+if grep -qE '^STRIKERS_FFMPEG_AVCODEC:FILEPATH=.*\.(a|lib)$' "$BUILD/CMakeCache.txt" 2>/dev/null; then
     FFMPEG_SHIPPED=1
 fi
 if [ "$FFMPEG_SHIPPED" = 1 ]; then
