@@ -237,7 +237,7 @@ void execute(char* line, unsigned long frame)
     {
         if (!PortPromptsSetFamily(next_word(&p)))
             fprintf(stderr, "[control] prompts: expected auto, gamecube, xbox, playstation, "
-                            "nintendo, generic or keyboard\n");
+                            "nintendo, steamdeck, generic or keyboard\n");
         return;
     }
 

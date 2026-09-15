@@ -252,10 +252,11 @@ QVector<Setting> makeInputSwitches()
         QStringLiteral(
         "Button art: auto follows the last input device; a named family overrides the art."),
         { QStringLiteral("auto"), QStringLiteral("gamecube"), QStringLiteral("xbox"),
-          QStringLiteral("playstation"), QStringLiteral("nintendo"), QStringLiteral("generic"),
-          QStringLiteral("keyboard") },
+          QStringLiteral("playstation"), QStringLiteral("nintendo"), QStringLiteral("steamdeck"),
+          QStringLiteral("generic"), QStringLiteral("keyboard") },
         { Text::tr("Automatic"), Text::tr("GameCube"), Text::tr("Xbox"), Text::tr("PlayStation"),
-          Text::tr("Nintendo"), Text::tr("Generic"), Text::tr("Keyboard") }));
+          Text::tr("Nintendo"), Text::tr("Steam Deck"), Text::tr("Generic"),
+          Text::tr("Keyboard") }));
 
     v.push_back(toggle("pad_swap_sticks", "input", Text::tr("Sticks"), "0",
         Text::tr("Swap the two sticks"),

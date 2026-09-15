@@ -32,7 +32,7 @@ int main()
         Input in = defaults(static_cast<Family>(f));
         token(in, L, "lt");
         token(in, R, "rt");
-        const char* expected[] = { "a", "a", "cross", "b", "south" };
+        const char* expected[] = { "a", "a", "cross", "b", "a", "south" };
         token(in, A, expected[f]);
         in.overrides[A] = RightShoulder;
         in.overrides[L] = LeftShoulder;

@@ -14,8 +14,8 @@ namespace prompts
 
 const char* familyName(Family f)
 {
-    static const char* names[] = { "gamecube", "xbox",    "playstation",
-                                   "nintendo", "generic", "keyboard" };
+    static const char* names[] = { "gamecube",  "xbox",    "playstation", "nintendo",
+                                   "steamdeck", "generic", "keyboard" };
     return f >= Gamecube && f <= Keyboard ? names[f] : "auto";
 }
 

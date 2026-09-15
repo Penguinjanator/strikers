@@ -16,6 +16,7 @@ enum Family
     Xbox,
     Playstation,
     Nintendo,
+    Steamdeck,
     Generic,
     Keyboard
 };

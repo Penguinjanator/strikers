@@ -16,6 +16,7 @@ extern "C" int PortPromptsSetFamily(const char*) { return 0; }
 #include "port/host.h"
 #include "port/input.h"
 #include "port/overlay.h"
+#include "port/steamdeck.h"
 #include "prompt_art.h"
 
 #include "NL/nlFont.h"
@@ -93,8 +94,28 @@ SDL_Gamepad* padForPort(int port)
     return index < 0 ? nullptr : PADGetSDLGamepadForIndex(index);
 }
 
+// The Deck's built-in controller, and the virtual pad Steam Input puts in front of it. SDL has no
+// gamepad type for either, so both arrive as PAD_TYPE_STANDARD
+const Uint16 kValveVendor = 0x28de;
+const Uint16 kDeckProduct = 0x1205;
+const Uint16 kSteamVirtualProduct = 0x11ff;
+
+bool deckPad(int port)
+{
+    SDL_Gamepad* pad = padForPort(port);
+    if (pad == nullptr || SDL_GetGamepadVendor(pad) != kValveVendor)
+        return false;
+    if (SDL_GetGamepadProduct(pad) == kDeckProduct)
+        return true;
+    // Steam Input hides the real device, so only the machine says whether it is a Deck.
+    return SDL_GetGamepadProduct(pad) == kSteamVirtualProduct && PortIsSteamDeck() != 0;
+}
+
 Family padFamily(int port)
 {
+    if (deckPad(port))
+        return Steamdeck;
+
     switch (PADGetControllerType(port))
     {
     case PAD_TYPE_XBOX360:
@@ -119,6 +140,7 @@ SDL_GamepadType sdlType(Family family)
     case Xbox:        return SDL_GAMEPAD_TYPE_XBOXONE;
     case Playstation: return SDL_GAMEPAD_TYPE_PS5;
     case Nintendo:    return SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO;
+    case Steamdeck:   return SDL_GAMEPAD_TYPE_XBOXONE;
     default:          return SDL_GAMEPAD_TYPE_STANDARD;
     }
 }
