@@ -273,9 +273,12 @@
         <translation>Rendu sur %1 lignes.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="390"/>
-        <source>The height is exact. The width shown is for 16:9 and follows the aspect ratio.</source>
-        <translation>La hauteur est exacte. La largeur indiquée correspond au 16:9 et suit le format d&apos;image.</translation>
+        <source>The height is exact. The width follows the aspect ratio.</source>
+        <translation>La hauteur est exacte. La largeur suit le format d&apos;image.</translation>
+    </message>
+    <message>
+        <source>Automatic (Steam Deck, 1280×800)</source>
+        <translation>Automatique (Steam Deck, 1280×800)</translation>
     </message>
     <message>
         <location filename="../src/mainwindow.cpp" line="481"/>
@@ -903,9 +906,12 @@ Le jeu utilise désormais ce dossier ; l&apos;image peut donc être déplacée o
         <translation>Plein écran</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="141"/>
-        <source>Start the game in fullscreen</source>
-        <translation>Lancer le jeu en plein écran</translation>
+        <source>Automatic (fullscreen in Steam&apos;s Game Mode)</source>
+        <translation>Automatique (plein écran en mode Jeu de Steam)</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Activé</translation>
     </message>
     <message>
         <location filename="../src/schema.cpp" line="142"/>

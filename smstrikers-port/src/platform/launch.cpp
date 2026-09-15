@@ -5,6 +5,7 @@
 #if defined(PORT_USE_AURORA)
 
 #include "port/fatal.h"
+#include "port/steamdeck.h"
 #include "port/texfilter.h"
 
 #include <stdio.h>
@@ -62,6 +63,13 @@ int EnvBool(const char* name, int fallback)
         strcmp(v, "off") == 0 || strcmp(v, "FALSE") == 0)
         return 0;
     return 1;
+}
+
+// gamescope (Steam's Game Mode) sizes a window to the screen only when it asks for fullscreen, and scales any other window in with bars.
+bool UnderGamescope()
+{
+    const char* v = getenv("GAMESCOPE_WAYLAND_DISPLAY");
+    return v != NULL && *v != '\0';
 }
 
 bool ParseWindowSize(const char* v, unsigned* w, unsigned* h)
@@ -172,7 +180,13 @@ extern "C" void PortAuroraConfigure(AuroraConfig* cfg)
     // Fullscreen at startup. F11 and the debug menu's System tab already toggle it at runtime
     // through SDL, but a player who wants fullscreen wants it before the game has drawn anything,
     // and AuroraConfig is the only place that can be asked for.
-    cfg->startFullscreen = EnvBool("STRIKERS_FULLSCREEN", 0) != 0;
+    {
+        const bool gamescope = UnderGamescope();
+        const char* v = getenv("STRIKERS_FULLSCREEN");
+        cfg->startFullscreen = EnvBool("STRIKERS_FULLSCREEN", gamescope ? 1 : 0) != 0;
+        if (gamescope && (v == NULL || *v == '\0'))
+            fprintf(stderr, "[port] gamescope: starting fullscreen; fullscreen = 0 opens a window\n");
+    }
 
     {
         const char* v = getenv("STRIKERS_WINDOW_SIZE");
@@ -381,6 +395,14 @@ void PortFollowRenderScale(unsigned int windowHeight)
         {
             g_renderScalePinned = true;
             g_renderScale = (float)atof(e);
+        }
+        else if (PortIsSteamDeck())
+        {
+            // The panel's own rows even when docked, where following the output would outrun the Deck's GPU.
+            g_renderScalePinned = true;
+            g_renderScale = (float)PORT_STEAM_DECK_ROWS / 448.0f;
+            fprintf(stderr, "[port] Steam Deck: rendering the panel's %u rows; res_scale overrides\n",
+                    (unsigned)PORT_STEAM_DECK_ROWS);
         }
     }
     if (!g_renderScalePinned)

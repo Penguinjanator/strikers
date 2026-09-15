@@ -47,6 +47,8 @@
 #include <QVBoxLayout>
 #include <QVariant>
 
+#include "port/steamdeck.h"
+
 namespace {
 
 QString trimNumber(double v)
@@ -330,15 +332,31 @@ QWidget* MainWindow::buildDisplayTab()
     {
         const Setting& s = byKey(group, "res_scale");
         auto* combo = new QComboBox;
-        combo->addItem(tr("Automatic (follows the window)"), QString());
-        static const struct { int rows; const char* name; } kResolutions[] = {
-            { 448, "GameCube" }, { 480, "480p" },   { 540, "540p" },   { 576, "576p" },
-            { 720, "720p" },     { 900, "900p" },   { 1080, "1080p" }, { 1440, "1440p" },
-            { 1800, nullptr },   { 2160, "4K" },    { 2880, "5K" },
+        // The game renders the panel's rows on a Deck when this is left unset.
+        combo->addItem(PortIsSteamDeck() ? tr("Automatic (Steam Deck, 1280×800)")
+                                         : tr("Automatic (follows the window)"),
+                       QString());
+        // One entry per height, since the height is all the value holds; the width names the display it is known from.
+        static const struct { int width; int rows; const char* name; } kResolutions[] = {
+            { 640, 448, "GameCube" },
+            { 854, 480, "480p" },
+            { 960, 540, "540p" },
+            { 1024, 576, "576p" },
+            { 1280, 720, "720p" },
+            { 1366, 768, nullptr },
+            { PORT_STEAM_DECK_WIDTH, PORT_STEAM_DECK_ROWS, "Steam Deck" },
+            { 1600, 900, "900p" },
+            { 1920, 1080, "1080p" },
+            { 1920, 1200, nullptr },
+            { 2560, 1440, "1440p" },
+            { 2560, 1600, nullptr },
+            { 3200, 1800, nullptr },
+            { 3840, 2160, "4K" },
+            { 5120, 2880, "5K" },
         };
         for (const auto& r : kResolutions)
         {
-            const QString size = QStringLiteral("%1×%2").arg(qRound(r.rows * 16.0 / 9.0)).arg(r.rows);
+            const QString size = QStringLiteral("%1×%2").arg(r.width).arg(r.rows);
             combo->addItem(r.name != nullptr ? QStringLiteral("%1 (%2)").arg(size, QLatin1String(r.name))
                                              : size,
                            trimScale(double(r.rows) / 448.0));
@@ -360,8 +378,7 @@ QWidget* MainWindow::buildDisplayTab()
             const bool automatic = combo->currentIndex() <= 0;
             rowsNote->setText(isCustom()
                                   ? tr("Renders %1 rows.").arg(qRound(spin->value() * 448.0))
-                                  : tr("The height is exact. The width shown is for 16:9 and "
-                                       "follows the aspect ratio."));
+                                  : tr("The height is exact. The width follows the aspect ratio."));
             rowsNote->setVisible(!automatic);
         };
         connect(combo, &QComboBox::currentIndexChanged, this, [this, spin, isCustom, showRows] {
@@ -501,7 +518,7 @@ QWidget* MainWindow::buildDisplayTab()
         }
     }
 
-    addSwitch(page, byKey(group, "fullscreen"));
+    addChoice(page, byKey(group, "fullscreen"));
     addSwitch(page, byKey(group, "pause_on_focus_lost"));
 
     page->finish();

@@ -1053,7 +1053,7 @@ u32 synthFXStart(u16 fid,
 int synthCheckFXRealloc(unsigned short fid) {
   struct FX_TAB* fx;            // r31
   unsigned long allocId;        // r30
-  unsigned long currentAllocId; // r1+0x8
+  u32 currentAllocId; /* PORT: voiceAllocatePeek writes a u32 through it. */
 
   fx = dataGetFX(fid);
   if (fx == NULL) {

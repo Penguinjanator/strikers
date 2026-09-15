@@ -47,12 +47,16 @@ add_library(strikers-settings-core STATIC
 target_include_directories(strikers-settings-core PUBLIC src)
 target_link_libraries(strikers-settings-core PUBLIC Qt6::Core)
 
-# Only disc.h goes on the include path: ../include's malloc.h and types.h would shadow the system's.
+# Only disc.h and steamdeck.h go on the include path: ../include's malloc.h and types.h would shadow the system's.
 set(STRIKERS_PORT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
-configure_file("${STRIKERS_PORT_DIR}/include/port/disc.h"
-               "${CMAKE_CURRENT_BINARY_DIR}/portinc/port/disc.h" COPYONLY)
-target_sources(strikers-settings-core PRIVATE "${STRIKERS_PORT_DIR}/src/platform/disc.c")
-target_include_directories(strikers-settings-core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/portinc")
+foreach(header disc.h steamdeck.h)
+  configure_file("${STRIKERS_PORT_DIR}/include/port/${header}"
+                 "${CMAKE_CURRENT_BINARY_DIR}/portinc/port/${header}" COPYONLY)
+endforeach()
+target_sources(strikers-settings-core PRIVATE
+  "${STRIKERS_PORT_DIR}/src/platform/disc.c"
+  "${STRIKERS_PORT_DIR}/src/platform/steamdeck.c")
+target_include_directories(strikers-settings-core PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/portinc")
 target_compile_definitions(strikers-settings-core PRIVATE PORT_DISC_INFLATE_HOOK=1)
 if(MSVC)
   target_compile_definitions(strikers-settings-core PRIVATE strcmpi=_stricmp _CRT_SECURE_NO_WARNINGS)

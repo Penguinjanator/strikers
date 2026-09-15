@@ -75,7 +75,8 @@ QVector<Setting> makeDisplay()
         "The resolution the game renders at, independent of your window size. "
         "Higher is sharper and costs graphics performance."),
         QStringLiteral(
-        "Internal render resolution, as a multiple of the console's 448 rows.")));
+        "Internal render resolution, as a multiple of the console's 448 rows. Unset, it follows the "
+        "window; on a Steam Deck it is the panel's 800 rows (1.786) even when docked.")));
 
     // Only 1 and 4 are offered because only 1 and 4 exist: the value goes straight to the swap
     // chain's sample count, and WebGPU guarantees those two and nothing between them.
@@ -137,13 +138,16 @@ QVector<Setting> makeDisplay()
         { Text::tr("Automatic (recommended)"), Text::tr("Direct3D 12"),
           Text::tr("Vulkan"), Text::tr("Metal") }));
 
-    v.push_back(toggle("fullscreen", "display", Text::tr("Fullscreen"), "0",
-        Text::tr("Start the game in fullscreen"),
+    // Three states, because unset is fullscreen under Steam's Game Mode and 0 has to survive a save.
+    v.push_back(choice("fullscreen", "display", Text::tr("Fullscreen"), "",
         Text::tr(
         "Whether the game starts fullscreen. F11 toggles it at any time, so "
         "this only sets the initial state."),
         QStringLiteral(
-        "Open fullscreen instead of in a window.")));
+        "1 opens fullscreen and 0 a window. Unset, it is fullscreen under Steam's Game Mode (gamescope), "
+        "which scales a window into the screen with black bars, and a window everywhere else."),
+        { QString(), QStringLiteral("1"), QStringLiteral("0") },
+        { Text::tr("Automatic (fullscreen in Steam's Game Mode)"), Text::tr("On"), Text::tr("Off") }));
 
     v.push_back(toggle("pause_on_focus_lost", "display", Text::tr("Pause"), "0",
         Text::tr("Pause when you click away from the game"),

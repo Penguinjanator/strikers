@@ -155,6 +155,7 @@ int selftest(const QString& path)
         { "pad_deadzone", "0.25" },
         { "overlay", "menu" },
         { "aspect", "5:4" },
+        { "fullscreen", "0" },
     };
 
     out() << "\nbefore:\n";
