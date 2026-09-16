@@ -353,11 +353,20 @@ static void Initialize()
     }
     else if (diskid->gameName[0] == 'G' && diskid->gameName[1] == '4' && diskid->gameName[2] == 'Q' && diskid->gameName[3] == 'J')
     {
-        g_Language = nlLocalization::LangJapanese;
+        // PORT: the Japanese disc carries every language's strings, fonts and menus, so `language` picks one; unset is Japanese.
+        static const nlLocalization::nlLanguage kJapaneseDisc[] = {
+            nlLocalization::LangEnglish, nlLocalization::LangGerman,  nlLocalization::LangFrench,
+            nlLocalization::LangSpanish, nlLocalization::LangItalian, nlLocalization::LangJapanese,
+        };
+        const int language = port_language();
+        g_Language = language >= 0 ? kJapaneseDisc[language] : nlLocalization::LangJapanese;
     }
     else if (diskid->gameName[0] == 'G' && diskid->gameName[1] == '4' && diskid->gameName[2] == 'Q' && diskid->gameName[3] == 'E')
     {
         g_Language = nlLocalization::LangEnglish;
+        // PORT: the American disc has English only, so a `language` line is reported as ignored.
+        if (port_language() >= 0)
+            OSReport("[port] language: ignored, the American disc plays in English\n");
     }
     else
     {
@@ -397,6 +406,7 @@ static void Initialize()
             g_Language = nlLocalization::LangLongestStrings;
         }
     }
+    OSReport("[port] language: %s\n", nlLocalization::LanguageName[g_Language]);   // PORT: which table the disc and `language` chose
 
     LoadMemoryCardIconData();
 

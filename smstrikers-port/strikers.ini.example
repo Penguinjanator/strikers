@@ -44,8 +44,8 @@
 # Graphics backend: auto, d3d12, vulkan, metal.
 # backend = vulkan
 
-# How many shaders compile at once, 0 to 16. 0 leaves it to the core count; 1 is what to try if the
-# graphics driver misbehaves at start.
+# Shaders compiled at once, 0 to 16. 0 picks a count from the CPU cores. Set 1 if the graphics driver
+# has problems at startup.
 # shader_jobs = 0
 
 [audio]
@@ -123,7 +123,8 @@
 # log = 1
 # log = console
 
-# The console's own language setting, which only a European disc reads.
+# Menu language: english, german, french, spanish or italian, and japanese on the Japanese disc.
+# Unset keeps the disc's own language. The American disc ignores this.
 # language = german
 
 [game]

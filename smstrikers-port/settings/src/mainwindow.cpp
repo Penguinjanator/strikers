@@ -38,6 +38,7 @@
 #include <QScrollArea>
 #include <QSettings>
 #include <QSlider>
+#include <QStandardItemModel>
 #include <QStatusBar>
 #include <QTabWidget>
 #include <QTableWidget>
@@ -883,8 +884,7 @@ QWidget* MainWindow::buildGameTab()
 
     page->beginSection(tr("Options"));
 
-    // The combo's first entry writes nothing: the console's own default is English, and a file with
-    // no `language` line gets exactly that.
+    // The combo's first entry writes nothing, which leaves each disc its own language.
     m_language = addChoice(page, Schema::get(QStringLiteral("language")));
     m_languageState = SettingsPage::note(QString());
     page->addFieldNote(m_languageState);
@@ -1523,24 +1523,33 @@ void MainWindow::updateDataState()
     }
 }
 
-// Only Mario Smash Football (G4QP01) asks the console for a language, so the combo is greyed out
-// under any other disc rather than left looking like it works.
+// Greyed out under the American disc, which has one language; Japanese needs the Japanese disc's own menus.
 void MainWindow::updateLanguageState(const QString& gameId)
 {
     if (m_language == nullptr || m_languageState == nullptr)
         return;
 
     const bool european = gameId.startsWith(QStringLiteral("G4QP"));
+    const bool japanese = gameId.startsWith(QStringLiteral("G4QJ"));
     const bool known = !gameId.isEmpty();
-    m_language->setEnabled(!known || european);
+    m_language->setEnabled(!known || european || japanese);
+
+    if (auto* model = qobject_cast<QStandardItemModel*>(m_language->model()))
+    {
+        const int i = m_language->findData(QStringLiteral("japanese"));
+        if (QStandardItem* item = i >= 0 ? model->item(i) : nullptr)
+            item->setEnabled(!known || japanese);
+    }
+
     if (!known)
-        m_languageState->setText(tr("Read by the European release only."));
+        m_languageState->setText(tr("Read by the European and Japanese releases."));
     else if (european)
         m_languageState->setText(tr("This copy is the European release, so this applies."));
+    else if (japanese)
+        m_languageState->setText(tr("This copy is the Japanese release, so this applies."));
     else
         m_languageState->setText(
-            tr("This copy is the %1 release, which has one language of its own.")
-                .arg(gameId.startsWith(QStringLiteral("G4QJ")) ? tr("Japanese") : tr("American")));
+            tr("This copy is the %1 release, which has one language of its own.").arg(tr("American")));
 }
 
 void MainWindow::setDirty(bool dirty)

@@ -200,16 +200,18 @@ QVector<Setting> makeGame()
     // and it has nothing to do with the language this window is written in.
     v.push_back(choice("language", "paths", Text::tr("Language"), "",
         Text::tr(
-        "Menu and commentary language. Only the European disc reads it; the "
-        "others take it from the disc id."),
+        "The language of menus and on-screen text. The American release is "
+        "English only, and Japanese needs the Japanese release."),
         QStringLiteral(
-        "The console's own language setting, which only a European disc reads."),
-        { QString(), QStringLiteral("german"), QStringLiteral("french"),
-          QStringLiteral("spanish"), QStringLiteral("italian") },
+        "Menu language: english, german, french, spanish or italian, and japanese on the Japanese disc. "
+        "Unset keeps the disc's own language. The American disc ignores this."),
+        { QString(), QStringLiteral("english"), QStringLiteral("german"),
+          QStringLiteral("french"), QStringLiteral("spanish"), QStringLiteral("italian"),
+          QStringLiteral("japanese") },
         // The languages the disc can be played in, named in the reader's language rather than each
         // in its own; this is a list to choose from.
-        { Text::tr("English"), Text::tr("German"), Text::tr("French"),
-          Text::tr("Spanish"), Text::tr("Italian") }));
+        { Text::tr("Disc default"), Text::tr("English"), Text::tr("German"), Text::tr("French"),
+          Text::tr("Spanish"), Text::tr("Italian"), Text::tr("Japanese") }));
 
     v.push_back(toggle("unlock_all", "game", Text::tr("Extras"), "0",
         Text::tr("Unlock every stadium, team and cup"),
