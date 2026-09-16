@@ -262,6 +262,37 @@ static void wait_until(u64 deadline)
         port_yield();
 }
 
+// Unless present waits for the vblank, the limiter sleeps at the top of the next frame so input is read after it.
+// A vblank wait would add it back in present and make step lengths alternate. STRIKERS_LIMITER_DEFER=1 or 0 overrides.
+static u64 s_deferredDeadline;
+
+static int limiter_defers(void)
+{
+    static int s_forced = -2;
+    if (s_forced == -2)
+    {
+        const char* e = getenv("STRIKERS_LIMITER_DEFER");
+        s_forced = (e == NULL || *e == '\0') ? -1 : (atoi(e) != 0);
+    }
+    if (s_forced >= 0)
+        return s_forced;
+    return !s_displayVsync;
+}
+
+void PortLimiterFlush(void)
+{
+    const u64 deadline = s_deferredDeadline;
+    if (deadline == 0)
+        return;
+    s_deferredDeadline = 0;
+    {
+        const u64 before = now_ns();
+        if (deadline > before)
+            wait_until(deadline);
+        PortBenchAddPreFrameSleep(now_ns() - before);
+    }
+}
+
 void VIWaitForRetrace(void)
 {
     // Wait for the next field boundary, then run the callbacks the console would have run from the
@@ -271,6 +302,16 @@ void VIWaitForRetrace(void)
     if (period != 0)
     {
         static u64 next_deadline;
+        if (s_deferredDeadline != 0)
+        {
+            // A second wait in one frame comes from a loop that expects to block.
+            const u64 pending = s_deferredDeadline;
+            const u64 before = now_ns();
+            s_deferredDeadline = 0;
+            if (pending > before)
+                wait_until(pending);
+            PortBenchAddSleep(now_ns() - before);
+        }
         u64 t = now_ns();
         if (next_deadline == 0)
         {
@@ -285,10 +326,17 @@ void VIWaitForRetrace(void)
 
         if (next_deadline > t)
         {
-            // Report what the wait *actually* cost, not what was asked for.
-            u64 before = now_ns();
-            wait_until(next_deadline);
-            PortBenchAddSleep(now_ns() - before);
+            if (limiter_defers())
+            {
+                s_deferredDeadline = next_deadline;
+            }
+            else
+            {
+                // Report what the wait *actually* cost, not what was asked for.
+                u64 before = now_ns();
+                wait_until(next_deadline);
+                PortBenchAddSleep(now_ns() - before);
+            }
         }
     }
 

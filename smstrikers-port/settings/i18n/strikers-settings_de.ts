@@ -864,9 +864,8 @@ Das Spiel verwendet jetzt diesen Ordner, das Abbild kann also verschoben oder ge
         <translation>Ein (am ruhigsten)</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="120"/>
         <source>Relaxed (tear-free, without dropping to half rate)</source>
-        <translation>Locker (ohne Tearing, ohne Abfall auf die halbe Rate)</translation>
+        <translation type="vanished">Locker (ohne Tearing, ohne Abfall auf die halbe Rate)</translation>
     </message>
     <message>
         <location filename="../src/schema.cpp" line="122"/>
@@ -1023,6 +1022,11 @@ Das Spiel verwendet jetzt diesen Ordner, das Abbild kann also verschoben oder ge
         <location filename="../src/schema.cpp" line="202"/>
         <source>The language of menus and on-screen text. The American release is English only, and Japanese needs the Japanese release.</source>
         <translation>Die Sprache der Menüs und Bildschirmtexte. Die amerikanische Fassung gibt es nur auf Englisch, und Japanisch braucht die japanische Fassung.</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="120"/>
+        <source>Relaxed (more responsive)</source>
+        <translation>Locker (reagiert schneller)</translation>
     </message>
     <message>
         <location filename="../src/schema.cpp" line="213"/>

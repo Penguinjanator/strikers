@@ -112,12 +112,12 @@ QVector<Setting> makeDisplay()
         "Synchronises each frame with your display's refresh, so the image "
         "cannot tear into two mismatched halves as the camera pans."),
         QStringLiteral(
-        "1 blocks on the vblank (Fifo). 0 selects Mailbox where the driver has it, which is still "
-        "tear-free but does not drop to half rate when a frame lands late, worth ~10 fps on a GPU "
-        "that is close to its limit."),
+        "1 waits for each refresh of your display and gives the steadiest picture. 0 makes the "
+        "controls more responsive and keeps the frame rate up when your graphics card struggles. "
+        "Where your system supports it, 0 still avoids tearing."),
         { QStringLiteral("1"), QStringLiteral("0") },
         { Text::tr("On (steadiest)"),
-          Text::tr("Relaxed (tear-free, without dropping to half rate)") }));
+          Text::tr("Relaxed (more responsive)") }));
 
     v.push_back(scalar("aspect", "display", Text::tr("Aspect ratio"), "",
         Text::tr(

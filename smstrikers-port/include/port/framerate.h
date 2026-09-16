@@ -24,6 +24,9 @@ void PortSetFrameLimit(double hz);
 
 void PortFrameLimitInfo(double* limitHz, double* displayHz, int* vsync, int* overridden);
 
+// Sleeps to the deadline VIWaitForRetrace deferred. Call it at the top of the frame ahead of the event pump.
+void PortLimiterFlush(void);
+
 #ifdef __cplusplus
 }
 #endif

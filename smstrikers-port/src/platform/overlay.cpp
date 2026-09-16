@@ -533,7 +533,7 @@ static void set_vsync(bool on)
     aurora_enable_vsync(on);
     double displayHz = 0.0;
     PortFrameLimitInfo(nullptr, &displayHz, nullptr, nullptr);
-    PortSetDisplayRefresh(displayHz, on ? 1 : 0);
+    PortSetDisplayRefresh(displayHz, aurora_present_waits_for_vblank() ? 1 : 0);
 }
 
 // The game's lockstep switch, with what it means said out loud: one 20 ms step per rendered frame

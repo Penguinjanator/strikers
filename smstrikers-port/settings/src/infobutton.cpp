@@ -212,8 +212,10 @@ void InfoButton::paintEvent(QPaintEvent*)
 
     // Palette colours only: the window's background is whatever the platform's light or dark
     // appearance says, and a hard-coded grey is legible in exactly one of them.
-    const QColor ink = m_hover || isDown() ? palette().color(QPalette::Highlight)
-                                           : palette().color(QPalette::Mid);
+    QColor ink = palette().color(QPalette::WindowText);
+    ink.setAlphaF(0.62f);
+    if (m_hover || isDown())
+        ink = palette().color(QPalette::Highlight);
 
     const qreal d = qMin(width(), height()) - 1.0;
     const QRectF circle((width() - d) / 2.0, (height() - d) / 2.0, d, d);

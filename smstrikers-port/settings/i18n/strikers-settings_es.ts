@@ -864,9 +864,8 @@ El juego usa ahora esa carpeta, así que la imagen se puede mover o borrar. El c
         <translation>Activada (la más estable)</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="120"/>
         <source>Relaxed (tear-free, without dropping to half rate)</source>
-        <translation>Flexible (sin cortes y sin bajar a la mitad)</translation>
+        <translation type="vanished">Flexible (sin cortes y sin bajar a la mitad)</translation>
     </message>
     <message>
         <location filename="../src/schema.cpp" line="122"/>
@@ -1023,6 +1022,11 @@ El juego usa ahora esa carpeta, así que la imagen se puede mover o borrar. El c
         <location filename="../src/schema.cpp" line="202"/>
         <source>The language of menus and on-screen text. The American release is English only, and Japanese needs the Japanese release.</source>
         <translation>El idioma de los menús y los textos en pantalla. La edición estadounidense solo está en inglés, y el japonés requiere la edición japonesa.</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="120"/>
+        <source>Relaxed (more responsive)</source>
+        <translation>Flexible (con mejor respuesta)</translation>
     </message>
     <message>
         <location filename="../src/schema.cpp" line="213"/>

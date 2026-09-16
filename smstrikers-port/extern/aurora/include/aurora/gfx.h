@@ -34,6 +34,8 @@ void aurora_get_pipeline_counts(uint32_t* queued, uint32_t* created);
 float aurora_get_fps();
 
 void aurora_enable_vsync(bool enabled);
+/* smstrikers-port: whether the selected present mode waits for the vblank; vsync off still gets Fifo on a surface without Mailbox or Immediate. */
+bool aurora_present_waits_for_vblank();
 
 #ifdef __cplusplus
 }

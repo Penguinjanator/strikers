@@ -866,9 +866,8 @@ Le jeu utilise désormais ce dossier ; l&apos;image peut donc être déplacée o
         <translation>Activée (la plus stable)</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="120"/>
         <source>Relaxed (tear-free, without dropping to half rate)</source>
-        <translation>Souple (sans déchirure, sans chuter à la moitié)</translation>
+        <translation type="vanished">Souple (sans déchirure, sans chuter à la moitié)</translation>
     </message>
     <message>
         <location filename="../src/schema.cpp" line="122"/>
@@ -1025,6 +1024,11 @@ Le jeu utilise désormais ce dossier ; l&apos;image peut donc être déplacée o
         <location filename="../src/schema.cpp" line="202"/>
         <source>The language of menus and on-screen text. The American release is English only, and Japanese needs the Japanese release.</source>
         <translation>La langue des menus et des textes à l&apos;écran. La version américaine n&apos;existe qu&apos;en anglais, et le japonais nécessite la version japonaise.</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="120"/>
+        <source>Relaxed (more responsive)</source>
+        <translation>Souple (plus réactif)</translation>
     </message>
     <message>
         <location filename="../src/schema.cpp" line="213"/>

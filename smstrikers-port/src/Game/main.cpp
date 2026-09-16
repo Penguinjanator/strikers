@@ -7,6 +7,7 @@
 
 #if defined(PORT_USE_AURORA)
 #include <aurora/aurora.h>
+#include <aurora/gfx.h>   // aurora_present_waits_for_vblank
 #include <dolphin/gx/GXAurora.h>   // AuroraSetViewportPolicy
 #include <dolphin/vi.h>                // VILockAspectRatio
 #include "port/aspect.h"
@@ -635,9 +636,8 @@ static void PortFollowDisplayRefresh()
         return;
     const SDL_DisplayMode* mode =
         SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(s_portWindow));
-    int vsync = 0;
-    PortFrameLimitInfo(NULL, NULL, &vsync, NULL);
-    PortSetDisplayRefresh(mode != NULL ? (double)mode->refresh_rate : 0.0, vsync);
+    PortSetDisplayRefresh(mode != NULL ? (double)mode->refresh_rate : 0.0,
+                          aurora_present_waits_for_vblank() ? 1 : 0);
 }
 
 static void PortPumpAuroraEvents()
@@ -777,8 +777,9 @@ int main(int argc, char* argv[])
             const SDL_DisplayMode* mode =
                 SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(info.window));
             // 0 for "unknown", refresh_rate is documented as 0.0f when the mode does not report one.
+            // PORT: the present mode and not cfg.vsync, which still gets Fifo on a surface without Mailbox or Immediate.
             PortSetDisplayRefresh(mode != NULL ? (double)mode->refresh_rate : 0.0,
-                                  cfg.vsync ? 1 : 0);
+                                  aurora_present_waits_for_vblank() ? 1 : 0);
             // PORT: kept for the event pump, which re-derives the rate when the display changes.
             s_portWindow = info.window;
         }
@@ -849,6 +850,9 @@ int main(int argc, char* argv[])
 
     while (s_portRunning && !PortQuitRequested())
     {
+        // PORT: the deferred limiter sleep goes before the event pump so the frame reads input after it.
+        PortLimiterFlush();
+        PortBenchInputPumped();
         PortPumpAuroraEvents();
         PortUpdateSyntheticInput(s_portFrame);
         PortDebugFrame();

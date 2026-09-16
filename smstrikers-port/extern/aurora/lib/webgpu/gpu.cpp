@@ -1194,3 +1194,8 @@ void aurora_enable_vsync(const bool enabled) {
       aurora::webgpu::select_present_mode(aurora::webgpu::g_surfaceCapabilities);
   aurora::window::push_custom_event(aurora::window::CustomEvent::RefreshSurface);
 }
+
+bool aurora_present_waits_for_vblank() {
+  const auto mode = aurora::webgpu::g_graphicsConfig.surfaceConfiguration.presentMode;
+  return mode == wgpu::PresentMode::Fifo || mode == wgpu::PresentMode::FifoRelaxed;
+}
