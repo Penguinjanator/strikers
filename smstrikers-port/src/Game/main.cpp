@@ -17,6 +17,7 @@
 #include "port/overlay.h"
 extern "C" void PortDebugFrame(void);   // PORT: defined in Game.cpp
 #include "port/launch.h"
+#include "port/shaders.h"   // PORT: the shader stage, held on the memory card screen
 #include <aurora/main.h>   // #define main aurora_main
 #include <aurora/event.h>
 #include <stdio.h>   // PORT: snprintf
@@ -833,6 +834,8 @@ int main(int argc, char* argv[])
     }
 
 #if defined(PORT_USE_AURORA)
+    PortShaderStageBegin();   // PORT: logs the pipeline queue the boot memory card screen waits for
+
     while (s_portRunning && !PortQuitRequested())
     {
         PortPumpAuroraEvents();

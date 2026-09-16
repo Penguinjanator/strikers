@@ -44,6 +44,10 @@
 # Graphics backend: auto, d3d12, vulkan, metal.
 # backend = vulkan
 
+# How many shaders compile at once, 0 to 16. 0 leaves it to the core count; 1 is what to try if the
+# graphics driver misbehaves at start.
+# shader_jobs = 0
+
 [audio]
 # Sound: music, effects, the stadium reverb and the movies' own tracks.
 # audio = 0

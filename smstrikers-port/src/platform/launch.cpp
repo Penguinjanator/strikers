@@ -239,6 +239,25 @@ extern "C" void PortAuroraConfigure(AuroraConfig* cfg)
     // Default 0, and that is a decision rather than an oversight.
     cfg->pauseOnFocusLost = EnvBool("STRIKERS_PAUSE_ON_FOCUS_LOST", 0) != 0;
 
+    // How many shaders compile at once; 0 or unset leaves it to the core count.
+    {
+        constexpr long kMaxShaderJobs = 16;
+        const char* v = getenv("STRIKERS_SHADER_JOBS");
+        cfg->pipelineJobs = 0;
+        if (v != NULL && *v != '\0')
+        {
+            char* end = NULL;
+            const long n = strtol(v, &end, 10);
+            while (end != NULL && (*end == ' ' || *end == '\t'))
+                end++;
+            if (end == v || end == NULL || *end != '\0' || n < 0 || n > kMaxShaderJobs)
+                fprintf(stderr, "[port] shader_jobs = %s is not a number from 0 to %ld; using the core count\n",
+                        v, kMaxShaderJobs);
+            else
+                cfg->pipelineJobs = (uint32_t)n;
+        }
+    }
+
     // Anisotropic filtering. This is the *ceiling*, and it is the half of the control the GX enum
     // cannot express: glxSend picks GX_ANISO_4, which Aurora's wgpu_aniso() resolves to exactly
     // this number (GX_ANISO_2 would resolve to half of it).
