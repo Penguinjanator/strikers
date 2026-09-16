@@ -13,6 +13,9 @@ extern "C" {
 // Whether this machine is a Steam Deck, from the vendor and product name its firmware reports.
 int PortIsSteamDeck(void);
 
+// Whether the game runs under gamescope, as it does in Steam's Game Mode.
+int PortUnderGamescope(void);
+
 #ifdef __cplusplus
 }
 #endif

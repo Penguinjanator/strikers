@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "dolphin/types.h"
@@ -12,6 +13,7 @@
 #include "port/determinism.h"
 #include "port/framerate.h"
 #include "port/morphwatch.h"
+#include "port/steamdeck.h"
 
 typedef void (*VIRetraceCallback)(u32 retraceCount);
 
@@ -86,11 +88,24 @@ static u64 frame_period_ns(void)
         }
         else if (s_displayHz > 0.0)
         {
-            const double hz = s_displayVsync
-                                  ? s_displayHz * PORT_VSYNC_HEADROOM
-                                  : s_displayHz;
+            // Under gamescope the acquire rarely blocks, so this limiter paces and runs at the panel rate.
+            const int underGamescope = PortUnderGamescope();
+            double hz = s_displayHz;
+            if (underGamescope)
+            {
+                // Xwayland reports a loose rate, 59.81 for a 59.999 Hz panel, and a limiter under it repeats frames.
+                const double rounded = (double)(long)(hz + 0.5);
+                if (hz - rounded < 0.5 && rounded - hz < 0.5)
+                    hz = rounded;
+            }
+            else if (s_displayVsync)
+            {
+                hz *= PORT_VSYNC_HEADROOM;
+            }
             s_period = (u64)(1000000000.0 / hz);
-            why = s_displayVsync ? "display, +5% for vsync" : "display";
+            why = !s_displayVsync ? "display"
+                  : underGamescope ? "display, exact: gamescope paces by this limiter"
+                                   : "display, +5% for vsync";
         }
         else
         {
@@ -214,6 +229,20 @@ int PortFixedSeed(unsigned int* out)
 
 static void wait_until(u64 deadline)
 {
+#if defined(__linux__)
+    // Tight timer slack makes one absolute sleep to just short of the deadline accurate on Linux.
+    static int s_slackSet;
+    if (!s_slackSet)
+    {
+        s_slackSet = 1;
+        port_tighten_timer_slack();
+    }
+    {
+        const u64 t = now_ns();
+        if (deadline > t + WAIT_SPIN_FLOOR_NS)
+            port_sleep_until_ns(deadline - WAIT_SPIN_FLOOR_NS);
+    }
+#else
     for (;;)
     {
         const u64 t = now_ns();
@@ -227,6 +256,7 @@ static void wait_until(u64 deadline)
             break;
         port_sleep_ns(req);
     }
+#endif
 
     while (now_ns() < deadline)
         port_yield();
@@ -242,8 +272,15 @@ void VIWaitForRetrace(void)
     {
         static u64 next_deadline;
         u64 t = now_ns();
-        if (next_deadline == 0 || t > next_deadline + period * 4)
-            next_deadline = t;                   // first call, or badly behind
+        if (next_deadline == 0)
+        {
+            next_deadline = t;                   // first call: no wait
+        }
+        else if (t > next_deadline + period)
+        {
+            // Behind by a period, as when vsync ends frames slower than the cap: land on `t` after the +=.
+            next_deadline = t - period;
+        }
         next_deadline += period;
 
         if (next_deadline > t)

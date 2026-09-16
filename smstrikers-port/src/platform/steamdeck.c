@@ -1,5 +1,6 @@
 #include "port/steamdeck.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #if defined(_WIN32)
@@ -69,4 +70,10 @@ int PortIsSteamDeck(void)
     }
 #endif
     return s_deck;
+}
+
+int PortUnderGamescope(void)
+{
+    const char* v = getenv("GAMESCOPE_WAYLAND_DISPLAY");
+    return v != NULL && *v != '\0';
 }

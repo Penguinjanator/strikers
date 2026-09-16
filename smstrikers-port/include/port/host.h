@@ -17,6 +17,12 @@ unsigned long long port_monotonic_ns(void);
 // frame rate outright.
 void port_sleep_ns(unsigned long long ns);
 
+// Sleep until a port_monotonic_ns() deadline: an absolute sleep on Linux, a relative one elsewhere.
+void port_sleep_until_ns(unsigned long long deadline_ns);
+
+// Cut the calling thread's Linux timer slack from its 50 us default; a no-op elsewhere.
+void port_tighten_timer_slack(void);
+
 // Give the rest of the time slice to any other thread and come straight back: the spin half of the
 // frame limiter's wait, since every host sleeps late by an amount that scales with the request.
 void port_yield(void);

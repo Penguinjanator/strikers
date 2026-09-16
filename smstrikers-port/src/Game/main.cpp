@@ -11,6 +11,7 @@
 #include <dolphin/vi.h>                // VILockAspectRatio
 #include "port/aspect.h"
 #include "port/framerate.h"
+#include "port/host.h"   // port_monotonic_ns
 #if defined(PORT_USE_AURORA)
 #include <SDL3/SDL_video.h>
 #endif
@@ -852,11 +853,15 @@ int main(int argc, char* argv[])
         PortUpdateSyntheticInput(s_portFrame);
         PortDebugFrame();
 
+        // PORT: timed, since the swapchain acquire blocks inside aurora_begin_frame under vsync.
+        const unsigned long long acquireStart = port_monotonic_ns();
         if (!aurora_begin_frame())
             continue;              // minimised or surface lost; nothing to draw
+        const unsigned long long acquireNs = port_monotonic_ns() - acquireStart;
 
         PortPromptsFrame(); // PORT: button prompts
         PortBenchFrameBegin();
+        PortBenchAddAcquire(acquireNs);
 
         // Sample the pad before the tasks that read it. main() registers VBlankPadUpdate through PADSetSamplingCallback.
         PortInvokePadSamplingCallback();

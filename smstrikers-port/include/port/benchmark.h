@@ -36,6 +36,9 @@ void PortBenchFrameEnd(void);
 
 void PortBenchAddSleep(unsigned long long ns);
 
+// Time blocked in aurora_begin_frame on the swapchain acquire; counted in the frame total, not busy.
+void PortBenchAddAcquire(unsigned long long ns);
+
 void PortBenchReport(void);
 
 // The demo path picks its stadium at random, so two runs may measure different content; the build

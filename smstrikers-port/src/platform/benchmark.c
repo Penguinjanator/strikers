@@ -11,6 +11,10 @@ unsigned long long PortFramePeriodNs(void);
 __attribute__((weak)) void aurora_gpu_frame_time(unsigned long long*, unsigned long long*,
                                                  unsigned long long*, unsigned long long*);
 
+// AuroraStats as Aurora lays it out, weak for the same reason, to tie long frames to pipeline compiles.
+typedef struct { unsigned int queuedPipelines, createdPipelines, drawCallCount, mergedDrawCallCount, lastVertSize, lastUniformSize, lastIndexSize, lastStorageSize, lastTextureUploadSize; } PortAuroraStatsHead;
+__attribute__((weak)) const PortAuroraStatsHead* aurora_get_stats(void);
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,12 +33,17 @@ static double s_runSeconds;       // 0 = run until stopped
 static unsigned long long s_t0;   // start of the current frame
 static unsigned long long s_tTasks;
 static unsigned long long s_sleepThisFrame;
+static unsigned long long s_acquireThisFrame;   // blocked in aurora_begin_frame
 static unsigned long long s_runStart;
 static unsigned long long s_lastReport;
 
 static unsigned int s_busyUs[BENCH_CAP];
 static unsigned int s_presentUs[BENCH_CAP];
 static unsigned int s_frameUs[BENCH_CAP];
+static unsigned int s_acquireUs[BENCH_CAP];
+static unsigned int s_pipelinesCreated[BENCH_CAP];
+static unsigned int s_lastCreated;
+static unsigned int s_draws[BENCH_CAP], s_texUploadBytes[BENCH_CAP], s_vertBytes[BENCH_CAP];
 static unsigned long long s_sleepUsTotal;
 static size_t s_count;
 static size_t s_dropped;
@@ -166,6 +175,12 @@ void PortBenchFrameBegin(void)
 {
     s_t0 = port_monotonic_ns();
     s_sleepThisFrame = 0;
+    s_acquireThisFrame = 0;
+}
+
+void PortBenchAddAcquire(unsigned long long ns)
+{
+    s_acquireThisFrame = ns;
 }
 
 void PortBenchAfterTasks(void)
@@ -248,7 +263,8 @@ void PortBenchFrameEnd(void)
     const unsigned long long end = port_monotonic_ns();
     const unsigned long long tasks = s_tTasks - s_t0;
     const unsigned long long present = end - s_tTasks;
-    const unsigned long long frame = end - s_t0;
+    // Includes the acquire wait before PortBenchFrameBegin.
+    const unsigned long long frame = (end - s_t0) + s_acquireThisFrame;
 
     // The frame limiter sleeps inside the tasks phase, so tasks time is not all work.
     unsigned long long busy = (tasks > s_sleepThisFrame) ? tasks - s_sleepThisFrame : 0;
@@ -297,6 +313,23 @@ void PortBenchFrameEnd(void)
         s_busyUs[s_count] = (unsigned int)(busy / 1000ull);
         s_presentUs[s_count] = (unsigned int)(present / 1000ull);
         s_frameUs[s_count] = (unsigned int)(frame / 1000ull);
+        s_acquireUs[s_count] = (unsigned int)(s_acquireThisFrame / 1000ull);
+        {
+            unsigned int created = 0;
+            if (aurora_get_stats != NULL)
+            {
+                const PortAuroraStatsHead* st = aurora_get_stats();
+                if (st != NULL)
+                {
+                    created = st->createdPipelines - s_lastCreated;
+                    s_lastCreated = st->createdPipelines;
+                    s_draws[s_count] = st->drawCallCount;
+                    s_texUploadBytes[s_count] = st->lastTextureUploadSize;
+                    s_vertBytes[s_count] = st->lastVertSize;
+                }
+            }
+            s_pipelinesCreated[s_count] = created;
+        }
         s_count++;
     }
     else
@@ -381,7 +414,9 @@ void PortBenchReport(void)
     double bMean, bP50, bP95, bP99, bMax;
     double pMean, pP50, pP95, pP99, pMax;
     double fMean, fP50, fP95, fP99, fMax;
+    double aMean, aP50, aP95, aP99, aMax;
 
+    stats(s_acquireUs, s_count, &aMean, &aP50, &aP95, &aP99, &aMax);
     stats(s_busyUs, s_count, &bMean, &bP50, &bP95, &bP99, &bMax);
     stats(s_presentUs, s_count, &pMean, &pP50, &pP95, &pP99, &pMax);
     stats(s_frameUs, s_count, &fMean, &fP50, &fP95, &fP99, &fMax);
@@ -405,11 +440,13 @@ void PortBenchReport(void)
         "                     mean     p50     p95     p99     max   (ms)\n"
         "  cpu busy        %7.3f %7.3f %7.3f %7.3f %7.3f\n"
         "  present/drain   %7.3f %7.3f %7.3f %7.3f %7.3f\n"
-        "  frame total     %7.3f %7.3f %7.3f %7.3f %7.3f\n"
+        "  acquire wait    %7.3f %7.3f %7.3f %7.3f %7.3f   (vsync, in begin_frame)\n"
+        "  frame total     %7.3f %7.3f %7.3f %7.3f %7.3f   (acquire+busy+sleep+present)\n"
         "  limiter sleep   %7.3f (idle)\n",
         s_count, wall, (double)s_count / (wall > 0.0 ? wall : 1.0), s_skipped,
         bMean, bP50, bP95, bP99, bMax,
         pMean, pP50, pP95, pP99, pMax,
+        aMean, aP50, aP95, aP99, aMax,
         fMean, fP50, fP95, fP99, fMax,
         sleepMean);
 
@@ -448,6 +485,21 @@ void PortBenchReport(void)
     // Where the worst frame was, as well as how bad.
     fprintf(stderr, "  worst frame     %7.3f at frame %lu\n",
             (double)s_worstUs / 1000.0, s_worstFrame);
+    // How many frames over 20 ms created a pipeline.
+    {
+        size_t i, longFrames = 0, longWithCompile = 0, compileFrames = 0, compiled = 0;
+        for (i = 0; i < s_count; i++)
+        {
+            if (s_pipelinesCreated[i] != 0) { compileFrames++; compiled += s_pipelinesCreated[i]; }
+            if (s_frameUs[i] > 20000)
+            {
+                longFrames++;
+                if (s_pipelinesCreated[i] != 0) longWithCompile++;
+            }
+        }
+        fprintf(stderr, "  pipelines       %zu created in %zu frames; of %zu frames over 20 ms, %zu created one\n",
+                compiled, compileFrames, longFrames, longWithCompile);
+    }
 
     if (s_dropped)
         fprintf(stderr, "  (%zu frames past the %d-frame sample cap not counted)\n",
@@ -479,9 +531,9 @@ static void write_csv(void)
     fprintf(f, "# build=%s", PORT_BUILD_TYPE);
     for (i = 0; i < s_labelCount; i++)
         fprintf(f, " %s=%s", s_labelKey[i], s_labelVal[i]);
-    fprintf(f, "\nframe,busy_us,present_us,frame_us\n");
+    fprintf(f, "\nframe,busy_us,present_us,frame_us,acquire_us,pipelines_created,draws,tex_upload_bytes,vert_bytes\n");
     for (i = 0; i < s_count; i++)
-        fprintf(f, "%zu,%u,%u,%u\n", i, s_busyUs[i], s_presentUs[i], s_frameUs[i]);
+        fprintf(f, "%zu,%u,%u,%u,%u,%u,%u,%u,%u\n", i, s_busyUs[i], s_presentUs[i], s_frameUs[i], s_acquireUs[i], s_pipelinesCreated[i], s_draws[i], s_texUploadBytes[i], s_vertBytes[i]);
     fclose(f);
     fprintf(stderr, "[bench] wrote %zu frames to %s\n", s_count, path);
 }

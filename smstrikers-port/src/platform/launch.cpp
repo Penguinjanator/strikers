@@ -65,13 +65,6 @@ int EnvBool(const char* name, int fallback)
     return 1;
 }
 
-// gamescope (Steam's Game Mode) sizes a window to the screen only when it asks for fullscreen, and scales any other window in with bars.
-bool UnderGamescope()
-{
-    const char* v = getenv("GAMESCOPE_WAYLAND_DISPLAY");
-    return v != NULL && *v != '\0';
-}
-
 bool ParseWindowSize(const char* v, unsigned* w, unsigned* h)
 {
     unsigned a = 0, b = 0;
@@ -181,7 +174,8 @@ extern "C" void PortAuroraConfigure(AuroraConfig* cfg)
     // through SDL, but a player who wants fullscreen wants it before the game has drawn anything,
     // and AuroraConfig is the only place that can be asked for.
     {
-        const bool gamescope = UnderGamescope();
+        // gamescope (Steam's Game Mode) sizes a window to the screen only when it asks for fullscreen, and scales any other window in with bars.
+        const bool gamescope = PortUnderGamescope() != 0;
         const char* v = getenv("STRIKERS_FULLSCREEN");
         cfg->startFullscreen = EnvBool("STRIKERS_FULLSCREEN", gamescope ? 1 : 0) != 0;
         if (gamescope && (v == NULL || *v == '\0'))
