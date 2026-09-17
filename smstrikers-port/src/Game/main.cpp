@@ -757,8 +757,7 @@ int main(int argc, char* argv[])
         // 1080p, 16:9: the logical framebuffer follows the display aspect, so a 16:9 window is filled rather than pillarboxed.
         cfg.windowWidth = 1920;
         cfg.windowHeight = 1080;
-        // Vsync. STRIKERS_VSYNC=0 selects Mailbox or Immediate instead, which is what lets the frame rate exceed the display's.
-        cfg.vsync = PortEnvU32("STRIKERS_VSYNC", 1) != 0;
+        cfg.vsync = PortEnvU32("STRIKERS_VSYNC", 0) != 0;
 
         // STRIKERS_MSAA sets the sample count and can only be chosen here. 1 by default: 4x costs an Intel N100 half its frame rate.
         cfg.msaa = (uint32_t)PortEnvU32("STRIKERS_MSAA", 1);
@@ -777,7 +776,7 @@ int main(int argc, char* argv[])
             const SDL_DisplayMode* mode =
                 SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(info.window));
             // 0 for "unknown", refresh_rate is documented as 0.0f when the mode does not report one.
-            // PORT: the present mode and not cfg.vsync, which still gets Fifo on a surface without Mailbox or Immediate.
+            // PORT: with vsync off, a surface that cannot skip the wait still waits for the display's refresh.
             PortSetDisplayRefresh(mode != NULL ? (double)mode->refresh_rate : 0.0,
                                   aurora_present_waits_for_vblank() ? 1 : 0);
             // PORT: kept for the event pump, which re-derives the rate when the display changes.

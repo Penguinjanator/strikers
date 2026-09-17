@@ -107,7 +107,7 @@ QVector<Setting> makeDisplay()
         QStringLiteral(
         "Frame rate cap in Hz, or 0 for unlimited.")));
 
-    v.push_back(choice("vsync", "display", Text::tr("Vertical sync"), "1",
+    v.push_back(choice("vsync", "display", Text::tr("Vertical sync"), "0",
         Text::tr(
         "Synchronises each frame with your display's refresh, so the image "
         "cannot tear into two mismatched halves as the camera pans."),

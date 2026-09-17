@@ -521,7 +521,7 @@ static bool vsync_state()
     {
         s_vsyncRead = true;
         const char* e = std::getenv("STRIKERS_VSYNC");
-        s_vsyncOn = !(e != nullptr && std::strcmp(e, "0") == 0);
+        s_vsyncOn = e != nullptr && *e != '\0' && std::strtoul(e, nullptr, 10) != 0;
     }
     return s_vsyncOn;
 }
