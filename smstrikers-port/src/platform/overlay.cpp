@@ -569,6 +569,10 @@ static int platform_command(const PortDebugCommand& c)
     case PDBG_SET_LOCKSTEP:
         set_lockstep(c.a != 0);
         return 1;
+    case PDBG_SET_DT_SNAP:
+        PortSetTaskClockSnap(c.a);
+        std::fprintf(stderr, "[limiter] task step snapping %s\n", c.a < 0 ? "follows STRIKERS_DT_SNAP" : c.a ? "on" : "off");
+        return 1;
     case PDBG_SET_WINDOW:
     {
         SDL_Window* w = main_window();
