@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include <SDL3/SDL_filesystem.h>
+#include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_properties.h>
 #include <SDL3/SDL_video.h>
@@ -169,6 +170,12 @@ extern "C" void PortAuroraConfigure(AuroraConfig* cfg)
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
 
     cfg->logCallback = AuroraLog;
+
+#if defined(__linux__)
+    // Dawn's EGL swap chain cannot present to a Wayland surface, so the GL backends go through XWayland.
+    if (cfg->desiredBackend == BACKEND_OPENGL || cfg->desiredBackend == BACKEND_OPENGLES)
+        SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "x11,wayland");
+#endif
 
     // Fullscreen at startup. F11 and the debug menu's System tab already toggle it at runtime
     // through SDL, but a player who wants fullscreen wants it before the game has drawn anything,

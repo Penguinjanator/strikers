@@ -41,7 +41,7 @@
 # demo match are worth leaving to run, and a benchmark that stopped would report nothing.
 # pause_on_focus_lost = 1
 
-# Graphics backend: auto, d3d12, vulkan, metal.
+# Graphics backend: auto, d3d12, vulkan, metal, opengl, opengles.
 # backend = vulkan
 
 # Shaders compiled at once, 0 to 16. 0 picks a count from the CPU cores. Set 1 if the graphics driver

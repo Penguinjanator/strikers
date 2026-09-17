@@ -132,11 +132,11 @@ QVector<Setting> makeDisplay()
         "right one for your system; change it only to work around a driver "
         "problem."),
         QStringLiteral(
-        "Graphics backend: auto, d3d12, vulkan, metal."),
+        "Graphics backend: auto, d3d12, vulkan, metal, opengl, opengles."),
         { QString(), QStringLiteral("d3d12"), QStringLiteral("vulkan"),
-          QStringLiteral("metal") },
+          QStringLiteral("metal"), QStringLiteral("opengl"), QStringLiteral("opengles") },
         { Text::tr("Automatic (recommended)"), Text::tr("Direct3D 12"),
-          Text::tr("Vulkan"), Text::tr("Metal") }));
+          Text::tr("Vulkan"), Text::tr("Metal"), Text::tr("OpenGL"), Text::tr("OpenGL ES") }));
 
     // Three states, because unset is fullscreen under Steam's Game Mode and 0 has to survive a save.
     v.push_back(choice("fullscreen", "display", Text::tr("Fullscreen"), "",

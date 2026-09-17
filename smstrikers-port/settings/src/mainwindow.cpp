@@ -92,6 +92,11 @@ const Setting& byKey(const QVector<Setting>& group, const char* k)
     return group.first();
 }
 
+bool isGlBackend(const QString& backend)
+{
+    return backend == QLatin1String("opengl") || backend == QLatin1String("opengles");
+}
+
 bool backendSupportedHere(const QString& backend)
 {
     if (backend.isEmpty())
@@ -101,7 +106,7 @@ bool backendSupportedHere(const QString& backend)
 #elif defined(Q_OS_MACOS)
     return backend == QLatin1String("metal");
 #else
-    return backend == QLatin1String("vulkan");
+    return backend == QLatin1String("vulkan") || isGlBackend(backend);
 #endif
 }
 
@@ -315,8 +320,10 @@ QComboBox* MainWindow::addChoice(SettingsPage* page, const Setting& s)
             {
                 // A value the file has and the combo does not: keep it rather than silently
                 // rewriting the user's file on the next save.
-                combo->addItem(MainWindow::tr("%1 (from the file)").arg(v), v);
-                i = combo->count() - 1;
+                i = combo->count();
+                while (i > 0 && isGlBackend(combo->itemData(i - 1).toString()))
+                    --i;
+                combo->insertItem(i, MainWindow::tr("%1 (from the file)").arg(v), v);
             }
             combo->setCurrentIndex(i);
         });
@@ -513,7 +520,11 @@ QWidget* MainWindow::buildDisplayTab()
         {
             const QString v = combo->itemData(i).toString();
             if (backendSupportedHere(v))
+            {
+                if (isGlBackend(v))
+                    combo->setItemText(i, tr("%1 (experimental)").arg(combo->itemText(i)));
                 continue;
+            }
             combo->setItemData(i, QVariant(0), Qt::UserRole - 1); // disable the item
             combo->setItemText(i, tr("%1 (not on this computer)").arg(combo->itemText(i)));
         }
