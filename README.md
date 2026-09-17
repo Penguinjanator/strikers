@@ -1,4 +1,4 @@
-# Strikers - A Native PC Port of Super Mario Strikers
+# Strikers - A native PC Port of Super Mario Strikers
 
 ![](media/strikers-gameplay.webp)
 
@@ -6,29 +6,23 @@
 
 Super Mario Strikers, rebuilt to run natively on Windows, Linux and macOS, with modern display support, configurable controls and a focus on performance across both powerful and low-power hardware.
 
-Built on the community decompilation by the excellent [Yannick Suter](https://github.com/yannicksuter), this project brings the original game to modern systems without changing how it plays or looks.
+Built on the community decompilation by the excellent [Yannick Suter](https://github.com/yannicksuter), this project brings the original game to modern systems while preserving the original gameplay and visual style.
 
 ## Features
 
 - High framerate support with configurable frame limits and VSync.
 - Widescreen and ultrawide support, with an expanded view of the pitch and corrected aspect ratios.
 - Higher-resolution rendering with adjustable internal resolution, 4x MSAA and up to 16x anisotropic filtering.
-- Modern graphics backends through Metal, Vulkan and Direct3D 12 via [Aurora](https://github.com/encounter/aurora). Vulkan is personally recommended on non-macOS systems.
+- Modern graphics backends through Metal, Vulkan and Direct3D 12 via [Aurora](https://github.com/encounter/aurora), with experimental OpenGL and OpenGL ES options on Linux. Vulkan is personally recommended on non-macOS systems. 
 - Controller support for Xbox, PlayStation, Switch Pro and compatible GameCube adapters through SDL.
 - Button prompts follow the active keyboard or controller and its bindings with selectable controller artwork.
 - Customisable controls, including keyboard and gamepad bindings, stick deadzones and rumble.
 - Faster loading compared with original hardware.
 - Direct disc-image loading from ISO/GCM, CISO and GCZ files, alongside extracted game folders.
-- US, European and Japanese game support in one executable, with region-aware saves and language handling.
+- US, European and Japanese game support in one executable, with region-aware saves and language handling. The Japanese disc supports Japanese, English, German, French, Spanish and Italian.
 - A dedicated settings app for configuring graphics, controls, audio and game-data location. Some basic localisation included to help.
 
 The obvious omission is online multiplayer. I have no desire to implement this as I don't have much experience with netcode. But I am sure someone will fork this and build it. It will be a fun challenge and I look forward to trying it myself.
-
-## Hardware and performance
-
-Developed on a modern MacBook Pro and tested on a variety of hardware I can get my hands on right now.
-
-Efficient performance is a priority, especially on smaller systems and handhelds. Steam Deck testing is still to come when I have access to mine again. The goal is a later release tuned for smooth gameplay, low power draw and longer battery life, but from testing with the hardware I have, I think it's 90% there.
 
 ## Notes
 
@@ -52,8 +46,6 @@ The main distinctions are:
 - Button prompt artwork: [Input Prompts](https://kenney.nl/assets/input-prompts) by Kenney, under CC0 1.0. 
 - Other third-party material and dependencies: these retain their applicable licences and notices. FFmpeg's terms depend on its build configuration.
 
-The project's current distribution policy is source-only. This is a project policy, not a claim that all reconstructed source is cleared for redistribution. Public availability does not itself grant permission to reuse or redistribute third-party material.
-
-You must supply game data from your own lawfully obtained copy. This project grants no rights to distribute game assets or disc images.
+The project distributes source code and compiled releases. These do not include game assets; you must supply game data from your own copy. Distribution does not grant permission to reuse or redistribute third-party material beyond its applicable licences and rights.
 
 This is an unofficial project, unaffiliated with and not endorsed by Nintendo or Next Level Games.
