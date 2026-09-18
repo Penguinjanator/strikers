@@ -11,6 +11,7 @@
 #include "port/host.h"
 #include "port/input.h"
 #include "port/launch.h"
+#include "port/texture_packs.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -1656,6 +1657,31 @@ void draw_system_tab()
         aurora_capture_frame(s_shotPath);
     help("Binary PPM of the game's render target, without this menu: Aurora captures "
          "before ImGui is composited. F12 writes numbered shots to STRIKERS_SHOT_DIR.");
+
+    ImGui::SeparatorText("texture packs");
+    {
+        int count = 0;
+        const char* folder = nullptr;
+        for (int i = 0; (folder = PortTexturesFolder(i, &count)) != nullptr; i++)
+            ImGui::Text("%5d  %s", count, folder);
+        if (PortTexturesFolder(0, nullptr) == nullptr)
+            ImGui::TextDisabled("no textures folder beside the game or in the user folder");
+        if (ImGui::SmallButton("reload textures"))
+            PortTexturesReload();
+        help("Looks for the folders again and rescans them, so added or edited files show "
+             "without a restart. Later folders in the list win.");
+        bool dump = PortTextureDumpEnabled() != 0;
+        if (ImGui::Checkbox("dump textures as they load", &dump))
+            PortTextureDumpEnable(dump ? 1 : 0);
+        if (dump)
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%u written", PortTextureDumpWritten());
+            ImGui::TextDisabled("%s", PortTextureDumpDir());
+        }
+        help("PNGs named for a texture pack, one folder per disc file. Only textures loaded "
+             "after this is ticked; STRIKERS_TEXTURE_DUMP=1 dumps from the start.");
+    }
 
     ImGui::SeparatorText("memory");
     {

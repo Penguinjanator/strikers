@@ -58,7 +58,7 @@ HelpPanel::HelpPanel(QWidget* parent)
         .arg(ink.red()).arg(ink.green()).arg(ink.blue()));
 
     auto* v = new QVBoxLayout(this);
-    v->setContentsMargins(12, 10, 12, 10);
+    v->setContentsMargins(16, 14, 16, 14);
     m_label = new QLabel(this);
     m_label->setTextFormat(Qt::RichText);
     m_label->setWordWrap(true);

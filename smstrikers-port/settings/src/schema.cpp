@@ -196,6 +196,28 @@ QVector<Setting> makeGame()
         QStringLiteral(
         "Where the game data is: either the `files` folder of an extracted disc, or a disc image.")));
 
+    // Unset or a folder means on and 0 means off; the switch keeps a folder the file names.
+    v.push_back(toggle("textures", "paths", Text::tr("Packs"), "",
+        Text::tr("Use texture packs"),
+        Text::tr("Replacement textures, including packs made for Dolphin."),
+        QStringLiteral(
+        "Texture packs load from textures/ beside the game and textures/ in the user folder. A folder named "
+        "here loads too and wins over both; 0 turns texture packs off.")));
+
+    v.push_back(scalar("texture_pack", "paths", Text::tr("Pack"), "",
+        Text::tr("Loads one pack when the textures folders hold several."),
+        QStringLiteral(
+        "One pack out of the textures folders, by its folder name. Unset loads every pack.")));
+
+    v.push_back(toggle("texture_dump", "paths", Text::tr("Pack making"), "0",
+        Text::tr("Save the game's textures as it loads them"),
+        Text::tr(
+        "Saves each texture as a picture. An edited copy that keeps its file "
+        "name and proportions replaces the original when put in a pack."),
+        QStringLiteral(
+        "Save each texture the game loads as a PNG named for a texture pack, in a folder per disc file. "
+        "1 saves to texture_dumps/ in the user folder; a path saves there.")));
+
     // This is the *game's* language, OSGetLanguage(), the setting a European GameCube kept in SRAM;
     // and it has nothing to do with the language this window is written in.
     v.push_back(choice("language", "paths", Text::tr("Language"), "",

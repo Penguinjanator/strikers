@@ -156,6 +156,9 @@ int selftest(const QString& path)
         { "overlay", "menu" },
         { "aspect", "5:4" },
         { "fullscreen", "0" },
+        { "textures", "packs/hd pitch" },
+        { "texture_pack", "hd pitch" },
+        { "texture_dump", "1" },
     };
 
     out() << "\nbefore:\n";

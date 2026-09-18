@@ -7,6 +7,7 @@
 #include "port/endian.h"
 #include "dolphin/os.h"
 #include "port/endian.h"
+#include "port/texture_packs.h"
 #include <stdlib.h>
 extern "C" int port_region_owns(const void*);  // src/platform/memalloc.cpp
 
@@ -368,6 +369,7 @@ PlatTexture* glx_MakeTexture(GXTextureHeader* header, uintptr_t texhandle)
     memcpy(pTex->m_SwizzledData, (const u8*)header + 0x20, textureSize);
 
     pTex->Prepare();
+    PortTextureDump(&pTex->m_TexObj, pTex->m_nPaletteEntries > 0 ? &pTex->m_TlutObj : NULL); // PORT: texture dumps
 
     return pTex;
 }
@@ -396,6 +398,7 @@ bool glplatLoadTextureBundle(const char* filename)
 
     glx_FreeMemory0();
     nlStrNCat<char>(fullFilename, "art/", filename, 0x100);
+    PortTextureDumpFrom(fullFilename); // PORT: texture dumps
 
     pFile = nlOpen(fullFilename);
     if (pFile == NULL)
@@ -448,6 +451,7 @@ bool glplatLoadTextureBundle(const char* filename)
         }
     }
 
+    PortTextureDumpFrom(NULL); // PORT: texture dumps
     nlFree(pData);
     nlFree(pDictionary);
     nlFree(pHeader);
@@ -500,6 +504,7 @@ bool glplatBeginLoadTextureBundle(const char* filename, void (*callback)(void*, 
 {
     char fullname[256];
     nlStrNCat<char>(fullname, "art/", filename, 0x100);
+    PortTextureDumpExpect(param, fullname); // PORT: texture dumps; the file arrives in `param` when it is set
     if (param == NULL)
     {
         if (nlLoadEntireFileAsync(fullname, callback, param, 0x20, AllocateEnd) == 0)
@@ -519,7 +524,11 @@ bool glplatBeginLoadTextureBundle(const char* filename, void (*callback)(void*, 
  */
 bool glplatEndLoadTextureBundle(void* data, unsigned long size)
 {
-    return glxParseTextureBundle((const char*)data);
+    // PORT: texture dumps
+    PortTextureDumpFromBuffer(data);
+    const bool parsed = glxParseTextureBundle((const char*)data);
+    PortTextureDumpFrom(NULL);
+    return parsed;
 }
 
 /**
@@ -868,10 +877,12 @@ void glplatTextureReplace(uintptr_t handle, const void* textureData, unsigned lo
     {
         GXInitTexObjCI(&pTex->m_TexObj, pTex->m_SwizzledData, pTex->m_Width, pTex->m_Height, (GXCITexFmt)glx_GetGXFormatTable()[pTex->m_Format], GX_CLAMP, GX_CLAMP, pTex->m_Levels > 1 ? 1 : 0, 0);
         GXInitTexObjLOD(&pTex->m_TexObj, (pTex->m_Levels == 1) ? GX_LINEAR : GX_LIN_MIP_NEAR, GX_LINEAR, 0.0f, (float)(pTex->m_MaxLevel - 1), 0.0f, GX_DISABLE, GX_DISABLE, GX_ANISO_1);
+        PortTextureDump(&pTex->m_TexObj, pTex->m_nPaletteEntries > 0 ? &pTex->m_TlutObj : NULL); // PORT: texture dumps
         return;
     }
 
     GXInitTexObj(&pTex->m_TexObj, pTex->m_SwizzledData, pTex->m_Width, pTex->m_Height, glx_GetGXFormatTable()[pTex->m_Format], GX_CLAMP, GX_CLAMP, pTex->m_Levels > 1 ? 1 : 0);
     GXInitTexObjLOD(&pTex->m_TexObj, (pTex->m_Levels == 1) ? GX_LINEAR : GX_LIN_MIP_LIN, GX_LINEAR, 0.0f, (float)(pTex->m_MaxLevel - 1), 0.0f, GX_DISABLE, GX_DISABLE, GX_ANISO_1);
+    PortTextureDump(&pTex->m_TexObj, NULL); // PORT: texture dumps
 }
 #pragma dont_inline off

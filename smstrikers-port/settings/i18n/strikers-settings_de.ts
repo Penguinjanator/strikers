@@ -130,81 +130,81 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/mainwindow.cpp" line="154"/>
-        <location filename="../src/mainwindow.cpp" line="1041"/>
-        <location filename="../src/mainwindow.cpp" line="1181"/>
-        <location filename="../src/mainwindow.cpp" line="1570"/>
+        <location filename="../src/mainwindow.cpp" line="187"/>
+        <location filename="../src/mainwindow.cpp" line="1173"/>
+        <location filename="../src/mainwindow.cpp" line="1314"/>
+        <location filename="../src/mainwindow.cpp" line="1771"/>
         <source>Super Mario Strikers Settings</source>
         <translation>Super Mario Strikers Einstellungen</translation>
     </message>
     <message>
-        <location filename="../src/main.cpp" line="317"/>
-        <location filename="../src/mainwindow.cpp" line="162"/>
+        <location filename="../src/main.cpp" line="320"/>
+        <location filename="../src/mainwindow.cpp" line="195"/>
         <source>Display</source>
         <translation>Anzeige</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="129"/>
+        <location filename="../src/mainwindow.cpp" line="162"/>
         <source>Mario Smash Football (Europe)</source>
         <translation>Mario Smash Football (Europa)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="131"/>
+        <location filename="../src/mainwindow.cpp" line="164"/>
         <source>Super Mario Strikers (Japan)</source>
         <translation>Super Mario Strikers (Japan)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="133"/>
+        <location filename="../src/mainwindow.cpp" line="166"/>
         <source>Super Mario Strikers (USA)</source>
         <translation>Super Mario Strikers (USA)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="163"/>
+        <location filename="../src/mainwindow.cpp" line="196"/>
         <source>Audio</source>
         <translation>Audio</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="164"/>
+        <location filename="../src/mainwindow.cpp" line="197"/>
         <source>Controls</source>
         <translation>Steuerung</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="165"/>
+        <location filename="../src/mainwindow.cpp" line="198"/>
         <source>Game</source>
         <translation>Spiel</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="171"/>
-        <location filename="../src/mainwindow.cpp" line="1228"/>
-        <location filename="../src/mainwindow.cpp" line="1235"/>
-        <location filename="../src/mainwindow.cpp" line="1243"/>
+        <location filename="../src/mainwindow.cpp" line="204"/>
+        <location filename="../src/mainwindow.cpp" line="1361"/>
+        <location filename="../src/mainwindow.cpp" line="1368"/>
+        <location filename="../src/mainwindow.cpp" line="1376"/>
         <source>Play</source>
         <translation>Spielen</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="173"/>
-        <location filename="../src/mainwindow.cpp" line="1198"/>
+        <location filename="../src/mainwindow.cpp" line="206"/>
+        <location filename="../src/mainwindow.cpp" line="1331"/>
         <source>Reset to Defaults</source>
         <translation>Standardwerte</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="174"/>
+        <location filename="../src/mainwindow.cpp" line="207"/>
         <source>Revert</source>
         <translation>Verwerfen</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="175"/>
+        <location filename="../src/mainwindow.cpp" line="208"/>
         <source>Save</source>
         <translation>Speichern</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="326"/>
-        <location filename="../src/mainwindow.cpp" line="771"/>
+        <location filename="../src/mainwindow.cpp" line="367"/>
+        <location filename="../src/mainwindow.cpp" line="812"/>
         <source>%1 (from the file)</source>
         <translation>%1 (aus der Datei)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="338"/>
+        <location filename="../src/mainwindow.cpp" line="379"/>
         <source>Resolution and quality</source>
         <translation>Auflösung und Qualität</translation>
     </message>
@@ -213,48 +213,48 @@
         <translation type="vanished">Wie mein Bildschirm</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="378"/>
+        <location filename="../src/mainwindow.cpp" line="419"/>
         <source>×</source>
         <translation>×</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="432"/>
+        <location filename="../src/mainwindow.cpp" line="473"/>
         <source>Frame pacing</source>
         <translation>Bildausgabe</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="438"/>
+        <location filename="../src/mainwindow.cpp" line="479"/>
         <source>Follow my display</source>
         <translation>Wie mein Bildschirm</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="444"/>
+        <location filename="../src/mainwindow.cpp" line="485"/>
         <source> Hz</source>
         <translation> Hz</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="445"/>
+        <location filename="../src/mainwindow.cpp" line="486"/>
         <source>No limit</source>
         <translation>Ohne Limit</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="467"/>
+        <location filename="../src/mainwindow.cpp" line="508"/>
         <source>Window</source>
         <translation>Fenster</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="474"/>
+        <location filename="../src/mainwindow.cpp" line="515"/>
         <source>Match the window</source>
         <translation>Wie das Fenster</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="372"/>
-        <location filename="../src/mainwindow.cpp" line="477"/>
+        <location filename="../src/mainwindow.cpp" line="413"/>
+        <location filename="../src/mainwindow.cpp" line="518"/>
         <source>Custom…</source>
         <translation>Eigenes…</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="345"/>
+        <location filename="../src/mainwindow.cpp" line="386"/>
         <source>Automatic (follows the window)</source>
         <translation>Automatisch (folgt dem Fenster)</translation>
     </message>
@@ -267,62 +267,62 @@
         <translation type="vanished">2160p (4K)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="388"/>
+        <location filename="../src/mainwindow.cpp" line="429"/>
         <source>Renders %1 rows.</source>
         <translation>Rendert %1 Zeilen.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="389"/>
+        <location filename="../src/mainwindow.cpp" line="430"/>
         <source>The height is exact. The width follows the aspect ratio.</source>
         <translation>Die Höhe ist exakt. Die Breite folgt dem Seitenverhältnis.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="344"/>
+        <location filename="../src/mainwindow.cpp" line="385"/>
         <source>Automatic (Steam Deck, 1280×800)</source>
         <translation>Automatisch (Steam Deck, 1280×800)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="479"/>
+        <location filename="../src/mainwindow.cpp" line="520"/>
         <source>width : height</source>
         <translation>Breite : Höhe</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="525"/>
+        <location filename="../src/mainwindow.cpp" line="566"/>
         <source>%1 (experimental)</source>
         <translation>%1 (experimentell)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="529"/>
+        <location filename="../src/mainwindow.cpp" line="570"/>
         <source>%1 (not on this computer)</source>
         <translation>%1 (auf diesem Rechner nicht verfügbar)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="550"/>
+        <location filename="../src/mainwindow.cpp" line="591"/>
         <source>Music, effects and commentary volumes are the game&apos;s own settings, and live in its options screen rather than here.</source>
         <translation>Die Lautstärken für Musik, Effekte und Kommentar sind Einstellungen des Spiels und stehen in dessen Optionsbildschirm, nicht hier.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="554"/>
+        <location filename="../src/mainwindow.cpp" line="595"/>
         <source>Troubleshooting</source>
         <translation>Fehlersuche</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="564"/>
+        <location filename="../src/mainwindow.cpp" line="605"/>
         <source>Keyboard</source>
         <translation>Tastatur</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="565"/>
+        <location filename="../src/mainwindow.cpp" line="606"/>
         <source>Controller</source>
         <translation>Controller</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="612"/>
+        <location filename="../src/mainwindow.cpp" line="653"/>
         <source>Click a binding and press the key you want. Escape cancels.</source>
         <translation>Auf eine Belegung klicken und die gewünschte Taste drücken. Esc bricht ab.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="613"/>
+        <location filename="../src/mainwindow.cpp" line="654"/>
         <source>Bindings are stored as SDL scancode names, which are physical key
 positions rather than letters. On a US or UK layout what you press is
 what is stored. On AZERTY or Dvorak the position and the letter differ,
@@ -341,34 +341,34 @@ Tasten ohne Namen, die Befehls- und die Menütaste, Medientasten und alles, was
 Ihr Layout nur mit einem Modifikator erzeugt, werden abgelehnt statt geraten.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="656"/>
+        <location filename="../src/mainwindow.cpp" line="697"/>
         <source>Click, then press the key for %1.</source>
         <translation>Klicken, dann die Taste für %1 drücken.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="659"/>
-        <location filename="../src/mainwindow.cpp" line="754"/>
+        <location filename="../src/mainwindow.cpp" line="700"/>
+        <location filename="../src/mainwindow.cpp" line="795"/>
         <source>%1, %2</source>
         <comment>controller group, then the button in it</comment>
         <translation>%1, %2</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="684"/>
+        <location filename="../src/mainwindow.cpp" line="725"/>
         <source>Reset Keyboard</source>
         <translation>Tastatur zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="708"/>
+        <location filename="../src/mainwindow.cpp" line="749"/>
         <source>Buttons</source>
         <translation>Tasten</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="713"/>
+        <location filename="../src/mainwindow.cpp" line="754"/>
         <source>Choose which button on your controller each GameCube button should come from.</source>
         <translation>Legen Sie fest, welche Taste Ihres Controllers für welche GameCube-Taste steht.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="715"/>
+        <location filename="../src/mainwindow.cpp" line="756"/>
         <source>The names are SDL&apos;s, and they are positions on SDL&apos;s idea of a
 controller rather than whatever your own controller prints on itself:
 `a` is the bottom face button on every pad, wherever its label sits.
@@ -385,67 +385,79 @@ Spiel mit eingeschalteter Pad-Sonde, um die tatsächlich geltenden Belegungen zu
 sehen; das ist zugleich die Antwort auf „Wie ist meine Steuerung belegt?“.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="778"/>
+        <location filename="../src/mainwindow.cpp" line="819"/>
         <source>Sticks and triggers</source>
         <translation>Sticks und Trigger</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="820"/>
+        <location filename="../src/mainwindow.cpp" line="861"/>
         <source>Reset Controller</source>
         <translation>Controller zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="846"/>
+        <location filename="../src/mainwindow.cpp" line="887"/>
         <source>Game files</source>
         <translation>Spieldateien</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="851"/>
+        <location filename="../src/mainwindow.cpp" line="892"/>
         <source>Found automatically</source>
         <translation>Automatisch gefunden</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="853"/>
+        <location filename="../src/mainwindow.cpp" line="894"/>
         <source>Disc Image…</source>
         <translation>Disc-Abbild…</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="854"/>
+        <location filename="../src/mainwindow.cpp" line="895"/>
         <source>Play straight from your disc image.</source>
         <translation>Direkt aus Ihrem Disc-Abbild spielen.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="855"/>
+        <location filename="../src/mainwindow.cpp" line="896"/>
         <source>Folder…</source>
         <translation>Ordner…</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="856"/>
+        <location filename="../src/mainwindow.cpp" line="897"/>
         <source>Use a folder of files already extracted from the disc.</source>
         <translation>Einen Ordner mit bereits von der Disc entpackten Dateien verwenden.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="881"/>
+        <location filename="../src/mainwindow.cpp" line="922"/>
         <source>Extract Files…</source>
         <translation>Dateien entpacken…</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="885"/>
+        <location filename="../src/mainwindow.cpp" line="926"/>
         <source>Optional. The game plays from the image as it is; extracting copies its files into a folder, so the image can be put away.</source>
         <translation>Optional. Das Spiel läuft direkt aus dem Abbild; das Entpacken kopiert seine Dateien in einen Ordner, damit das Abbild weggeräumt werden kann.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1476"/>
+        <location filename="../src/mainwindow.cpp" line="937"/>
+        <location filename="../src/mainwindow.cpp" line="1682"/>
+        <source>Texture packs</source>
+        <translation>Texturpakete</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="944"/>
+        <location filename="../src/mainwindow.cpp" line="1001"/>
+        <source>Open Folder</source>
+        <translation>Ordner öffnen</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1609"/>
         <source>✗ There is no game disc beside the game, and it cannot start without one. Choose your disc image.</source>
         <translation>✗ Neben dem Spiel liegt keine Spiel-Disc, und ohne sie startet es nicht. Wählen Sie Ihr Disc-Abbild.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1481"/>
+        <location filename="../src/mainwindow.cpp" line="1614"/>
         <source>The game will use %1, which is beside it.</source>
         <translation>Das Spiel verwendet %1, das neben ihm liegt.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1503"/>
+        <location filename="../src/mainwindow.cpp" line="1636"/>
         <source>✓ %1, from a disc image (%2).</source>
         <translation>✓ %1, aus einem Disc-Abbild (%2).</translation>
     </message>
@@ -454,7 +466,7 @@ sehen; das ist zugleich die Antwort auf „Wie ist meine Steuerung belegt?“.</
         <translation type="vanished">Auswählen…</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1274"/>
+        <location filename="../src/mainwindow.cpp" line="1407"/>
         <source>Choose the folder holding the game&apos;s files</source>
         <translation>Ordner mit den Spieldateien auswählen</translation>
     </message>
@@ -463,92 +475,92 @@ sehen; das ist zugleich die Antwort auf „Wie ist meine Steuerung belegt?“.</
         <translation type="vanished">Ordner</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="896"/>
+        <location filename="../src/mainwindow.cpp" line="1028"/>
         <source>Options</source>
         <translation>Optionen</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="920"/>
+        <location filename="../src/mainwindow.cpp" line="1052"/>
         <source>The menu opens as soon as the game starts. F1 opens and closes it while you play.</source>
         <translation>Das Menü öffnet sich direkt beim Spielstart. F1 öffnet und schließt es während des Spiels.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="949"/>
+        <location filename="../src/mainwindow.cpp" line="1081"/>
         <source>Advanced</source>
         <translation>Erweitert</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="967"/>
+        <location filename="../src/mainwindow.cpp" line="1099"/>
         <source>Everything else the file says, so editing it here loses nothing. A row that is switched off in the file starts empty; give it a value and saving turns it on, clear the value and saving comments it out again.</source>
         <translation>Alles Übrige, was in der Datei steht, damit das Bearbeiten hier nichts verliert. Eine in der Datei abgeschaltete Zeile beginnt leer; geben Sie ihr einen Wert, schaltet das Speichern sie ein, löschen Sie den Wert, kommentiert das Speichern sie wieder aus.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="973"/>
+        <location filename="../src/mainwindow.cpp" line="1105"/>
         <source>Setting</source>
         <translation>Einstellung</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="973"/>
+        <location filename="../src/mainwindow.cpp" line="1105"/>
         <source>Value</source>
         <translation>Wert</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="973"/>
+        <location filename="../src/mainwindow.cpp" line="1105"/>
         <source>State</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="992"/>
+        <location filename="../src/mainwindow.cpp" line="1124"/>
         <source>Add</source>
         <translation>Hinzufügen</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="993"/>
+        <location filename="../src/mainwindow.cpp" line="1125"/>
         <source>Remove</source>
         <translation>Entfernen</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="999"/>
+        <location filename="../src/mainwindow.cpp" line="1131"/>
         <source>new</source>
         <translation>neu</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1059"/>
+        <location filename="../src/mainwindow.cpp" line="1191"/>
         <source>%1 (new, from %2 when you save)</source>
         <translation>%1 (neu, wird beim Speichern aus %2 angelegt)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1062"/>
+        <location filename="../src/mainwindow.cpp" line="1194"/>
         <source>%1 (new, created when you save)</source>
         <translation>%1 (neu, wird beim Speichern angelegt)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1127"/>
+        <location filename="../src/mainwindow.cpp" line="1260"/>
         <source>on</source>
         <translation>ein</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1135"/>
+        <location filename="../src/mainwindow.cpp" line="1268"/>
         <source>off</source>
         <translation>aus</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1135"/>
+        <location filename="../src/mainwindow.cpp" line="1268"/>
         <source>off (suggests %1)</source>
         <translation>aus (schlägt %1 vor)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1182"/>
+        <location filename="../src/mainwindow.cpp" line="1315"/>
         <source>Could not save: %1</source>
         <translation>Speichern fehlgeschlagen: %1</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1186"/>
+        <location filename="../src/mainwindow.cpp" line="1319"/>
         <source>Saved to %1</source>
         <translation>Gespeichert in %1</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1199"/>
+        <location filename="../src/mainwindow.cpp" line="1332"/>
         <source>Put every setting in this window back to the way it came?
 
 Anything under Advanced is left alone: those are not this window&apos;s to reset. Nothing is written until you press Save.</source>
@@ -557,61 +569,61 @@ Anything under Advanced is left alone: those are not this window&apos;s to reset
 Alles unter „Erweitert“ bleibt unberührt: dafür ist dieses Fenster nicht zuständig. Geschrieben wird erst, wenn Sie auf Speichern drücken.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1218"/>
+        <location filename="../src/mainwindow.cpp" line="1351"/>
         <source>Save and start %1.</source>
         <translation>Speichern und %1 starten.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1236"/>
+        <location filename="../src/mainwindow.cpp" line="1369"/>
         <source>Could not save the settings first: %1</source>
         <translation>Die Einstellungen ließen sich vorher nicht speichern: %1</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1244"/>
+        <location filename="../src/mainwindow.cpp" line="1377"/>
         <source>Could not start %1.</source>
         <translation>%1 ließ sich nicht starten.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1257"/>
+        <location filename="../src/mainwindow.cpp" line="1390"/>
         <source>GameCube disc images (%1)</source>
         <translation>GameCube-Disc-Abbilder (%1)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1259"/>
+        <location filename="../src/mainwindow.cpp" line="1392"/>
         <source>ISO or GCM image, NKit included (*.iso *.gcm)</source>
         <translation>ISO- oder GCM-Abbild, auch NKit (*.iso *.gcm)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1260"/>
+        <location filename="../src/mainwindow.cpp" line="1393"/>
         <source>Compressed ISO (*.ciso)</source>
         <translation>Komprimiertes ISO (*.ciso)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1261"/>
+        <location filename="../src/mainwindow.cpp" line="1394"/>
         <source>Dolphin GCZ (*.gcz)</source>
         <translation>Dolphin-GCZ (*.gcz)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1262"/>
+        <location filename="../src/mainwindow.cpp" line="1395"/>
         <source>All files (*)</source>
         <translation>Alle Dateien (*)</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1265"/>
+        <location filename="../src/mainwindow.cpp" line="1398"/>
         <source>Choose your Super Mario Strikers disc image</source>
         <translation>Ihr Super Mario Strikers-Disc-Abbild auswählen</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1294"/>
-        <location filename="../src/mainwindow.cpp" line="1357"/>
-        <location filename="../src/mainwindow.cpp" line="1380"/>
-        <location filename="../src/mainwindow.cpp" line="1421"/>
-        <location filename="../src/mainwindow.cpp" line="1429"/>
+        <location filename="../src/mainwindow.cpp" line="1427"/>
+        <location filename="../src/mainwindow.cpp" line="1490"/>
+        <location filename="../src/mainwindow.cpp" line="1513"/>
+        <location filename="../src/mainwindow.cpp" line="1554"/>
+        <location filename="../src/mainwindow.cpp" line="1562"/>
         <source>Extract Files</source>
         <translation>Dateien entpacken</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1302"/>
+        <location filename="../src/mainwindow.cpp" line="1435"/>
         <source>This disc has already been extracted to:
 
 %1
@@ -624,17 +636,17 @@ Use that folder?</source>
 Diesen Ordner verwenden?</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1304"/>
+        <location filename="../src/mainwindow.cpp" line="1437"/>
         <source>Use It</source>
         <translation>Verwenden</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1310"/>
+        <location filename="../src/mainwindow.cpp" line="1443"/>
         <source>%1 already exists, and it is not an extraction of this disc. Extracting only ever makes a new folder, so choose another place.</source>
         <translation>%1 existiert bereits und ist keine entpackte Kopie dieser Disc. Beim Entpacken wird immer ein neuer Ordner angelegt, wählen Sie also einen anderen Ort.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1317"/>
+        <location filename="../src/mainwindow.cpp" line="1450"/>
         <source>Copy the game&apos;s files out of the disc image into this folder?
 
 %1
@@ -647,37 +659,37 @@ They take %2 MB. The image itself is not changed.</source>
 Sie belegen %2 MB. Das Abbild selbst wird nicht verändert.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1321"/>
+        <location filename="../src/mainwindow.cpp" line="1454"/>
         <source>Extract</source>
         <translation>Entpacken</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1325"/>
+        <location filename="../src/mainwindow.cpp" line="1458"/>
         <source>Choose Another Folder…</source>
         <translation>Anderen Ordner wählen…</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1341"/>
+        <location filename="../src/mainwindow.cpp" line="1474"/>
         <source>Choose where to put the game&apos;s files</source>
         <translation>Wählen Sie, wohin die Spieldateien sollen</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1379"/>
+        <location filename="../src/mainwindow.cpp" line="1512"/>
         <source>Extracting the game&apos;s files…</source>
         <translation>Spieldateien werden entpackt…</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1379"/>
+        <location filename="../src/mainwindow.cpp" line="1512"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1397"/>
+        <location filename="../src/mainwindow.cpp" line="1530"/>
         <source>Extracting the game&apos;s files… %1 of %2 MB</source>
         <translation>Spieldateien werden entpackt… %1 von %2 MB</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1422"/>
+        <location filename="../src/mainwindow.cpp" line="1555"/>
         <source>The game&apos;s files could not be extracted, and nothing was left behind.
 
 %1</source>
@@ -686,7 +698,7 @@ Sie belegen %2 MB. Das Abbild selbst wird nicht verändert.</translation>
 %1</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1430"/>
+        <location filename="../src/mainwindow.cpp" line="1563"/>
         <source>The game&apos;s files are in:
 
 %1
@@ -699,12 +711,42 @@ The game now uses that folder, so the image can be moved or deleted. The change 
 Das Spiel verwendet jetzt diesen Ordner, das Abbild kann also verschoben oder gelöscht werden. Die Änderung bleibt erhalten, wenn Sie speichern.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1457"/>
+        <location filename="../src/mainwindow.cpp" line="1590"/>
         <source>%1 is used by more than one control. The game takes the first one it reads, so the others will not work.</source>
         <translation>%1 ist mehrfach belegt. Das Spiel nimmt die erste Belegung, die es liest; die übrigen bleiben wirkungslos.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1556"/>
+        <location filename="../src/mainwindow.cpp" line="1683"/>
+        <source>Could not create %1.</source>
+        <translation>%1 ließ sich nicht anlegen.</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1701"/>
+        <source>%1: 1 texture</source>
+        <translation>%1: 1 Textur</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1702"/>
+        <source>%1: %2 textures</source>
+        <translation>%1: %2 Texturen</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1716"/>
+        <source>No packs yet. Each pack goes in a folder of its own in the textures folder.</source>
+        <translation>Noch keine Pakete. Jedes Paket kommt in einen eigenen Ordner im Texturordner.</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1727"/>
+        <source>All packs</source>
+        <translation>Alle Pakete</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1731"/>
+        <source>%1 (not found)</source>
+        <translation>%1 (nicht gefunden)</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1757"/>
         <source>Read by the European and Japanese releases.</source>
         <translation>Wird von der europäischen und der japanischen Fassung gelesen.</translation>
     </message>
@@ -713,27 +755,27 @@ Das Spiel verwendet jetzt diesen Ordner, das Abbild kann also verschoben oder ge
         <translation type="vanished">Das Spiel sucht neben sich selbst nach einem Ordner „files“.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1519"/>
+        <location filename="../src/mainwindow.cpp" line="1652"/>
         <source>✓ This is the right folder.</source>
         <translation>✓ Das ist der richtige Ordner.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1520"/>
+        <location filename="../src/mainwindow.cpp" line="1653"/>
         <source>✓ %1, from an extracted disc.</source>
         <translation>✓ %1, aus einer entpackten Disc.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1527"/>
+        <location filename="../src/mainwindow.cpp" line="1660"/>
         <source>✗ There is no such file or folder.</source>
         <translation>✗ Diese Datei oder diesen Ordner gibt es nicht.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1529"/>
+        <location filename="../src/mainwindow.cpp" line="1662"/>
         <source>✗ One level too high: the files folder inside this one is the one to choose.</source>
         <translation>✗ Eine Ebene zu hoch: Wählen Sie den Ordner files darin.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1532"/>
+        <location filename="../src/mainwindow.cpp" line="1665"/>
         <source>✗ No game files here. Look for the folder with common.ini in it.</source>
         <translation>✗ Hier liegen keine Spieldateien. Suchen Sie den Ordner mit common.ini.</translation>
     </message>
@@ -746,17 +788,17 @@ Das Spiel verwendet jetzt diesen Ordner, das Abbild kann also verschoben oder ge
         <translation type="vanished">Wird nur von der europäischen Fassung gelesen.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1558"/>
+        <location filename="../src/mainwindow.cpp" line="1759"/>
         <source>This copy is the European release, so this applies.</source>
         <translation>Diese Fassung ist die europäische, also greift die Einstellung.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1560"/>
+        <location filename="../src/mainwindow.cpp" line="1761"/>
         <source>This copy is the Japanese release, so this applies.</source>
         <translation>Diese Fassung ist die japanische, also greift die Einstellung.</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1563"/>
+        <location filename="../src/mainwindow.cpp" line="1764"/>
         <source>This copy is the %1 release, which has one language of its own.</source>
         <translation>Diese Fassung ist die %1, die nur eine eigene Sprache hat.</translation>
     </message>
@@ -765,12 +807,12 @@ Das Spiel verwendet jetzt diesen Ordner, das Abbild kann also verschoben oder ge
         <translation type="vanished">japanische</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1563"/>
+        <location filename="../src/mainwindow.cpp" line="1764"/>
         <source>American</source>
         <translation>amerikanische</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="1569"/>
+        <location filename="../src/mainwindow.cpp" line="1770"/>
         <source>Super Mario Strikers Settings (unsaved changes)</source>
         <translation>Super Mario Strikers Einstellungen (nicht gespeichert)</translation>
     </message>
@@ -1000,7 +1042,7 @@ Das Spiel verwendet jetzt diesen Ordner, das Abbild kann also verschoben oder ge
         <translation>Ihre eigene Kopie des Spiels: ein Disc-Abbild oder ein daraus entpackter Ordner. Leer lassen, um zu verwenden, was neben dem Spiel liegt.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="201"/>
+        <location filename="../src/schema.cpp" line="223"/>
         <source>Language</source>
         <translation>Sprache</translation>
     </message>
@@ -1009,22 +1051,22 @@ Das Spiel verwendet jetzt diesen Ordner, das Abbild kann also verschoben oder ge
         <translation type="vanished">Sprache der Menüs und Kommentare. Nur die europäische Disc liest sie; die anderen nehmen sie aus der Disc-Kennung.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="213"/>
+        <location filename="../src/schema.cpp" line="235"/>
         <source>English</source>
         <translation>Englisch</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="213"/>
+        <location filename="../src/schema.cpp" line="235"/>
         <source>German</source>
         <translation>Deutsch</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="213"/>
+        <location filename="../src/schema.cpp" line="235"/>
         <source>French</source>
         <translation>Französisch</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="202"/>
+        <location filename="../src/schema.cpp" line="224"/>
         <source>The language of menus and on-screen text. The American release is English only, and Japanese needs the Japanese release.</source>
         <translation>Die Sprache der Menüs und Bildschirmtexte. Die amerikanische Fassung gibt es nur auf Englisch, und Japanisch braucht die japanische Fassung.</translation>
     </message>
@@ -1044,221 +1086,261 @@ Das Spiel verwendet jetzt diesen Ordner, das Abbild kann also verschoben oder ge
         <translation>OpenGL ES</translation>
     </message>
     <message>
+        <location filename="../src/schema.cpp" line="200"/>
+        <source>Packs</source>
+        <translation>Pakete</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="201"/>
+        <source>Use texture packs</source>
+        <translation>Texturpakete verwenden</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="202"/>
+        <source>Replacement textures, including packs made for Dolphin.</source>
+        <translation>Ersatztexturen, auch Pakete für Dolphin.</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="207"/>
+        <source>Pack</source>
+        <translation>Paket</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="208"/>
+        <source>Loads one pack when the textures folders hold several.</source>
+        <translation>Lädt nur ein Paket, wenn die Texturordner mehrere enthalten.</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="212"/>
+        <source>Pack making</source>
+        <translation>Paketerstellung</translation>
+    </message>
+    <message>
         <location filename="../src/schema.cpp" line="213"/>
+        <source>Save the game&apos;s textures as it loads them</source>
+        <translation>Texturen des Spiels beim Laden speichern</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="214"/>
+        <source>Saves each texture as a picture. An edited copy that keeps its file name and proportions replaces the original when put in a pack.</source>
+        <translation>Speichert jede Textur als Bild. Eine bearbeitete Kopie, die Dateinamen und Seitenverhältnis behält, ersetzt in einem Paket das Original.</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="235"/>
         <source>Disc default</source>
         <translation>Standard der Disc</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="214"/>
+        <location filename="../src/schema.cpp" line="236"/>
         <source>Spanish</source>
         <translation>Spanisch</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="214"/>
+        <location filename="../src/schema.cpp" line="236"/>
         <source>Italian</source>
         <translation>Italienisch</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="214"/>
+        <location filename="../src/schema.cpp" line="236"/>
         <source>Japanese</source>
         <translation>Japanisch</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="216"/>
+        <location filename="../src/schema.cpp" line="238"/>
         <source>Extras</source>
         <translation>Extras</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="217"/>
+        <location filename="../src/schema.cpp" line="239"/>
         <source>Unlock every stadium, team and cup</source>
         <translation>Alle Stadien, Teams und Pokale freischalten</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="218"/>
+        <location filename="../src/schema.cpp" line="240"/>
         <source>Makes every stadium, team and cup mode available without earning them first.</source>
         <translation>Macht alle Stadien, Teams und Pokalmodi verfügbar, ohne sie erst erspielen zu müssen.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="227"/>
+        <location filename="../src/schema.cpp" line="249"/>
         <source>Debug mode</source>
         <translation>Debug-Modus</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="228"/>
+        <location filename="../src/schema.cpp" line="250"/>
         <source>Show the debug menu</source>
         <translation>Das Debug-Menü anzeigen</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="229"/>
+        <location filename="../src/schema.cpp" line="251"/>
         <source>The developer menu: frame timings, cheats, camera and render controls. F1 opens and closes it.</source>
         <translation>Das Entwicklermenü: Bildzeiten, Cheats, Kamera- und Render-Regler. F1 öffnet und schließt es.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="242"/>
-        <location filename="../src/schema.cpp" line="261"/>
+        <location filename="../src/schema.cpp" line="264"/>
+        <location filename="../src/schema.cpp" line="283"/>
         <source>Keyboard</source>
         <translation>Tastatur</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="243"/>
+        <location filename="../src/schema.cpp" line="265"/>
         <source>Play with the keyboard</source>
         <translation>Mit der Tastatur spielen</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="244"/>
+        <location filename="../src/schema.cpp" line="266"/>
         <source>Installs the keyboard as a controller. Turn it off to free the keys if you only play on a pad.</source>
         <translation>Richtet die Tastatur als Controller ein. Ausschalten gibt die Tasten frei, wenn Sie nur am Pad spielen.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="251"/>
+        <location filename="../src/schema.cpp" line="273"/>
         <source>Button prompts</source>
         <translation>Tastensymbole</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="252"/>
+        <location filename="../src/schema.cpp" line="274"/>
         <source>Show the controls bound on the active device, or choose a controller style.</source>
         <translation>Zeigt die Belegung des aktiven Geräts an, oder wählen Sie einen Controller-Stil.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="259"/>
+        <location filename="../src/schema.cpp" line="281"/>
         <source>Automatic</source>
         <translation>Automatisch</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="259"/>
+        <location filename="../src/schema.cpp" line="281"/>
         <source>GameCube</source>
         <translation>GameCube</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="259"/>
+        <location filename="../src/schema.cpp" line="281"/>
         <source>Xbox</source>
         <translation>Xbox</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="259"/>
+        <location filename="../src/schema.cpp" line="281"/>
         <source>PlayStation</source>
         <translation>PlayStation</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="260"/>
+        <location filename="../src/schema.cpp" line="282"/>
         <source>Nintendo</source>
         <translation>Nintendo</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="260"/>
+        <location filename="../src/schema.cpp" line="282"/>
         <source>Steam Deck</source>
         <translation>Steam Deck</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="260"/>
+        <location filename="../src/schema.cpp" line="282"/>
         <source>Generic</source>
         <translation>Allgemein</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="263"/>
+        <location filename="../src/schema.cpp" line="285"/>
         <source>Sticks</source>
         <translation>Sticks</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="264"/>
+        <location filename="../src/schema.cpp" line="286"/>
         <source>Swap the two sticks</source>
         <translation>Die beiden Sticks tauschen</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="265"/>
+        <location filename="../src/schema.cpp" line="287"/>
         <source>Move with the right stick and aim with the left.</source>
         <translation>Mit dem rechten Stick laufen und mit dem linken zielen.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="271"/>
+        <location filename="../src/schema.cpp" line="293"/>
         <source>Stick deadzone</source>
         <translation>Stick-Totzone</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="272"/>
+        <location filename="../src/schema.cpp" line="294"/>
         <source>How far a stick must travel before input registers. Raise it if a worn stick drifts at rest.</source>
         <translation>Wie weit ein Stick sich bewegen muss, bevor die Eingabe zählt. Erhöhen Sie sie, wenn ein ausgeleierter Stick in Ruhe driftet.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="279"/>
+        <location filename="../src/schema.cpp" line="301"/>
         <source>Trigger point</source>
         <translation>Auslösepunkt</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="280"/>
+        <location filename="../src/schema.cpp" line="302"/>
         <source>How far a trigger must travel to register as a press.</source>
         <translation>Wie weit ein Trigger gezogen sein muss, damit er als Druck zählt.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="287"/>
+        <location filename="../src/schema.cpp" line="309"/>
         <source>Rumble</source>
         <translation>Vibration</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="288"/>
+        <location filename="../src/schema.cpp" line="310"/>
         <source>Vibrate the controller</source>
         <translation>Den Controller vibrieren lassen</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="289"/>
+        <location filename="../src/schema.cpp" line="311"/>
         <source>Force feedback on tackles, saves and goals.</source>
         <translation>Force Feedback bei Tacklings, Paraden und Toren.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="295"/>
+        <location filename="../src/schema.cpp" line="317"/>
         <source>Rumble strength</source>
         <translation>Vibrationsstärke</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="296"/>
+        <location filename="../src/schema.cpp" line="318"/>
         <source>Force feedback intensity, from a faint buzz to the full motor.</source>
         <translation>Stärke des Force Feedback, vom leisen Brummen bis zum vollen Motor.</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="452"/>
+        <location filename="../src/schema.cpp" line="474"/>
         <source>Face buttons</source>
         <translation>Aktionstasten</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="454"/>
+        <location filename="../src/schema.cpp" line="476"/>
         <source>Shoulders and Start</source>
         <translation>Schultertasten und Start</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="456"/>
+        <location filename="../src/schema.cpp" line="478"/>
         <source>D-pad</source>
         <translation>Steuerkreuz</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="458"/>
+        <location filename="../src/schema.cpp" line="480"/>
         <source>Control stick</source>
         <translation>Control-Stick</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="460"/>
+        <location filename="../src/schema.cpp" line="482"/>
         <source>C-stick</source>
         <translation>C-Stick</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="467"/>
+        <location filename="../src/schema.cpp" line="489"/>
         <source>Up</source>
         <comment>d-pad or stick direction</comment>
         <translation>Oben</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="469"/>
+        <location filename="../src/schema.cpp" line="491"/>
         <source>Down</source>
         <comment>d-pad or stick direction</comment>
         <translation>Unten</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="471"/>
+        <location filename="../src/schema.cpp" line="493"/>
         <source>Left</source>
         <comment>d-pad or stick direction</comment>
         <translation>Links</translation>
     </message>
     <message>
-        <location filename="../src/schema.cpp" line="473"/>
+        <location filename="../src/schema.cpp" line="495"/>
         <source>Right</source>
         <comment>d-pad or stick direction</comment>
         <translation>Rechts</translation>

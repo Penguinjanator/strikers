@@ -17,6 +17,7 @@ extern "C" int PortPromptsSetFamily(const char*) { return 0; }
 #include "port/input.h"
 #include "port/overlay.h"
 #include "port/steamdeck.h"
+#include "port/texture_packs.h"
 #include "prompt_art.h"
 
 #include "NL/nlFont.h"
@@ -357,6 +358,7 @@ void textureHeader(unsigned char* blob)
 
 void paintLegends()
 {
+    PortTextureDumpSkip(1);
     for (int c = 0; c < kLegendCount; ++c)
     {
         if (!s_loaded[c])
@@ -382,6 +384,7 @@ void paintLegends()
             be16(blob + 1056 + i * 2, palette[i]);
         glTextureReplace(kLegends[c], blob, sizeof blob);
     }
+    PortTextureDumpSkip(0);
 }
 
 void update()

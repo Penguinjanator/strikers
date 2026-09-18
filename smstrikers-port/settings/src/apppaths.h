@@ -25,4 +25,7 @@ QString findGame(const QString& archiveRoot, QString* reason);
 
 QString findDataBesideGame(const QString& archiveRoot);
 
+// The game's user folder: SDL's preference path for "Super Mario Strikers", or user_dir from strikers.ini.
+QString userFolder(const QString& configured = QString());
+
 } // namespace AppPaths
