@@ -285,3 +285,5 @@ int port_setenv_default(const char* name, const char* value)
 }
 
 #endif
+
+int port_docked(void) { return -1; }

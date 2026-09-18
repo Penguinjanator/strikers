@@ -1,5 +1,6 @@
 // See include/port/launch.h for why these three settings live here rather than in main.cpp.
 
+#include "port/host.h"
 #include "port/launch.h"
 
 #if defined(PORT_USE_AURORA)
@@ -297,6 +298,15 @@ extern "C" void PortAuroraConfigure(AuroraConfig* cfg)
         }
     }
 
+#if defined(__SWITCH__)
+    // Set at startup when the .nro carries the shader seeds in its romfs.
+    {
+        const char* dir = getenv("STRIKERS_RESOURCES_DIR");
+        if (dir != NULL && *dir != '\0')
+            cfg->resourcesPath = dir;
+    }
+#endif
+
     BuildIcon();
     cfg->iconRGBA8 = g_icon;
     cfg->iconWidth = kIconSize;
@@ -403,6 +413,13 @@ void ApplyRenderRows()
             g_renderScalePinned ? ", chosen" : " following the window", (double)g_auroraScale);
 }
 
+#if defined(__SWITCH__)
+// Scale from STRIKERS_RES_SCALE or the window, used when no per-mode override applies.
+bool g_baseCaptured = false;
+bool g_basePinned = false;
+float g_baseScale = 1.0f;
+#endif
+
 } // namespace
 
 void PortFollowRenderScale(unsigned int windowHeight)
@@ -425,6 +442,29 @@ void PortFollowRenderScale(unsigned int windowHeight)
                     (unsigned)PORT_STEAM_DECK_ROWS);
         }
     }
+#if defined(__SWITCH__)
+    // Per-mode scales override STRIKERS_RES_SCALE, checked each frame to follow docking.
+    {
+        static float s_handheld = -1.0f;
+        static float s_docked = -1.0f;
+        if (s_handheld < 0.0f)
+        {
+            const char* h = getenv("STRIKERS_RES_SCALE_HANDHELD");
+            const char* d = getenv("STRIKERS_RES_SCALE_DOCKED");
+            s_handheld = (h != NULL && *h != '\0') ? (float)atof(h) : 0.0f;
+            s_docked = (d != NULL && *d != '\0') ? (float)atof(d) : 0.0f;
+        }
+        if (!g_baseCaptured)
+        {
+            g_baseCaptured = true;
+            g_basePinned = g_renderScalePinned;
+            g_baseScale = g_renderScale;
+        }
+        const float perMode = port_docked() == 1 ? s_docked : s_handheld;
+        g_renderScalePinned = perMode > 0.0f || g_basePinned;
+        g_renderScale = perMode > 0.0f ? perMode : g_baseScale;
+    }
+#endif
     if (!g_renderScalePinned)
     {
         if (windowHeight == 0)
@@ -444,6 +484,11 @@ void PortSetRenderScale(float scale)
     g_renderScaleChecked = true;
     g_renderScalePinned = true;
     g_renderScale = scale;
+#if defined(__SWITCH__)
+    g_baseCaptured = true;
+    g_basePinned = true;
+    g_baseScale = scale;
+#endif
     if (scale <= 0.0f)
         aurora_set_frame_buffer_scale(scale);
     ApplyRenderRows();

@@ -19,3 +19,11 @@ add_test(NAME tool_genstubs
          COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/../tools/test_genstubs.py")
 add_test(NAME tool_extract_disc
          COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/../tools/test_extract_disc.py")
+
+if(UNIX)
+    add_executable(switch_dvd_test switch_dvd_test.c)
+    target_include_directories(switch_dvd_test PRIVATE ../include)
+    add_test(NAME switch_dvd COMMAND switch_dvd_test)
+    add_test(NAME tool_switch_rebuild
+             COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/../tools/test_switch_rebuild.py")
+endif()
