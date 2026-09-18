@@ -54,6 +54,8 @@ extern wgpu::Instance g_instance;
 extern wgpu::AdapterInfo g_adapterInfo;
 extern bool g_hasCoreFeatures;
 extern bool g_bcTexturesSupported;
+// smstrikers-port: upload eligible CMPR textures as BC1 instead of RGBA8.
+extern bool g_cmprAsBc1;
 extern bool g_astcTexturesSupported;
 extern bool g_textureComponentSwizzleSupported;
 

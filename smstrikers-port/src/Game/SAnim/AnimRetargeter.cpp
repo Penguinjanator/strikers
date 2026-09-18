@@ -88,10 +88,19 @@ AnimRetargetList* AnimRetargetList::Initialize(nlChunk* chunkData)
 
     nlChunk* mapChunk;
     s32 i = 0;
+    const u8* treeEnd = (const u8*)chunkData + 8 + chunkData->m_Size;
 
     while (i < data->m_NumAnimRetargets)
     {
         mapChunk = (nlChunk*)((u8*)nextChunk + nextChunk->m_Size + 8);
+        // PORT: the payload's map count may exceed the number of chunks.
+        if ((const u8*)mapChunk + 8 > treeEnd || (const u8*)mapChunk + 8 + mapChunk->m_Size > treeEnd)
+        {
+            OSReport("Error: retarget list names %ld bone maps and holds %d\n",
+                     data->m_NumAnimRetargets, (int)i);
+            data->m_NumAnimRetargets = i;
+            break;
+        }
         nextChunk = mapChunk;
         signed short* nextMap = (signed short*)GetChunkData_ARL(mapChunk);
 

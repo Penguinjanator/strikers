@@ -31,6 +31,9 @@ void port_yield(void);
 void* port_aligned_alloc(size_t alignment, size_t size);
 void port_aligned_free(void* ptr);
 
+// Current operation mode: 1 docked, 0 handheld, -1 on other platforms.
+int port_docked(void);
+
 // Local time, into caller-provided storage. Returns 0 on success.
 int port_localtime(time_t when, struct tm* out);
 

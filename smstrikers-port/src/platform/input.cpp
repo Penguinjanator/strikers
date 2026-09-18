@@ -638,6 +638,13 @@ extern "C" int PortInputPadSetting(unsigned int pad)
         if (kPadButtons[i].pad != pad)
             continue;
         const char* v = input_cfg(kPadButtons[i].env);
+#if defined(__SWITCH__)
+        // Default GameCube X and Y to the Switch buttons labelled X and Y, which SDL calls y and x.
+        if (v == nullptr && pad == PAD_BUTTON_X)
+            v = "y";
+        else if (v == nullptr && pad == PAD_BUTTON_Y)
+            v = "x";
+#endif
         if (v == nullptr)
             return kPadNativeInvalid;
         const int native = parse_pad_button(v);

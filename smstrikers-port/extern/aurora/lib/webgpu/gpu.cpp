@@ -72,6 +72,7 @@ wgpu::AdapterInfo g_adapterInfo;
 static wgpu::SurfaceCapabilities g_surfaceCapabilities;
 bool g_hasCoreFeatures = false;
 bool g_bcTexturesSupported = false;
+bool g_cmprAsBc1 = false;
 bool g_astcTexturesSupported = false;
 bool g_textureComponentSwizzleSupported = false;
 static std::atomic_bool g_initialized = false;
@@ -957,6 +958,14 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
         }
       }
     }
+#ifdef __SWITCH__
+    // smstrikers-port: BC1 is 4 bits a pixel to decoded CMPR's 32 but blends in thirds where GX uses eighths.
+    {
+      const char* e = std::getenv("STRIKERS_CMPR_BC1");
+      g_cmprAsBc1 = g_bcTexturesSupported && (e == nullptr || *e != '0');
+    }
+#endif
+
     std::string featureList;
     for (auto featureName : requiredFeatures) {
       featureList += "\n  ";

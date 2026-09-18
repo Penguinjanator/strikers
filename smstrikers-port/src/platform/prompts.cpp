@@ -197,6 +197,10 @@ void initialize()
     selectDefault();
 
     std::vector<std::string> candidates;
+#if defined(__SWITCH__)
+    // Packed into the .nro's romfs.
+    candidates.push_back("romfs:/input-prompts");
+#endif
     char dir[1024];
     if (port_executable_dir(dir, sizeof dir) == 0)
     {
