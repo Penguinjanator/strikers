@@ -604,23 +604,26 @@ void update_fake_pad(unsigned long frame, unsigned long holdFrames)
 }
 
 // Which device is on each port, so a connect can be noticed without a callback Aurora does not
-// offer to C. -2 is "not looked at yet", so the first pass reports what is already there.
-s32 s_padIndex[PAD_CHANMAX] = { -2, -2, -2, -2 };
+// offer to C. By instance, since a pad replaced within one frame can take its predecessor's index.
+SDL_JoystickID s_padId[PAD_CHANMAX];
+bool s_padsLooked = false;
 
 void poll_controllers(bool report)
 {
     for (u32 p = 0; p < PAD_CHANMAX; p++)
     {
         const s32 idx = PADGetIndexForPort(p);
-        if (idx == s_padIndex[p])
+        SDL_Gamepad* pad = idx >= 0 ? PADGetSDLGamepadForIndex((u32)idx) : nullptr;
+        const SDL_JoystickID id = pad != nullptr ? SDL_GetGamepadID(pad) : 0;
+        if (s_padsLooked && id == s_padId[p])
             continue;
-        const bool firstLook = s_padIndex[p] == -2;
-        s_padIndex[p] = idx;
-        if (idx >= 0)
+        s_padId[p] = id;
+        if (id != 0)
             apply_gamepad(p, report);
-        else if (firstLook && report)
+        else if (!s_padsLooked && report)
             OSReport("[port] input: pad port %u: no controller\n", p);
     }
+    s_padsLooked = true;
 }
 
 }   // namespace

@@ -112,6 +112,13 @@ bool deckPad(int port)
     return SDL_GetGamepadProduct(pad) == kSteamVirtualProduct && PortIsSteamDeck() != 0;
 }
 
+// Held sideways, a lone Joy-Con's face buttons do not carry the letters SDL gives them.
+bool loneJoyCon(int port)
+{
+    const PADControllerType type = PADGetControllerType(port);
+    return type == PAD_TYPE_JOYCON_LEFT || type == PAD_TYPE_JOYCON_RIGHT;
+}
+
 Family padFamily(int port)
 {
     if (deckPad(port))
@@ -479,8 +486,9 @@ void update()
             if (family == Generic)
                 in.labels[i] = Unknown;
             else if (in.connected && (forced == Auto || padFamily(port) == family))
-                in.labels[i] =
-                    labelFor(SDL_GetGamepadButtonLabel(pad, static_cast<SDL_GamepadButton>(i)));
+                in.labels[i] = loneJoyCon(port) ? Unknown
+                                                : labelFor(SDL_GetGamepadButtonLabel(
+                                                      pad, static_cast<SDL_GamepadButton>(i)));
             else if (family != Gamecube && family != Generic)
                 in.labels[i] = labelFor(SDL_GetGamepadButtonLabelForType(
                     sdlType(family), static_cast<SDL_GamepadButton>(i)));

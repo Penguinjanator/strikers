@@ -9,6 +9,8 @@
 
 #include <switch.h>
 
+#include <SDL3/SDL_gamepad.h>
+#include <dolphin/pad.h>
 #include <imgui.h>
 
 #include <cstdint>
@@ -84,20 +86,20 @@ int PortOverlayEnabled(void) { return 0; }
 namespace
 {
 
-// Minus, which the game does not use, shows and hides the overlay.
+// Minus, which the game does not use, shows and hides the overlay. On a lone left Joy-Con, Minus is
+// Start instead.
 bool toggle_pressed()
 {
-    static PadState pad;
-    static bool started = false;
+    static bool held = false;
 
-    if (!started)
-    {
-        padInitializeAny(&pad);
-        started = true;
-    }
-    padUpdate(&pad);
+    bool down = false;
+    for (u32 i = 0; i < PADCount(); i++)
+        if (SDL_Gamepad* pad = PADGetSDLGamepadForIndex(i))
+            down = down || SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_BACK);
 
-    return (padGetButtonsDown(&pad) & HidNpadButton_Minus) != 0;
+    const bool pressed = down && !held;
+    held = down;
+    return pressed;
 }
 
 const char* backend_name()
