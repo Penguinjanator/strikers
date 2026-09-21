@@ -406,6 +406,8 @@ target_compile_options(strikers_musyx PRIVATE
 add_library(strikers_ode      OBJECT ${ODE_SOURCES})
 add_library(strikers_game     OBJECT ${GAME_SOURCES})
 add_library(strikers_platform OBJECT ${PLATFORM_SOURCES})
+# The crash log stamps the build into every file it writes.
+target_include_directories(strikers_platform PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/version")
 
 foreach(_t strikers_ode strikers_game strikers_platform strikers_sdk
           strikers_operators)
