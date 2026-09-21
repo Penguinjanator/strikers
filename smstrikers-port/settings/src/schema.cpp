@@ -290,7 +290,8 @@ QVector<Setting> makeInputSwitches()
         "1 swaps the left and right sticks, so the right stick moves the player and\n"
         "the left one aims. The GameCube's own layout is the other way round.")));
 
-    v.push_back(scalar("pad_deadzone", "input", Text::tr("Stick deadzone"), "0.15",
+    // What the game uses unset (Aurora's 8000 and 31150 of 32767), since a default is saved commented out.
+    v.push_back(scalar("pad_deadzone", "input", Text::tr("Stick deadzone"), "0.24",
         Text::tr(
         "How far a stick must travel before input registers. Raise it if a "
         "worn stick drifts at rest."),
@@ -298,7 +299,7 @@ QVector<Setting> makeInputSwitches()
         "How far a stick has to move before the game sees it, as a fraction of full\n"
         "travel. Raise it on a worn pad that drifts; lower it for finer control.")));
 
-    v.push_back(scalar("pad_trigger_threshold", "input", Text::tr("Trigger point"), "0.5",
+    v.push_back(scalar("pad_trigger_threshold", "input", Text::tr("Trigger point"), "0.95",
         Text::tr(
         "How far a trigger must travel to register as a press."),
         QStringLiteral(

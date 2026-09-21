@@ -14,6 +14,7 @@
 #include "port/framerate.h"
 #include "port/host.h"   // port_monotonic_ns
 #if defined(PORT_USE_AURORA)
+#include <SDL3/SDL_events.h>
 #include <SDL3/SDL_video.h>
 #endif
 #include "port/overlay.h"
@@ -864,10 +865,25 @@ int main(int argc, char* argv[])
         if (!aurora_begin_frame())
             continue;              // minimised or surface lost; nothing to draw
         const unsigned long long acquireNs = port_monotonic_ns() - acquireStart;
-
-        PortPromptsFrame(); // PORT: button prompts
         PortBenchFrameBegin();
         PortBenchAddAcquire(acquireNs);
+
+        // PORT: SDL's pad state only changes in a pump and the acquire blocks under vsync, so pump again after it.
+        {
+            static int s_latePump = -1;
+            if (s_latePump < 0)
+            {
+                const char* e = getenv("STRIKERS_LATE_PUMP");
+                s_latePump = (e != NULL && *e == '0') ? 0 : 1;
+            }
+            if (s_latePump)
+            {
+                PortBenchInputPumped();
+                SDL_PumpEvents();
+            }
+        }
+
+        PortPromptsFrame(); // PORT: button prompts
 
         // Sample the pad before the tasks that read it. main() registers VBlankPadUpdate through PADSetSamplingCallback.
         PortInvokePadSamplingCallback();

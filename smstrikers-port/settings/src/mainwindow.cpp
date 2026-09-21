@@ -860,7 +860,8 @@ QWidget* MainWindow::buildGamepadPage()
 
     addSwitch(page, Schema::get(QStringLiteral("pad_swap_sticks")));
     addSlider(Schema::get(QStringLiteral("pad_deadzone")), 0.0, 0.9, 100, QString());
-    addSlider(Schema::get(QStringLiteral("pad_trigger_threshold")), 0.1, 0.9, 100, QString());
+    // The top is the game's default, 0.95; a lower one would clamp it on load and save a change.
+    addSlider(Schema::get(QStringLiteral("pad_trigger_threshold")), 0.1, 0.95, 100, QString());
     addSwitch(page, Schema::get(QStringLiteral("pad_rumble")));
     addSlider(Schema::get(QStringLiteral("pad_rumble_strength")), 0, 100, 1,
               QStringLiteral("%"));

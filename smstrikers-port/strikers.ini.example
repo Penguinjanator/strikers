@@ -109,8 +109,8 @@
 # pad_dpad_left = dpleft
 # pad_dpad_right = dpright
 # pad_swap_sticks = 0     ; 1 swaps the main stick and the C-stick
-# pad_deadzone = 0.15     ; 0.0 .. 0.9, fraction of stick radius
-# pad_trigger_threshold = 0.5
+# pad_deadzone = 0.24     ; 0.0 .. 0.9, fraction of stick radius
+# pad_trigger_threshold = 0.95
 # pad_rumble = 1          ; 0 turns rumble off on every port
 # pad_rumble_strength = 100   ; 0..100
 
