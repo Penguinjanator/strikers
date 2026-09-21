@@ -24,6 +24,7 @@ extern "C" void PortUpdateSyntheticInput(unsigned long frame) { (void)frame; }
 #include "dolphin/os.h"
 #include "dolphin/pad.h"
 #include "port/input.h"
+#include "port/overlay.h"
 
 namespace
 {
@@ -1053,7 +1054,10 @@ extern "C" void PortUpdateSyntheticInput(unsigned long frame)
     }
     held |= fake_key_state(frame, &lx, &ly, &rx, &ry, &tl, &tr);
 
-    if (held == 0 && lx == 0 && ly == 0 && rx == 0 && ry == 0 && tl == 0 && tr == 0)
+    // The debug menu detaches the keyboard, so a neutral virtual pad keeps port 0 connected.
+    const bool menuHasKeyboard = PortOverlayMenuOpen() && PortInputKeyboardEnabled();
+    if (held == 0 && lx == 0 && ly == 0 && rx == 0 && ry == 0 && tl == 0 && tr == 0 &&
+        !menuHasKeyboard)
     {
         PADClearVirtualStatus(0);
         return;

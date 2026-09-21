@@ -151,6 +151,11 @@
 # Every stadium, team and cup mode available.
 # unlock_all = 1
 
+[discord]
+# Your Discord status while the game runs: in the menus, or a match's mode, cup round, stadium,
+# captains, score and time left. Off by default; 1 turns it on while Discord's desktop app runs.
+# discord = 1
+
 [debug]
 # The debug overlay and menu. `menu` opens the menu straight away, `1` draws only the compact
 # heads-up form.

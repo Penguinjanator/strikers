@@ -243,6 +243,15 @@ QVector<Setting> makeGame()
         QStringLiteral(
         "Every stadium, team and cup mode available.")));
 
+    v.push_back(toggle("discord", "discord", Text::tr("Discord (Rich Presence)"), "0",
+        Text::tr("Show what you're playing on Discord"),
+        Text::tr(
+        "Your Discord profile shows the mode, the captains and the score "
+        "while you play. Discord has to be open on this computer."),
+        QStringLiteral(
+        "Your Discord status while the game runs: in the menus, or a match's mode, cup round, stadium, "
+        "captains, score and time left. Off by default; 1 turns it on while Discord's desktop app runs.")));
+
     // The default is off and the on value is `menu`, not `1`, because `1` is the compact heads-up
     // form and a player who turns "debug mode" on and sees a frame counter has not been given the
     // thing the switch names.

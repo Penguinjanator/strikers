@@ -1161,6 +1161,21 @@ El juego usa ahora esa carpeta, así que la imagen se puede mover o borrar. El c
         <translation>Deja disponibles todos los estadios, equipos y modos de copa sin tener que ganarlos antes.</translation>
     </message>
     <message>
+        <location filename="../src/schema.cpp" line="246"/>
+        <source>Discord (Rich Presence)</source>
+        <translation>Discord (Rich Presence)</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="247"/>
+        <source>Show what you&apos;re playing on Discord</source>
+        <translation>Mostrar en Discord a qué juegas</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="248"/>
+        <source>Your Discord profile shows the mode, the captains and the score while you play. Discord has to be open on this computer.</source>
+        <translation>Tu perfil de Discord muestra el modo, los capitanes y el marcador mientras juegas. Discord tiene que estar abierto en este ordenador.</translation>
+    </message>
+    <message>
         <location filename="../src/schema.cpp" line="249"/>
         <source>Debug mode</source>
         <translation>Modo de depuración</translation>

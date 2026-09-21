@@ -1163,6 +1163,21 @@ Le jeu utilise désormais ce dossier ; l&apos;image peut donc être déplacée o
         <translation>Rend disponibles tous les stades, toutes les équipes et tous les modes coupe sans avoir à les gagner.</translation>
     </message>
     <message>
+        <location filename="../src/schema.cpp" line="246"/>
+        <source>Discord (Rich Presence)</source>
+        <translation>Discord (Rich Presence)</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="247"/>
+        <source>Show what you&apos;re playing on Discord</source>
+        <translation>Afficher sur Discord ce à quoi vous jouez</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="248"/>
+        <source>Your Discord profile shows the mode, the captains and the score while you play. Discord has to be open on this computer.</source>
+        <translation>Votre profil Discord affiche le mode, les capitaines et le score pendant que vous jouez. Discord doit être ouvert sur cet ordinateur.</translation>
+    </message>
+    <message>
         <location filename="../src/schema.cpp" line="249"/>
         <source>Debug mode</source>
         <translation>Mode débogage</translation>

@@ -206,6 +206,11 @@ int main() { std::jthread t([](std::stop_token) {}); }
 
     add_subdirectory(extern/aurora EXCLUDE_FROM_ALL)
 
+    # The Switch has no Discord client.
+    if(NOT NX)
+        add_subdirectory(extern/borealis EXCLUDE_FROM_ALL)
+    endif()
+
     if(NX AND TARGET sqlite3)
         # The Horizon VFS has no shared memory, mmap, dynamic loading or temporary files.
         target_compile_definitions(sqlite3 PRIVATE
@@ -305,6 +310,20 @@ add_library(strikers_operators OBJECT
 set_target_properties(strikers_operators PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON)
+
+# borealis headers need C++20, so discord.cpp is a target of its own.
+list(REMOVE_ITEM PLATFORM_SOURCES
+     "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/discord.cpp")
+if(STRIKERS_AURORA AND NOT NX)
+    add_library(strikers_discord OBJECT
+         "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/discord.cpp")
+    set_target_properties(strikers_discord PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON)
+    target_include_directories(strikers_discord PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_link_libraries(strikers_discord PRIVATE borealis::discord)
+endif()
 
 # The debug overlay is ImGui, and ImGui arrives with Aurora and only with Aurora: with
 # STRIKERS_AURORA=OFF none of overlay.cpp's includes are on the path, so it leaves the source set
@@ -419,6 +438,9 @@ endforeach()
 add_custom_target(strikers_scan
     DEPENDS strikers_ode strikers_game strikers_platform strikers_sdk
             strikers_musyx strikers_operators)
+if(TARGET strikers_discord)
+    add_dependencies(strikers_scan strikers_discord)
+endif()
 
 # The link test. Aurora, MusyX and the THP decoder are not wired up, so tools/genstubs.py supplies
 # an abort-on-call definition for each symbol they would provide.
@@ -431,6 +453,10 @@ add_executable(strikers
     $<TARGET_OBJECTS:strikers_musyx>
 )
 target_link_libraries(strikers PRIVATE port_flags)
+if(TARGET strikers_discord)
+    target_sources(strikers PRIVATE $<TARGET_OBJECTS:strikers_discord>)
+    target_link_libraries(strikers PRIVATE borealis::discord)
+endif()
 
 # The executable's icon on Windows: the game's memory card icon, from assets/icon. The files are
 # checked in; the build only compiles the resource.

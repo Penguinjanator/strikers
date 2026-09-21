@@ -1161,6 +1161,21 @@ Das Spiel verwendet jetzt diesen Ordner, das Abbild kann also verschoben oder ge
         <translation>Macht alle Stadien, Teams und Pokalmodi verfügbar, ohne sie erst erspielen zu müssen.</translation>
     </message>
     <message>
+        <location filename="../src/schema.cpp" line="246"/>
+        <source>Discord (Rich Presence)</source>
+        <translation>Discord (Rich Presence)</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="247"/>
+        <source>Show what you&apos;re playing on Discord</source>
+        <translation>Auf Discord zeigen, was Sie spielen</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="248"/>
+        <source>Your Discord profile shows the mode, the captains and the score while you play. Discord has to be open on this computer.</source>
+        <translation>Ihr Discord-Profil zeigt beim Spielen den Modus, die Kapitäne und den Spielstand. Discord muss auf diesem Computer geöffnet sein.</translation>
+    </message>
+    <message>
         <location filename="../src/schema.cpp" line="249"/>
         <source>Debug mode</source>
         <translation>Debug-Modus</translation>

@@ -20,6 +20,7 @@
 #include "port/overlay.h"
 extern "C" void PortDebugFrame(void);   // PORT: defined in Game.cpp
 #include "port/launch.h"
+#include "port/discord.h"
 #include "port/shaders.h"   // PORT: the shader stage, held on the memory card screen
 #include <aurora/main.h>   // #define main aurora_main
 #include <aurora/event.h>
@@ -47,6 +48,7 @@ extern "C" void PortDebugFrame(void);   // PORT: defined in Game.cpp
 #include "NL/nlLocalization.h"
 #include "NL/nlString.h"
 #include "NL/platpad.h"
+#include "Game/Game.h"
 #include "Game/ProfileTask.h"
 #include "Game/Sys/FloatingPointExceptions.h"
 #include "Game/Sys/CallStackDumper.h"
@@ -821,6 +823,8 @@ int main(int argc, char* argv[])
 
         // Aurora's PAD reads SDL gamepads and reports PAD_ERR_NO_CONTROLLER when there is neither a gamepad nor a keyboard binding.
         PortInstallKeyboardBindings();
+
+        PortDiscordInit();
     }
 #else
     (void)argc;
@@ -859,6 +863,8 @@ int main(int argc, char* argv[])
         PortPumpAuroraEvents();
         PortUpdateSyntheticInput(s_portFrame);
         PortDebugFrame();
+        // PORT: ReturnToFE leaves the pause flag set, so it is a pause only while a match exists.
+        PortDiscordUpdate(FrontEnd::m_bInPauseMenuState && g_pGame != NULL ? 1 : 0);
 
         // PORT: timed, since the swapchain acquire blocks inside aurora_begin_frame under vsync.
         const unsigned long long acquireStart = port_monotonic_ns();
@@ -935,6 +941,7 @@ int main(int argc, char* argv[])
                 s_portRunning = false;
         }
     }
+    PortDiscordShutdown();
     PortBenchReport();
     aurora_shutdown();
     return 0;
