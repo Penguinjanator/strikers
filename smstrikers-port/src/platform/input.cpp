@@ -507,11 +507,6 @@ void apply_gamepad(u32 port, bool report)
     {
         const char* on = input_cfg("STRIKERS_PAD_RUMBLE");
         const char* strength = input_cfg("STRIKERS_PAD_RUMBLE_STRENGTH");
-#if defined(__SWITCH__)
-        // Aurora's default of half strength is harsh on HD rumble.
-        if (strength == nullptr)
-            strength = "5";
-#endif
         if (on != nullptr && cfg_off(on))
         {
             PADSetRumbleIntensity(port, 0, 0);
