@@ -3,6 +3,7 @@
 #include "port/switch/rumble.h"
 
 #include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_joystick.h>
 #include <dolphin/pad.h>
 
 #include <chrono>
@@ -107,6 +108,7 @@ struct Voice
 struct Pad
 {
     SDL_Gamepad* gamepad;
+    SDL_JoystickID instance;
     float lowGain;
     float highGain;
     Voice voices[4];
@@ -144,14 +146,19 @@ bool sample(const Effect& fx, float ms, Key& out)
 
 float clamp01(float v) { return v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v; }
 
-void send(const Pad& pad, const Key& mix)
+bool send(const Pad& pad, const Key& mix)
 {
     HidVibrationValue value;
     value.amp_low = clamp01(mix.lowAmp * pad.lowGain);
     value.freq_low = mix.lowHz;
     value.amp_high = clamp01(mix.highAmp * pad.highGain);
     value.freq_high = mix.highHz;
-    SDL_SendGamepadEffect(pad.gamepad, &value, (int)sizeof value);
+    // A Joy-Con that changes mode comes back under the same handle with a new ID.
+    SDL_LockJoysticks();
+    const bool sent = SDL_GetGamepadID(pad.gamepad) == pad.instance &&
+                      SDL_SendGamepadEffect(pad.gamepad, &value, (int)sizeof value);
+    SDL_UnlockJoysticks();
+    return sent;
 }
 
 void run(void* arg)
@@ -196,8 +203,13 @@ void run(void* arg)
                 }
             }
 
-            if (active || pad.sounding)
-                send(pad, mix);
+            // Effects stop for a controller that has gone or been replaced.
+            if ((active || pad.sounding) && !send(pad, mix))
+            {
+                for (Voice& voice : pad.voices)
+                    voice.effect = nullptr;
+                active = false;
+            }
             pad.sounding = active;
             playing = playing || active;
         }
@@ -237,6 +249,7 @@ int PortSwitchRumblePlay(unsigned int pad, int preset)
     std::lock_guard<std::mutex> lock(s_player->mutex);
     Pad& state = s_player->pads[pad];
     state.gamepad = gamepad;
+    state.instance = SDL_GetGamepadID(gamepad);
     state.lowGain = (float)low / 32767.5f;
     state.highGain = (float)high / 32767.5f;
 
