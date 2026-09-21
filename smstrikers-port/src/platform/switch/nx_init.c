@@ -10,8 +10,10 @@
 
 #include <switch.h>
 
+#include "port/config.h"
 #include "port/host.h"
 #include "port/switch/clocks.h"
+#include "port/switch/memory.h"
 #include "port/switch/sqlite_vfs.h"
 
 static int s_nxlink = -1;
@@ -151,6 +153,45 @@ static void log_thread_start(void)
         s_logSyncRunning = R_SUCCEEDED(threadStart(&s_logSync));
 }
 
+// newlib's own, from its <malloc.h>, which the game tree's MSL shim shadows.
+struct mallinfo
+{
+    size_t arena, ordblks, smblks, hblks, hblkhd, usmblks, fsmblks, uordblks, fordblks, keepcost;
+};
+struct mallinfo mallinfo(void);
+
+// libnx maps nearly all of the process's memory as heap at startup; sbrk hands it to newlib.
+extern char* fake_heap_end;
+
+void PortSwitchHeapInfo(unsigned long long* inUse, unsigned long long* available)
+{
+    const struct mallinfo info = mallinfo();
+    *inUse = (unsigned long long)info.uordblks;
+    *available =
+        (unsigned long long)info.fordblks + (unsigned long long)(fake_heap_end - (char*)sbrk(0));
+}
+
+// Holding Capture saves the last 30 seconds where the host game allows it; recording takes 96 MiB.
+static void start_recording(void)
+{
+    const char* want = getenv("STRIKERS_VIDEO_CAPTURE");
+    if (want != NULL && *want != '\0' && atoi(want) == 0)
+        return;
+
+    bool supported = false;
+    Result rc = appletIsGamePlayRecordingSupported(&supported);
+    if (R_FAILED(rc) || !supported)
+    {
+        fprintf(stderr, "[capture] video recording unavailable: supported %d, rc 0x%x\n",
+                supported ? 1 : 0, (unsigned)rc);
+        return;
+    }
+
+    rc = appletInitializeGamePlayRecording();
+    fprintf(stderr, "[capture] video recording %s, rc 0x%x\n", R_SUCCEEDED(rc) ? "on" : "not started",
+            (unsigned)rc);
+}
+
 void userAppInit(void)
 {
     // Output goes to nxlink under `nxlink -s`, else nowhere until the `log` key opens a file.
@@ -199,6 +240,10 @@ void userAppInit(void)
             errorApplicationShow(&error);
         exit(1);
     }
+
+    // start_recording reads the ini, which is otherwise first loaded as the disc opens.
+    PortConfigLoad();
+    start_recording();
 
     // Stays on until the startup shaders are compiled.
     PortSwitchCpuBoost(1);

@@ -112,7 +112,7 @@ bool deckPad(int port)
     return SDL_GetGamepadProduct(pad) == kSteamVirtualProduct && PortIsSteamDeck() != 0;
 }
 
-// Held sideways, a lone Joy-Con's face buttons do not carry the letters SDL gives them.
+// Held sideways, a single Joy-Con's face buttons do not carry the letters SDL gives them.
 bool loneJoyCon(int port)
 {
     const PADControllerType type = PADGetControllerType(port);

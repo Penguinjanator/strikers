@@ -22,10 +22,14 @@
 #include "port/host.h"
 #include "port/shaders.h"
 #include "port/switch/clocks.h"
+#include "port/switch/memory.h"
 
 #include <aurora/aurora.h>
 
 extern bool g_bRunSimAndRenderInLockStep;
+
+class cGame;
+extern cGame* g_pGame;
 
 namespace
 {
@@ -86,8 +90,7 @@ int PortOverlayEnabled(void) { return 0; }
 namespace
 {
 
-// Minus, which the game does not use, shows and hides the overlay. On a lone left Joy-Con, Minus is
-// Start instead.
+// The game has no use for Minus, except as Start on a single left Joy-Con.
 bool toggle_pressed()
 {
     static bool held = false;
@@ -173,34 +176,66 @@ void update_cpu_boost()
     apply_cpu_boost();
 }
 
-// Mean and worst frame time over the last 64 intervals.
+// Mean and worst frame time, and Aurora's submit-to-done GPU time, over the last 64 frames.
 double s_intervals[64];
 unsigned s_intervalNext;
 double s_frameMean;
 double s_frameWorst;
+double s_gpuSamples[64];
+unsigned s_gpuNext;
+uint64_t s_gpuCount;
+double s_gpuMean;
+double s_gpuWorst;
+
+// A gap this long between frames is a standby or a HOME suspend.
+const unsigned long long kPauseNs = 1000000000ull;
+
+void window_stats(const double* samples, unsigned next, double* mean, double* worst)
+{
+    const unsigned count = next < 64 ? next : 64;
+    double total = 0.0;
+    *worst = 0.0;
+    for (unsigned i = 0; i < count; i++)
+    {
+        total += samples[i];
+        if (samples[i] > *worst)
+            *worst = samples[i];
+    }
+    *mean = count > 0 ? total / count : 0.0;
+}
 
 void sample_frame()
 {
     static unsigned long long last;
     const unsigned long long now = port_monotonic_ns();
-    if (last != 0)
+    if (last != 0 && now - last >= kPauseNs)
+    {
+        s_intervalNext = 0;
+        s_gpuNext = 0;
+    }
+    else if (last != 0)
     {
         s_intervals[s_intervalNext % 64] = (double)(now - last) / 1000000.0;
         s_intervalNext++;
     }
     last = now;
 
-    const unsigned count = s_intervalNext < 64 ? s_intervalNext : 64;
-    double total = 0.0;
-    double worst = 0.0;
-    for (unsigned i = 0; i < count; i++)
+    uint64_t gpuLast = 0;
+    uint64_t gpuCount = 0;
+    aurora_gpu_frame_time(&gpuLast, nullptr, nullptr, &gpuCount);
+    if (gpuCount != s_gpuCount)
     {
-        total += s_intervals[i];
-        if (s_intervals[i] > worst)
-            worst = s_intervals[i];
+        s_gpuCount = gpuCount;
+        // A frame submitted before a standby completes after it.
+        if (gpuLast < kPauseNs)
+        {
+            s_gpuSamples[s_gpuNext % 64] = (double)gpuLast / 1000000.0;
+            s_gpuNext++;
+        }
     }
-    s_frameMean = count > 0 ? total / count : 0.0;
-    s_frameWorst = worst;
+
+    window_stats(s_intervals, s_intervalNext, &s_frameMean, &s_frameWorst);
+    window_stats(s_gpuSamples, s_gpuNext, &s_gpuMean, &s_gpuWorst);
 }
 
 void draw_overlay()
@@ -208,10 +243,9 @@ void draw_overlay()
     const double mean = s_frameMean;
     const double worst = s_frameWorst;
 
-    u64 used = 0;
-    u64 available = 0;
-    svcGetInfo(&used, InfoType_UsedMemorySize, CUR_PROCESS_HANDLE, 0);
-    svcGetInfo(&available, InfoType_TotalMemorySize, CUR_PROCESS_HANDLE, 0);
+    unsigned long long heapInUse = 0;
+    unsigned long long heapFree = 0;
+    PortSwitchHeapInfo(&heapInUse, &heapFree);
 
     u32 battery = 0;
     psmGetBatteryChargePercentage(&battery);
@@ -232,14 +266,8 @@ void draw_overlay()
         ImGui::Text("CPU busy %.1f ms   present %.1f   sleep %.1f", live.busyMs, live.presentMs,
                     live.sleepMs);
 
-        uint64_t gpuLast = 0;
-        uint64_t gpuMean = 0;
-        uint64_t gpuMax = 0;
-        uint64_t gpuCount = 0;
-        aurora_gpu_frame_time(&gpuLast, &gpuMean, &gpuMax, &gpuCount);
-        if (gpuCount > 0)
-            ImGui::Text("GPU %.1f ms, worst %.1f", (double)gpuMean / 1000000.0,
-                        (double)gpuMax / 1000000.0);
+        if (s_gpuNext > 0)
+            ImGui::Text("GPU %.1f ms, worst %.1f", s_gpuMean, s_gpuWorst);
         else
             ImGui::TextUnformatted("GPU timing unavailable");
         ImGui::Separator();
@@ -248,8 +276,7 @@ void draw_overlay()
                     ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
         ImGui::Text("CPU %u MHz   GPU %u MHz   RAM %u MHz", clock_mhz(PcvModuleId_CpuBus),
                     clock_mhz(PcvModuleId_GPU), clock_mhz(PcvModuleId_EMC));
-        ImGui::Text("Process %llu of %llu MiB", (unsigned long long)(used >> 20),
-                    (unsigned long long)(available >> 20));
+        ImGui::Text("Heap %llu MiB in use, %llu MiB free", heapInUse >> 20, heapFree >> 20);
         ImGui::Text("Game arena %u MiB free, largest block %u MiB",
                     nlVirtualTotalFree() >> 20, nlVirtualLargestBlock() >> 20);
         ImGui::Text("Battery %u%%%s", battery,
@@ -265,7 +292,8 @@ void draw_overlay()
 
 void PortSwitchLoadingIndicator(int on)
 {
-    s_loadingIndicator = on != 0;
+    // Match transitions report loads that end within a frame; FastLoad's GPU drop stalls them.
+    s_loadingIndicator = on != 0 && g_pGame == nullptr;
     apply_cpu_boost();
 }
 
