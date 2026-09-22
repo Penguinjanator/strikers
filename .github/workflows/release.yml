@@ -194,13 +194,11 @@ jobs:
             -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE/smstrikers-port" \
             "${{ steps.mesa.outputs.image }}" sleep infinity
 
-      # The host nm cannot read AArch64 objects; llvm-nm can.
-      - name: Install host tools and portlibs
+      # The host nm cannot read AArch64 objects; llvm-nm can. The pinned image already has the Switch portlibs.
+      - name: Install host tools
         run: |
           docker exec build sh -c 'apt-get update && apt-get install -y --no-install-recommends \
             cmake ninja-build python3 git curl xz-utils zip make llvm'
-          docker exec build dkp-pacman -Sy --needed --noconfirm \
-            switch-dev switch-sdl2 switch-mesa switch-libdrm_nouveau switch-zlib switch-pkg-config
 
       - name: Fetch Dawn
         run: docker exec build ./tools/fetch-switch-deps.sh
