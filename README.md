@@ -2,6 +2,14 @@
 
 ![](media/strikers-gameplay.webp)
 
+**Download:**&nbsp;&nbsp;
+[![Download for Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge)](https://github.com/new-coke/strikers/releases/latest/download/strikers-windows-x86_64.zip)
+[![Download for macOS](https://img.shields.io/badge/macOS-6E6E73?style=for-the-badge)](https://github.com/new-coke/strikers/releases/latest/download/strikers-macos-arm64.tar.gz)
+[![Download for Linux x86-64](https://img.shields.io/badge/Linux_x86--64-FCC624?style=for-the-badge)](https://github.com/new-coke/strikers/releases/latest/download/strikers-linux-x86_64.tar.gz)
+[![Download for Linux arm64](https://img.shields.io/badge/Linux_arm64-FCC624?style=for-the-badge)](https://github.com/new-coke/strikers/releases/latest/download/strikers-linux-arm64.tar.gz)
+[![Download for Steam Deck](https://img.shields.io/badge/Steam_Deck-1A9FFF?style=for-the-badge)](https://github.com/new-coke/strikers/releases/latest/download/strikers-linux-x86_64.tar.gz)
+[![Download for Nintendo Switch](https://img.shields.io/badge/Nintendo_Switch-E60012?style=for-the-badge)](https://github.com/new-coke/strikers/releases/latest/download/strikers-switch.zip)
+
 *Requires game data from your own copy of Super Mario Strikers. No game assets are included.*
 
 Super Mario Strikers, rebuilt to run natively on Windows, Linux, macOS and Nintendo Switch, with modern display support, configurable controls and a focus on performance across both powerful and low-power hardware.
@@ -26,7 +34,7 @@ Built on the community decompilation by the excellent [Yannick Suter](https://gi
 
 ## Installation
 
-Download the archive for your platform from [Releases](https://github.com/new-coke/strikers/releases), then follow its page on the [wiki](https://github.com/new-coke/strikers/wiki):
+Download your platform's archive above or from [Releases](https://github.com/new-coke/strikers/releases), then follow its page on the [wiki](https://github.com/new-coke/strikers/wiki):
 
 - [Windows](https://github.com/new-coke/strikers/wiki/Windows)
 - [macOS](https://github.com/new-coke/strikers/wiki/macOS)
