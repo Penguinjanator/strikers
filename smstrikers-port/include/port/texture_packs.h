@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-// Registers textures/ beside the executable, textures/ in `userPath`, then STRIKERS_TEXTURES; later ones win.
+// Registers mods/textures/ in each mods root, then STRIKERS_TEXTURES; later ones win.
 void PortTexturesInit(const char* userPath);
 
 // Look for the folders again and rescan them.

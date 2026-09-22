@@ -18,6 +18,7 @@ extern "C" void PortTextureDump(const GXTexObj*, const GXTlutObj*) {}
 #else
 
 #include "port/host.h"
+#include "port/mods.h"
 #include "port/region.h"
 
 #include <aurora/replacement.h>
@@ -108,11 +109,12 @@ void FindFolders()
         return;
 
     std::vector<std::string> roots;
-    char exeDir[1024];
-    if (port_executable_dir(exeDir, sizeof exeDir) == 0)
-        roots.push_back(std::string(exeDir) + "/textures");
-    if (!g_userPath.empty())
-        roots.push_back(TrimSeparators(g_userPath) + "/textures");
+    for (int root = 0; root < PORT_MODS_ROOT_COUNT; root++)
+    {
+        char dir[1024];
+        if (PortModsFolder(root, g_userPath.c_str(), "textures", dir, sizeof dir))
+            roots.push_back(dir);
+    }
     if (named != NULL && *named != '\0')
         roots.push_back(TrimSeparators(named));
 
@@ -176,7 +178,7 @@ extern "C" void PortTexturesInit(const char* userPath)
     FindFolders();
     LoadFolders();
     if (g_folders.empty())
-        fprintf(stderr, "[port] textures: no pack folder; textures/ beside the game or in %s\n",
+        fprintf(stderr, "[port] textures: no pack folder; mods/textures/ beside the game or in %s\n",
                 g_userPath.c_str());
     else
         fprintf(stderr, "[port] textures: up to %lu MB of them loaded at once\n", cacheMb);

@@ -127,8 +127,8 @@
 # Unset keeps the disc's own language. The American disc ignores this.
 # language = german
 
-# Texture packs load from textures/ beside the game and textures/ in the user folder. A folder named
-# here loads too and wins over both; 0 turns texture packs off.
+# Texture packs load from mods/textures/ beside the game and mods/textures/ in the user folder. A
+# folder named here loads too and wins over both; 0 turns texture packs off.
 # textures = C:/games/strikers/packs/hd pitch
 
 # One pack out of the textures folders, by its folder name. Unset loads every pack.

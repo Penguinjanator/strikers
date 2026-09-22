@@ -119,6 +119,11 @@ QString AppPaths::userFolder(const QString& configured)
     return dir;
 }
 
+QString AppPaths::modsFolder(const QString& root, const QString& kind)
+{
+    return root + QStringLiteral("/mods/") + kind;
+}
+
 QString AppPaths::findDataBesideGame(const QString& archiveRoot)
 {
     const QDir root(archiveRoot);

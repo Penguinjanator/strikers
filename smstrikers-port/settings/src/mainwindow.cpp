@@ -951,7 +951,7 @@ QWidget* MainWindow::buildGameTab()
         m_texturesBox = new QCheckBox(s.check);
         auto* open = new QPushButton(tr("Open Folder"));
         connect(open, &QPushButton::clicked, this, [this] {
-            openFolder(userFolder() + QStringLiteral("/textures"));
+            openFolder(AppPaths::modsFolder(userFolder(), QStringLiteral("textures")));
         });
         page->addSetting(s.label, switchRow(m_texturesBox, infoFor(s), open, &packsLead));
         connect(m_texturesBox, &QCheckBox::toggled, this, [this] {
@@ -1706,8 +1706,8 @@ void MainWindow::updateTexturePacks()
     if (m_packList == nullptr)
         return;
 
-    QStringList roots = { userFolder() + QStringLiteral("/textures"),
-                          AppPaths::archiveRoot() + QStringLiteral("/textures") };
+    QStringList roots = { AppPaths::modsFolder(userFolder(), QStringLiteral("textures")),
+                          AppPaths::modsFolder(AppPaths::archiveRoot(), QStringLiteral("textures")) };
     if (!m_texturesFolder.isEmpty())
         roots << gamePath(m_texturesFolder);
 

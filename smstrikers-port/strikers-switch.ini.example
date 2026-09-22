@@ -27,7 +27,7 @@
 # Unset, the game uses the console's language if the disc has it. The American disc is English only.
 # language = german
 
-# Texture packs load from textures/ in this folder and from user/textures/. 0 turns them off.
+# Texture packs load from mods/textures/ here and from user/mods/textures/. 0 turns them off.
 # textures = 0
 
 # 1 writes strikers-log.txt in this folder. Attach it to a bug report.

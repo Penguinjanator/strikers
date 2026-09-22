@@ -201,7 +201,7 @@ QVector<Setting> makeGame()
         Text::tr("Use texture packs"),
         Text::tr("Replacement textures, including packs made for Dolphin."),
         QStringLiteral(
-        "Texture packs load from textures/ beside the game and textures/ in the user folder. A folder named "
+        "Texture packs load from mods/textures/ beside the game and mods/textures/ in the user folder. A folder named "
         "here loads too and wins over both; 0 turns texture packs off.")));
 
     v.push_back(scalar("texture_pack", "paths", Text::tr("Pack"), "",
