@@ -39,7 +39,7 @@ enum PortLanguage
     PORT_LANGUAGE_JAPANESE = 5,
 };
 
-// STRIKERS_LANGUAGE, which the European and Japanese discs read; unset or unrecognised is PORT_LANGUAGE_UNSET.
+// STRIKERS_LANGUAGE, else the console's language on Switch if the disc has it, else unset.
 int port_language(void);
 
 #ifdef __cplusplus

@@ -1,6 +1,7 @@
 // Host services on Horizon through newlib and libnx.
 
 #include "port/host.h"
+#include "port/region.h"
 
 #include <switch.h>
 
@@ -126,4 +127,39 @@ int port_setenv_default(const char* name, const char* value)
 int port_docked(void)
 {
     return appletGetOperationMode() == AppletOperationMode_Console ? 1 : 0;
+}
+
+int PortSwitchLanguage(void)
+{
+    static int s_checked;
+    static int s_language = PORT_LANGUAGE_UNSET;
+    u64 code;
+    SetLanguage language;
+
+    if (s_checked)
+        return s_language;
+    s_checked = 1;
+    if (port_region() == PORT_REGION_USA || R_FAILED(setInitialize()))
+        return s_language;
+    if (R_SUCCEEDED(setGetSystemLanguage(&code)) && R_SUCCEEDED(setMakeLanguage(code, &language)))
+    {
+        switch (language)
+        {
+        case SetLanguage_ENUS:
+        case SetLanguage_ENGB:  s_language = PORT_LANGUAGE_ENGLISH; break;
+        case SetLanguage_DE:    s_language = PORT_LANGUAGE_GERMAN; break;
+        case SetLanguage_FR:
+        case SetLanguage_FRCA:  s_language = PORT_LANGUAGE_FRENCH; break;
+        case SetLanguage_ES:
+        case SetLanguage_ES419: s_language = PORT_LANGUAGE_SPANISH; break;
+        case SetLanguage_IT:    s_language = PORT_LANGUAGE_ITALIAN; break;
+        case SetLanguage_JA:
+            if (port_region() == PORT_REGION_JAPAN)
+                s_language = PORT_LANGUAGE_JAPANESE;
+            break;
+        default: break;
+        }
+    }
+    setExit();
+    return s_language;
 }

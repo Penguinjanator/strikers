@@ -171,6 +171,10 @@ void OSTicksToCalendarTime(u64 ticks, OSCalendarTime* td)
 
 u32 OSGetConsoleType(void) { return 0x00000001u; } // retail production unit
 
+#if defined(__SWITCH__)
+int PortSwitchLanguage(void);
+#endif
+
 int port_language(void)
 {
     static const struct { const char* name; int value; } kLanguages[] = {
@@ -192,7 +196,11 @@ int port_language(void)
     size_t i;
 
     if (v == NULL || *v == '\0')
+#if defined(__SWITCH__)
+        return PortSwitchLanguage();
+#else
         return PORT_LANGUAGE_UNSET;
+#endif
 
     if (*v >= '0' && *v <= '9')
     {

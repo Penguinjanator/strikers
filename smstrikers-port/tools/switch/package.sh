@@ -27,6 +27,7 @@ OUT="$STAGE/switch/strikers"
 mkdir -p "$OUT"
 
 cp "$BUILD/strikers.nro" "$OUT/"
+cp strikers-switch.ini.example "$OUT/strikers.ini.example"
 # FFmpeg and the Vulkan driver are linked into the .nro, so their notices ship too.
 cp LICENSE-BSD.TXT LICENSE-CC0.txt LICENSE-GPL-2.0.txt LICENSE-LGPL-2.1.txt "$OUT/"
 cp extern/musyx/LICENSE "$OUT/LICENSE-MUSYX.txt"
