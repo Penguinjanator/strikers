@@ -369,7 +369,7 @@ PlatTexture* glx_MakeTexture(GXTextureHeader* header, uintptr_t texhandle)
     memcpy(pTex->m_SwizzledData, (const u8*)header + 0x20, textureSize);
 
     pTex->Prepare();
-    PortTextureDump(&pTex->m_TexObj, pTex->m_nPaletteEntries > 0 ? &pTex->m_TlutObj : NULL); // PORT: texture dumps
+    PortTextureCreated(&pTex->m_TexObj, pTex->m_nPaletteEntries > 0 ? &pTex->m_TlutObj : NULL); // PORT: texture packs
 
     return pTex;
 }
@@ -877,12 +877,12 @@ void glplatTextureReplace(uintptr_t handle, const void* textureData, unsigned lo
     {
         GXInitTexObjCI(&pTex->m_TexObj, pTex->m_SwizzledData, pTex->m_Width, pTex->m_Height, (GXCITexFmt)glx_GetGXFormatTable()[pTex->m_Format], GX_CLAMP, GX_CLAMP, pTex->m_Levels > 1 ? 1 : 0, 0);
         GXInitTexObjLOD(&pTex->m_TexObj, (pTex->m_Levels == 1) ? GX_LINEAR : GX_LIN_MIP_NEAR, GX_LINEAR, 0.0f, (float)(pTex->m_MaxLevel - 1), 0.0f, GX_DISABLE, GX_DISABLE, GX_ANISO_1);
-        PortTextureDump(&pTex->m_TexObj, pTex->m_nPaletteEntries > 0 ? &pTex->m_TlutObj : NULL); // PORT: texture dumps
+        PortTextureCreated(&pTex->m_TexObj, pTex->m_nPaletteEntries > 0 ? &pTex->m_TlutObj : NULL); // PORT: texture packs
         return;
     }
 
     GXInitTexObj(&pTex->m_TexObj, pTex->m_SwizzledData, pTex->m_Width, pTex->m_Height, glx_GetGXFormatTable()[pTex->m_Format], GX_CLAMP, GX_CLAMP, pTex->m_Levels > 1 ? 1 : 0);
     GXInitTexObjLOD(&pTex->m_TexObj, (pTex->m_Levels == 1) ? GX_LINEAR : GX_LIN_MIP_LIN, GX_LINEAR, 0.0f, (float)(pTex->m_MaxLevel - 1), 0.0f, GX_DISABLE, GX_DISABLE, GX_ANISO_1);
-    PortTextureDump(&pTex->m_TexObj, NULL); // PORT: texture dumps
+    PortTextureCreated(&pTex->m_TexObj, NULL); // PORT: texture packs
 }
 #pragma dont_inline off

@@ -13,7 +13,7 @@ extern "C" void PortTextureDumpFrom(const char*) {}
 extern "C" void PortTextureDumpExpect(const void*, const char*) {}
 extern "C" void PortTextureDumpFromBuffer(const void*) {}
 extern "C" void PortTextureDumpSkip(int) {}
-extern "C" void PortTextureDump(const GXTexObj*, const GXTlutObj*) {}
+extern "C" void PortTextureCreated(const GXTexObj*, const GXTlutObj*) {}
 
 #else
 
@@ -43,6 +43,7 @@ struct Folder
 
 std::string g_userPath;
 std::vector<Folder> g_folders;
+bool g_onePack;
 
 bool g_dumping;
 std::string g_dumpDir;
@@ -119,13 +120,13 @@ void FindFolders()
         roots.push_back(TrimSeparators(named));
 
     const char* pack = getenv("STRIKERS_TEXTURE_PACK");
-    const bool one = pack != NULL && *pack != '\0';
+    g_onePack = pack != NULL && *pack != '\0';
     for (size_t i = 0; i < roots.size(); i++)
     {
-        const bool mustExist = !one && named != NULL && i + 1 == roots.size();
-        AddFolder(one ? roots[i] + "/" + pack : roots[i], (int)i, mustExist);
+        const bool mustExist = !g_onePack && named != NULL && i + 1 == roots.size();
+        AddFolder(g_onePack ? roots[i] + "/" + pack : roots[i], (int)i, mustExist);
     }
-    if (one && g_folders.empty())
+    if (g_onePack && g_folders.empty())
         fprintf(stderr, "[port] textures: no pack named %s in the textures folders\n", pack);
 }
 
@@ -134,7 +135,7 @@ void LoadFolders()
     for (size_t i = 0; i < g_folders.size(); i++)
     {
         Folder& f = g_folders[i];
-        f.registrations = (int)aurora_replacement_load(f.path.c_str(), f.priority);
+        f.registrations = (int)aurora_replacement_load(f.path.c_str(), f.priority, g_onePack ? 1 : 0);
         fprintf(stderr, "[port] textures: %d from %s\n", f.registrations, f.path.c_str());
     }
 }
@@ -174,6 +175,12 @@ extern "C" void PortTexturesInit(const char* userPath)
                             "using %lu\n", mb, cacheMb);
     }
     aurora_replacement_set_cache_budget((uint64_t)cacheMb << 20);
+#if defined(__SWITCH__)
+    // Its slow CPU would otherwise show the disc texture for seconds before the pack's.
+    aurora_replacement_set_wait(1);
+    // Its heap has no room to spare for a pack bigger than the budget, or for reloading what was evicted.
+    aurora_replacement_set_strict_budget(1);
+#endif
 
     FindFolders();
     LoadFolders();
@@ -255,8 +262,12 @@ extern "C" void PortTextureDumpFromBuffer(const void* buffer)
 
 extern "C" void PortTextureDumpSkip(int skip) { g_dumpSkip += skip ? 1 : -1; }
 
-extern "C" void PortTextureDump(const GXTexObj* obj, const GXTlutObj* tlut)
+extern "C" void PortTextureCreated(const GXTexObj* obj, const GXTlutObj* tlut)
 {
+#if defined(__SWITCH__)
+    if (!g_folders.empty())
+        aurora_replacement_prefetch(obj, tlut);
+#endif
     if (!g_dumping || g_dumpSkip > 0)
         return;
     // Menu resources, fonts and loading screens arrive by hash, with no file name to sort them by.

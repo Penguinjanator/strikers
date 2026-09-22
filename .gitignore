@@ -11,6 +11,8 @@ smstrikers-port/extern/nvk-mesa-switch/
 smstrikers-port/extern/mesa-switch/
 smstrikers-port/assets/switch/romfs/*
 !smstrikers-port/assets/switch/romfs/initial_pipeline_cache.db
+!smstrikers-port/assets/switch/romfs/initial_dawn_cache.db
+!smstrikers-port/assets/switch/romfs/initial_dawn_cache.db.stamp
 
 /dist/
 smstrikers-port/dist/

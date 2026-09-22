@@ -34,8 +34,8 @@ void PortTextureDumpFromBuffer(const void* buffer);
 // 1 before the port writes its own art into a disc texture, 0 after.
 void PortTextureDumpSkip(int skip);
 
-// Write `obj` as a PNG if dumps are on and the file is not there yet.
-void PortTextureDump(const GXTexObj* obj, const GXTlutObj* tlut);
+// The game made `obj`: on Switch its replacement starts loading, and with dumps on it is written as a PNG.
+void PortTextureCreated(const GXTexObj* obj, const GXTlutObj* tlut);
 
 #ifdef __cplusplus
 }
