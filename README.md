@@ -42,7 +42,7 @@ Download your platform's archive above or from [Releases](https://github.com/new
 - [Steam Deck](https://github.com/new-coke/strikers/wiki/Steam-Deck)
 - [Nintendo Switch](https://github.com/new-coke/strikers/wiki/Nintendo-Switch)
 
-The wiki also lists the supported discs and how to report a problem.
+The wiki also lists the supported discs and how to report a problem. [Troubleshooting](https://github.com/new-coke/strikers/wiki/Troubleshooting) covers issues you may have playing or installing the game.
 
 ## Notes
 
