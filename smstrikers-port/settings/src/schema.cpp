@@ -276,14 +276,14 @@ QVector<Setting> makeInputSwitches()
         "Installs the keyboard as a controller. Turn it off to free the keys "
         "if you only play on a pad."),
         QStringLiteral(
-        "0 disables the keyboard pad. The keys below are then not installed at all,\n"
-        "for a machine that plays with a pad and wants them back.")));
+        "0 stops the keyboard acting as player 1's controller.")));
 
     v.push_back(choice("button_prompts", "input", Text::tr("Button prompts"), "auto",
         Text::tr(
         "Show the controls bound on the active device, or choose a controller style."),
         QStringLiteral(
-        "Button art: auto follows the last input device; a named family overrides the art."),
+        "Button art: auto follows the last input device. gamecube, xbox, playstation, nintendo, steamdeck,\n"
+        "generic or keyboard shows that family's buttons instead."),
         { QStringLiteral("auto"), QStringLiteral("gamecube"), QStringLiteral("xbox"),
           QStringLiteral("playstation"), QStringLiteral("nintendo"), QStringLiteral("steamdeck"),
           QStringLiteral("generic"), QStringLiteral("keyboard") },
@@ -296,8 +296,7 @@ QVector<Setting> makeInputSwitches()
         Text::tr(
         "Move with the right stick and aim with the left."),
         QStringLiteral(
-        "1 swaps the left and right sticks, so the right stick moves the player and\n"
-        "the left one aims. The GameCube's own layout is the other way round.")));
+        "1 swaps the main stick and the C-stick.")));
 
     // What the game uses unset (Aurora's 8000 and 31150 of 32767), since a default is saved commented out.
     v.push_back(scalar("pad_deadzone", "input", Text::tr("Stick deadzone"), "0.24",
@@ -305,30 +304,26 @@ QVector<Setting> makeInputSwitches()
         "How far a stick must travel before input registers. Raise it if a "
         "worn stick drifts at rest."),
         QStringLiteral(
-        "How far a stick has to move before the game sees it, as a fraction of full\n"
-        "travel. Raise it on a worn pad that drifts; lower it for finer control.")));
+        "Stick deadzone, 0.0 to 0.9, as a fraction of the stick's travel.")));
 
     v.push_back(scalar("pad_trigger_threshold", "input", Text::tr("Trigger point"), "0.95",
         Text::tr(
         "How far a trigger must travel to register as a press."),
         QStringLiteral(
-        "How far a trigger has to be pulled to count as a press, as a fraction of\n"
-        "full travel. The console's L and R had a physical click near the bottom;\n"
-        "this is where that click goes.")));
+        "How far an analog trigger is pulled before L or R counts as pressed, as a fraction of its travel.")));
 
     v.push_back(toggle("pad_rumble", "input", Text::tr("Rumble"), "1",
         Text::tr("Vibrate the controller"),
         Text::tr(
         "Force feedback on tackles, saves and goals."),
         QStringLiteral(
-        "1 enables force feedback. The game has its own rumble option too, and the\n"
-        "shipped `no_pad_rumble` config key turns it off independently of both.")));
+        "0 turns rumble off on every controller.")));
 
     v.push_back(scalar("pad_rumble_strength", "input", Text::tr("Rumble strength"), "100",
         Text::tr(
         "Force feedback intensity, from a faint buzz to the full motor."),
         QStringLiteral(
-        "Rumble strength as a percentage. 100 is what the console asked for.")));
+        "Rumble strength, 0 to 100.")));
 
     return v;
 }

@@ -44,6 +44,16 @@ Download your platform's archive above or from [Releases](https://github.com/new
 
 The wiki also lists the supported discs and how to report a problem. [Troubleshooting](https://github.com/new-coke/strikers/wiki/Troubleshooting) covers issues you may have playing or installing the game.
 
+## Building from source
+
+[Development](https://github.com/new-coke/strikers/wiki/Development) on the wiki covers building, running from a checkout and debugging:
+
+- [Windows](https://github.com/new-coke/strikers/wiki/Development#windows)
+- [macOS](https://github.com/new-coke/strikers/wiki/Development#macos)
+- [Linux](https://github.com/new-coke/strikers/wiki/Development#linux-and-steam-deck)
+- [Steam Deck](https://github.com/new-coke/strikers/wiki/Development#linux-and-steam-deck)
+- [Nintendo Switch](https://github.com/new-coke/strikers/wiki/Development#nintendo-switch)
+
 ## Notes
 
 This has been a solo effort. I am releasing this on what is effectively a 'burner' GitHub account because I don't want it attached to my name for professional and legal reasons. I have not done this port for reasons of ego or notoriety. Mario Strikers is one of my favourite games and it's been a dream of mine to bring it to the PC platform without the pains of emulation. My goal is simply to have it running on Steam Deck or similar low-end hardware with as little power draw as possible and nice performance, as I play the original game on Steam Deck a lot and bring it to parties and such.
@@ -69,8 +79,9 @@ The main distinctions are:
 - Discord Rich Presence: [borealis](https://github.com/encounter/borealis) by Luke Street and [nlohmann/json](https://github.com/nlohmann/json) by Niels Lohmann, both MIT.
 - Switch build: NVK from [mesa-switch](https://github.com/danfromtico/mesa-switch) (MIT, see 'NOTICE-NVK.md'); [libnx](https://github.com/switchbrew/libnx) (ISC); devkitPro's SDL2 (zlib), Mesa EGL/OpenGL ES and libdrm_nouveau (MIT); [sdl3on2](https://github.com/new-coke/sdl3on2) (zlib); [dawn-switch](https://github.com/new-coke/dawn-switch) (BSD 3-Clause).
 - Settings app: [Qt 6](https://www.qt.io), under the LGPL 3.0.
+- Movies: [FFmpeg](https://ffmpeg.org)'s libavcodec, built with only the THP decoder and linked statically, under the LGPL 2.1.
 - FreeType: portions of this software are copyright The FreeType Project (www.freetype.org). All rights reserved.
-- Other third-party material and dependencies: these retain their applicable licences, and each archive includes their notices. FFmpeg's terms depend on its build configuration.
+- Other third-party material and dependencies: these retain their applicable licences, and each archive includes their notices.
 
 The project distributes source code and compiled releases. These do not include game assets; you must supply game data from your own copy. Distribution does not grant permission to reuse or redistribute third-party material beyond its applicable licences and rights.
 

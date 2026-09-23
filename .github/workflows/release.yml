@@ -77,7 +77,13 @@ jobs:
 
       - name: Install toolchain (macOS)
         if: runner.os == 'macOS'
-        run: brew install ninja ffmpeg
+        run: brew install ninja
+
+      # Homebrew's ffmpeg is GPL and pulls in x264 and x265; this is the LGPL THP-only decoder the other platforms ship.
+      - name: Build ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        working-directory: smstrikers-port
+        run: ./tools/build-ffmpeg.sh
 
       - name: Install Qt (settings app)
         if: runner.os != 'Linux'
@@ -259,6 +265,23 @@ jobs:
           merge-multiple: true
           skip-decompress: true
 
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          sparse-checkout: smstrikers-port/tools/build-ffmpeg.sh
+          sparse-checkout-cone-mode: false
+
+      # The LGPL source of the FFmpeg linked into every archive, at the version build-ffmpeg.sh pins.
+      - name: Attach FFmpeg's source
+        run: |
+          set -eu
+          script=source/smstrikers-port/tools/build-ffmpeg.sh
+          version=$(sed -n 's/^VERSION=//p' "$script")
+          sha=$(sed -n 's/^WANT_SHA="\([0-9a-f]*\)"$/\1/p' "$script")
+          test -n "$version" && test -n "$sha"
+          curl -fsSL --retry 3 -o "artifacts/ffmpeg-$version.tar.xz" "https://ffmpeg.org/releases/ffmpeg-$version.tar.xz"
+          echo "$sha  artifacts/ffmpeg-$version.tar.xz" | sha256sum -c -
+
       - name: Verify archives and write checksums
         working-directory: artifacts
         run: |
@@ -266,7 +289,7 @@ jobs:
           for archive in strikers-macos-arm64.tar.gz strikers-linux-x86_64.tar.gz strikers-linux-arm64.tar.gz strikers-windows-x86_64.zip strikers-switch.zip; do
             test -s "$archive"
           done
-          sha256sum *.tar.gz *.zip > SHA256SUMS
+          sha256sum *.tar.gz *.zip *.tar.xz > SHA256SUMS
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -289,5 +312,7 @@ jobs:
             from the album.
             Linux builds need glibc 2.35 or newer: Ubuntu 22.04, Debian 12,
             Fedora 36, current SteamOS, or anything later.
+            The ffmpeg tarball is the LGPL source of the movie decoder
+            linked into every build.
             Verify downloads against SHA256SUMS. Test the packaged builds
             before publishing this draft.

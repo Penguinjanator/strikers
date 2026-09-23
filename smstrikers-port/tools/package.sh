@@ -111,7 +111,7 @@ if [ "$WINDOWS" = "1" ]; then
     fi
 fi
 
-# On macOS the movie decoder is Homebrew's libavcodec by absolute path, which the audit below
+# A macOS build against Homebrew's libavcodec links it by absolute path, which the audit below
 # refuses; this copies the closure beside the executable and rewrites the load commands.
 ./tools/bundle-dylibs.sh "$OUT/$(basename "$BIN")" "$OUT"
 
