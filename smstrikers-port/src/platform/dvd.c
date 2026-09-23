@@ -469,10 +469,6 @@ BOOL DVDOpen(const char* fileName, DVDFileInfo* fileInfo)
     return DVDFastOpen(DVDConvertPathToEntrynum(fileName), fileInfo);
 }
 
-
-static s32 dvd_read(const DvdEntry* e, void* addr, s32 length, s32 offset);
-
-#if defined(__SWITCH__)
 // Pending reads share a fixed-size pool across open files.
 #define DVD_PENDING_MAX 24
 typedef struct DvdPending
@@ -544,11 +540,9 @@ static DvdPending* pending_acquire(void)
     }
     return NULL;
 }
-#endif
 
 BOOL DVDClose(DVDFileInfo* fileInfo)
 {
-#if defined(__SWITCH__)
     int i;
     if (fileInfo == NULL)
         return TRUE;
@@ -561,11 +555,6 @@ BOOL DVDClose(DVDFileInfo* fileInfo)
     take_busy_poll(&fileInfo->cb);
     fileInfo->cb.state = DVD_STATE_END;
     return TRUE;
-#else
-    if (fileInfo)
-        fileInfo->cb.state = DVD_STATE_END;
-    return TRUE;
-#endif
 }
 
 s32 DVDReadAsyncPrio(DVDFileInfo* fileInfo, void* addr, s32 length, s32 offset,
@@ -593,7 +582,6 @@ s32 DVDReadAsyncPrio(DVDFileInfo* fileInfo, void* addr, s32 length, s32 offset,
         return -1;
     }
 
-#if defined(__SWITCH__)
     // Read synchronously once the entire image is in RAM.
     if (s_disc != NULL && port_disc_in_memory(s_disc))
     {
@@ -622,28 +610,6 @@ s32 DVDReadAsyncPrio(DVDFileInfo* fileInfo, void* addr, s32 length, s32 offset,
     owe_busy_poll(&fileInfo->cb);
     PortDiscQueue(pending_run, job);
     return 0;
-#else
-    const s32 got = dvd_read(e, addr, length, offset);
-
-    if (probe_dvd())
-        OSReport("[port] dvd: read %s off=%d len=%d -> %d cb=%d\n", e->path,
-                 (int)offset, (int)length, (int)got, callback != NULL);
-
-    fileInfo->cb.transferredSize = got > 0 ? (u32)got : 0;
-    if (callback)
-    {
-        // A caller that asked for a callback gets it here, inline; nothing in this tree does, and
-        // there is no later point from which to fire it.
-        fileInfo->cb.state = DVD_STATE_END;
-        callback(got, fileInfo);
-    }
-    else
-    {
-        // Done, but busy to the first poll. See the header comment.
-        fileInfo->cb.state = DVD_STATE_BUSY;
-    }
-    return got < 0 ? -1 : 0;
-#endif
 }
 
 static s32 dvd_read(const DvdEntry* e, void* addr, s32 length, s32 offset)
@@ -684,7 +650,6 @@ static s32 dvd_read(const DvdEntry* e, void* addr, s32 length, s32 offset)
     return got;
 }
 
-#if defined(__SWITCH__)
 static s32 pending_read_now(const DvdEntry* e, void* addr, s32 length, s32 offset)
 {
     const s32 got = dvd_read(e, addr, length, offset);
@@ -709,26 +674,14 @@ static void pending_run(void* ctx)
     // Released last: DVDClose may be waiting on it to free the file.
     port_store_release_i32(&job->inUse, 0);
 }
-#endif
 
 s32 DVDGetCommandBlockStatus(const DVDCommandBlock* block)
 {
     if (!block)
         return DVD_STATE_END;
-#if defined(__SWITCH__)
     if (take_busy_poll(block))
         return DVD_STATE_BUSY;
     return port_load_acquire_i32(&block->state);
-#else
-    if (block->state == DVD_STATE_BUSY)
-    {
-        // The one poll that says busy. The console's own status call read a block the drive was
-        // still writing to through the same const pointer; the cast is the same lie it told.
-        ((DVDCommandBlock*)block)->state = DVD_STATE_END;
-        return DVD_STATE_BUSY;
-    }
-    return block->state;
-#endif
 }
 
 s32 DVDGetDriveStatus(void)

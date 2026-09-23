@@ -17,8 +17,9 @@ struct Job
 constexpr size_t QueueSize = 64;
 
 std::mutex g_mutex;
-std::condition_variable g_work;
-std::condition_variable g_space;
+// Leaked, like the reader: glibc's destructor waits for the idle reader, so exit() would hang.
+std::condition_variable& g_work = *new std::condition_variable;
+std::condition_variable& g_space = *new std::condition_variable;
 Job g_queue[QueueSize];
 size_t g_head = 0;
 size_t g_tail = 0;
