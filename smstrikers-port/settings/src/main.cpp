@@ -7,6 +7,7 @@
 #include "inifile.h"
 #include "mainwindow.h"
 #include "schema.h"
+#include "windowlanguage.h"
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -16,8 +17,6 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
-#include <QLibraryInfo>
-#include <QLocale>
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QPushButton>
@@ -33,35 +32,7 @@
 
 #include <cstdio>
 
-// Set by CMake to the languages actually compiled in, "" for an English-only build.
-#ifndef STRIKERS_SETTINGS_TRANSLATIONS
-#define STRIKERS_SETTINGS_TRANSLATIONS ""
-#endif
-
 namespace {
-
-// The language this window is written in. It is not the game's language.
-QString installTranslations(const QString& forced)
-{
-    const QLocale locale = forced.isEmpty() ? QLocale::system() : QLocale(forced);
-
-    // Qt's own, the buttons in a QMessageBox, the file dialog; from the Qt installation, and this
-    // is the fallback.
-    auto* qt = new QTranslator(qApp);
-    if (qt->load(locale, QStringLiteral("qtbase"), QStringLiteral("_"),
-                 QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
-        QCoreApplication::installTranslator(qt);
-
-    auto* mine = new QTranslator(qApp);
-    // load(QLocale, ) walks uiLanguages() rather than matching name(): it tries every tag
-    // QLocale::uiLanguages() lists, in order, dropping the script and the territory as it goes.
-    if (!mine->load(locale, QStringLiteral("strikers-settings"), QStringLiteral("_"),
-                    QStringLiteral(":/i18n")))
-        return QString();
-
-    QCoreApplication::installTranslator(mine);
-    return mine->language();
-}
 
 QTextStream& out()
 {
@@ -295,9 +266,7 @@ int languages()
 {
     // What the build says it embedded, not what the resource happens to hold: the two disagreeing
     // is the whole point of the check.
-    const QStringList expected =
-        QString::fromLatin1(STRIKERS_SETTINGS_TRANSLATIONS)
-            .split(QLatin1Char(','), Qt::SkipEmptyParts);
+    const QStringList expected = WindowLanguage::available();
     if (expected.isEmpty())
     {
         // A legitimate configuration: a build with no Qt Linguist tools and no committed catalogues
@@ -513,10 +482,28 @@ void usage()
              "With no path, strikers.ini in the folder holding the game is used, and\n"
              "created on the first save from strikers.ini.example if one is there.\n"
              "\n"
-             "--lang takes de, es, fr or en and overrides the system locale. It is the\n"
-             "interface language of this window only; the game's own language is the\n"
-             "Language setting on the Game tab, and the two are unrelated.\n";
+             "--lang takes de, es, fr or en and overrides the system locale and the\n"
+             "Window language setting. It is the interface language of this window\n"
+             "only; the game's own language is the Language setting on the Game tab,\n"
+             "and the two are unrelated.\n";
     out().flush();
+}
+
+// Labels are tr()'d once, when the window is built, so a new language needs a new window.
+void followLanguage(MainWindow* w)
+{
+    QObject::connect(w, &MainWindow::windowLanguageChosen, w, [w] {
+        const MainWindow::Snapshot state = w->snapshot();
+        WindowLanguage::install(QString());
+        Schema::retranslate();
+        auto* next = new MainWindow;
+        next->setAttribute(Qt::WA_DeleteOnClose);
+        next->restore(state);
+        followLanguage(next);
+        next->show();
+        w->hide();
+        w->deleteLater();
+    });
 }
 
 } // namespace
@@ -578,8 +565,7 @@ int main(int argc, char** argv)
     // players' machines.
     QCoreApplication::setApplicationName(QStringLiteral("strikers-settings"));
     QCoreApplication::setOrganizationName(QStringLiteral("smstrikers-port"));
-    // Not tr(): this runs before installTranslations(), which cannot move earlier because --lang
-    // decides it, so a tr() here would find no catalogue and be English anyway.
+    // Not tr(): no catalogue is installed until the arguments, --lang among them, are read.
     QGuiApplication::setApplicationDisplayName(
         QStringLiteral("Super Mario Strikers Settings"));
 
@@ -663,7 +649,7 @@ int main(int argc, char** argv)
     // After the arguments, because --lang decides it; before anything reads the schema, because the
     // schema is data built once on first use and a table built one call early would be English for
     // the rest of the run.
-    installTranslations(language);
+    WindowLanguage::install(language);
     Schema::retranslate();
 
     // Before the ini path is resolved: this asks nothing of the file system and a machine with no
@@ -697,9 +683,11 @@ int main(int argc, char** argv)
     if (!shotPath.isEmpty())
         return screenshot(iniPath, shotPath, shotTab, shotSize, shotHelp, shotExpand);
 
-    MainWindow w;
-    w.rememberGeometry();
-    w.openFile(iniPath);
-    w.show();
+    auto* w = new MainWindow;
+    w->setAttribute(Qt::WA_DeleteOnClose);
+    w->rememberGeometry();
+    w->openFile(iniPath);
+    followLanguage(w);
+    w->show();
     return app.exec();
 }

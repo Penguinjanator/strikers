@@ -77,6 +77,8 @@ qt_add_executable(strikers-settings
   src/keycapturebutton.h
   src/settingspage.cpp
   src/settingspage.h
+  src/windowlanguage.cpp
+  src/windowlanguage.h
 )
 target_link_libraries(strikers-settings PRIVATE strikers-settings-core Qt6::Widgets)
 

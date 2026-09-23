@@ -816,6 +816,21 @@ El juego usa ahora esa carpeta, así que la imagen se puede mover o borrar. El c
         <source>Super Mario Strikers Settings (unsaved changes)</source>
         <translation>Ajustes de Super Mario Strikers: cambios sin guardar</translation>
     </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1047"/>
+        <source>Window language</source>
+        <translation>Idioma de la ventana</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1048"/>
+        <source>The language this window is written in. The game&apos;s own is the Language setting above.</source>
+        <translation>El idioma de esta ventana. El del juego es el ajuste &quot;Idioma&quot;, justo encima.</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1052"/>
+        <source>Automatic (%1)</source>
+        <translation>Automático (%1)</translation>
+    </message>
 </context>
 <context>
     <name>Schema</name>

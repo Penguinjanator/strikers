@@ -57,6 +57,23 @@ public:
     // its own geometry answers one resize with many.
     int resizeCount() const { return m_resizes; }
 
+    // What a window rebuilt in another language takes over from the one it replaces.
+    struct Snapshot
+    {
+        QString path;
+        IniFile ini;  // only when dirty, with the controls collected into it
+        bool dirty = false;
+        int tab = 0;
+        QByteArray geometry;
+        bool rememberGeometry = false;
+    };
+    Snapshot snapshot();
+    void restore(const Snapshot& s);
+
+signals:
+    // Emitted after the pick is stored, which WindowLanguage::install() reads.
+    void windowLanguageChosen();
+
 protected:
     void changeEvent(QEvent* event) override;
     void closeEvent(QCloseEvent* event) override;

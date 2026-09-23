@@ -8,6 +8,7 @@
 #include "keynames.h"
 #include "settingspage.h"
 #include "texturepacks.h"
+#include "windowlanguage.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -1040,6 +1041,31 @@ QWidget* MainWindow::buildGameTab()
     m_languageState = SettingsPage::note(QString());
     page->addFieldNote(m_languageState);
 
+    // Not in strikers.ini, which is the game's.
+    {
+        Setting s;
+        s.label = tr("Window language");
+        s.detail = tr("The language this window is written in. The game's own is the Language "
+                      "setting above.");
+        auto* combo = new QComboBox;
+        combo->addItem(
+            tr("Automatic (%1)").arg(WindowLanguage::name(WindowLanguage::resolve(QString()))),
+            QString());
+        combo->addItem(WindowLanguage::name(QStringLiteral("en")), QStringLiteral("en"));
+        for (const QString& tag : WindowLanguage::available())
+            combo->addItem(WindowLanguage::name(tag), tag);
+        combo->setCurrentIndex(qMax(0, combo->findData(WindowLanguage::chosen())));
+        page->addSetting(s.label, combo,
+                         new InfoButton(HelpText::popover(s), HelpText::popover(s, true)));
+        connect(combo, &QComboBox::activated, this, [this, combo] {
+            const QString tag = combo->currentData().toString();
+            if (tag == WindowLanguage::chosen())
+                return;
+            WindowLanguage::choose(tag);
+            emit windowLanguageChosen();
+        });
+    }
+
     addSwitch(page, Schema::get(QStringLiteral("unlock_all")));
     addSwitch(page, Schema::get(QStringLiteral("discord")));
 
@@ -1202,6 +1228,40 @@ void MainWindow::openFile(const QString& path)
     else
         showPath(tr("%1 (new, created when you save)")
                      .arg(QDir::toNativeSeparators(path)));
+}
+
+MainWindow::Snapshot MainWindow::snapshot()
+{
+    Snapshot s;
+    s.path = m_path;
+    s.dirty = m_dirty;
+    if (m_dirty)
+    {
+        collectFromUi();
+        s.ini = m_ini;
+    }
+    s.tab = m_tabs->currentIndex();
+    s.geometry = saveGeometry();
+    s.rememberGeometry = m_rememberGeometry;
+    return s;
+}
+
+void MainWindow::restore(const Snapshot& s)
+{
+    openFile(s.path);
+    if (s.dirty)
+    {
+        m_ini = s.ini;
+        loadIntoUi();
+        setDirty(true);
+    }
+    m_tabs->setCurrentIndex(s.tab);
+
+    // No smaller than this language needs: German is wider than English.
+    const QSize fitted = size();
+    m_rememberGeometry = s.rememberGeometry;
+    restoreGeometry(s.geometry);
+    resize(qMax(width(), fitted.width()), qMax(height(), fitted.height()));
 }
 
 void MainWindow::showPath(const QString& text)
