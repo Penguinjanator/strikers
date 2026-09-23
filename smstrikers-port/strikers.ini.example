@@ -1,9 +1,10 @@
 # strikers.ini, rename or copy this to strikers.ini beside the executable.
 
 # Handheld / battery: uncomment these three together on a Steam Deck or any machine running on one.
+# With vsync the GPU waits for the panel and idles. Without it the game also draws frames the panel
+# never shows and drains the battery.
 #   fps_limit = 40
-# vsync = 1 # Fifo blocks and lets the GPU idle; Mailbox renders frames the panel never shows, which
-# on a battery is heat.
+#   vsync     = 1
 #   msaa      = 1
 # res_scale is deliberately absent: the default already renders the Deck's panel pixel for pixel.
 
@@ -48,6 +49,9 @@
 # has problems at startup.
 # shader_jobs = 0
 
+# 1 lets the game run on a software renderer when there is no usable graphics card.
+# allow_cpu_adapter = 1
+
 [audio]
 # Sound: music, effects, the stadium reverb and the movies' own tracks.
 # audio = 0
@@ -59,19 +63,26 @@
 # the mixer's state every two seconds.
 # log_audio = 1
 
+# Record everything the game plays to a WAV file.
+# audio_dump = C:/games/strikers/strikers.wav
+
 [input]
 # Controls. Everything here is commented out and the defaults below are what you get without the
 # file.
-# STRIKERS_PROBE_PAD=1 prints the whole effective table at startup, which is
-# also the answer to "what are my controls".
 
-# keyboard = 1            ; 0 disables the keyboard pad
+# Print the effective controls to the log at startup, and each controller's state as it changes.
+# Any value turns it on.
+# probe_pad = 1
 
-# Button art: auto follows the last input device; a named family overrides the art.
+# 0 stops the keyboard acting as player 1's controller.
+# keyboard = 1
+
+# Button art: auto follows the last input device. gamecube, xbox, playstation, nintendo, steamdeck,
+# generic or keyboard shows that family's buttons instead.
 # button_prompts = auto
 
 # Keyboard, player 1. SDL scancode names as SDL_GetScancodeName spells them: "A", "Return", "Space",
-# "Left Shift", "F1", "Keypad 0". STRIKERS_PROBE_PAD=1 prints the whole effective table.
+# "Left Shift", "F1", "Keypad 0".
 # key_a = X
 # key_b = Z
 # key_x = C
@@ -108,11 +119,21 @@
 # pad_dpad_down = dpdown
 # pad_dpad_left = dpleft
 # pad_dpad_right = dpright
-# pad_swap_sticks = 0     ; 1 swaps the main stick and the C-stick
-# pad_deadzone = 0.24     ; 0.0 .. 0.9, fraction of stick radius
+
+# 1 swaps the main stick and the C-stick.
+# pad_swap_sticks = 0
+
+# Stick deadzone, 0.0 to 0.9, as a fraction of the stick's travel.
+# pad_deadzone = 0.24
+
+# How far an analog trigger is pulled before L or R counts as pressed, as a fraction of its travel.
 # pad_trigger_threshold = 0.95
-# pad_rumble = 1          ; 0 turns rumble off on every port
-# pad_rumble_strength = 100   ; 0..100
+
+# 0 turns rumble off on every controller.
+# pad_rumble = 1
+
+# Rumble strength, 0 to 100.
+# pad_rumble_strength = 100
 
 [paths]
 # Where the game data is: either the `files` folder of an extracted disc, or a disc image.
@@ -142,6 +163,14 @@
 # 1 saves to texture_dumps/ in the user folder; a path saves there.
 # texture_dump = 1
 
+# The user folder: saves, texture packs and texture dumps. Unset, it is %APPDATA%\Super Mario
+# Strikers on Windows, ~/Library/Application Support/Super Mario Strikers on macOS and
+# ~/.local/share/Super Mario Strikers on Linux.
+# user_dir = C:/games/strikers/user
+
+# The compiled shader cache. Unset, it stays in the system folder above even when user_dir is set.
+# cache_dir = C:/games/strikers/cache
+
 [game]
 # Which disc the data came from, when the data cannot say: the id is read from sys/boot.bin
 # beside `files` or from an image's first bytes, and an extraction of `files` alone is taken
@@ -161,8 +190,29 @@
 # heads-up form.
 # overlay = menu
 
-# Force a stadium instead of letting the demo pick at random.
+# Force a stadium instead of letting the demo pick at random: mario_stadium, peach_toad, dk_daisy,
+# wario_stadium, yoshi_stadium, super_stadium or forbidden_dome, or 0 to 6.
 # force_stadium = mario_stadium
+
+# Set the teams and sidekicks: daisy, donkeykong, luigi, mario, peach, waluigi, wario or yoshi,
+# and toad, koopa, hammerbro or birdo.
+# team1 = mario
+# team2 = luigi
+# sidekick1 = toad
+# sidekick2 = koopa
 
 # Pin the RNG seed, so a run is reproducible.
 # seed = 3
+
+# 1 skips the game's movies.
+# no_movies = 1
+
+# Extra reports in the log. Any value turns one on; remove the line to turn it off.
+# Every front-end screen entered and package loaded:
+# log_scenes = 1
+# Match state, once a second:
+# log_match = 1
+# The cutscene player and presentation clock:
+# log_nis = 1
+# Every bundle file opened:
+# log_bundles = 1
