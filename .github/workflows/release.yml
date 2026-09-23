@@ -7,37 +7,51 @@ on:
     tags: ['v*']
   workflow_dispatch:
     inputs:
+      platform:
+        description: 'Build one platform, or all; only all can create a release'
+        type: choice
+        options: [all, macos-arm64, linux-x86_64, linux-arm64, windows-x86_64, switch]
+        default: all
       dry_run:
         description: 'Build and upload artifacts, but do not create a release'
         type: boolean
         default: true
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.ref }}-${{ inputs.platform || 'all' }}
   cancel-in-progress: false
 
 jobs:
+  # A job-level if is evaluated before the matrix exists, so the platform is picked here.
+  targets:
+    if: inputs.platform != 'switch'
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - id: pick
+        env:
+          PLATFORM: ${{ inputs.platform || 'all' }}
+          TARGETS: |
+            [
+              {"name": "macos-arm64", "runner": "macos-15", "archive": "tar.gz"},
+              {"name": "linux-x86_64", "runner": "ubuntu-24.04", "archive": "tar.gz"},
+              {"name": "linux-arm64", "runner": "ubuntu-24.04-arm", "archive": "tar.gz"},
+              {"name": "windows-x86_64", "runner": "windows-2022", "archive": "zip"}
+            ]
+        run: |
+          matrix=$(jq -c --arg p "$PLATFORM" '{include: map(select($p == "all" or .name == $p))}' <<< "$TARGETS")
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   build:
     name: build (${{ matrix.name }})
+    needs: targets
     runs-on: ${{ matrix.runner }}
     env:
       STRIKERS_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: macos-arm64
-            runner: macos-15
-            archive: tar.gz
-          - name: linux-x86_64
-            runner: ubuntu-24.04
-            archive: tar.gz
-          - name: linux-arm64
-            runner: ubuntu-24.04-arm
-            archive: tar.gz
-          - name: windows-x86_64
-            runner: windows-2022
-            archive: zip
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -146,6 +160,7 @@ jobs:
 
   switch:
     name: build (switch)
+    if: (inputs.platform || 'all') == 'all' || inputs.platform == 'switch'
     # mesa-switch compiles NVK's Rust for the host architecture.
     runs-on: ubuntu-24.04-arm
     env:
@@ -231,7 +246,7 @@ jobs:
     needs: [build, switch]
     if: >-
       success() && startsWith(github.ref, 'refs/tags/v') &&
-      (github.event_name != 'workflow_dispatch' || !inputs.dry_run)
+      (github.event_name != 'workflow_dispatch' || (!inputs.dry_run && inputs.platform == 'all'))
     runs-on: ubuntu-24.04
     permissions:
       contents: write
