@@ -366,6 +366,8 @@ extern "C" TLInstance* PortFEFindChild(TLInstance* parent, const char* name)
     return nullptr;
 }
 
+extern "C" void* PortFETrack(void* p) { return track(p); }
+
 extern "C" unsigned long PortFECloneCount(void)
 {
     unsigned long n = 0;

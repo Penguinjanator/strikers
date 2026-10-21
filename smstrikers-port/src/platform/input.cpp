@@ -8,6 +8,8 @@ extern "C" int PortInputPadSetting(unsigned int) { return -1; }
 extern "C" int PortInputKeyboardEnabled(void) { return 0; }
 extern "C" void PortNoteSceneEntered(int scene) { (void)scene; }
 extern "C" void PortUpdateSyntheticInput(unsigned long frame) { (void)frame; }
+extern "C" int PortInputQuitPressed(void) { return 0; }
+extern "C" void PortInputNoteKey(int scancode) { (void)scancode; }
 
 #else
 
@@ -25,6 +27,8 @@ extern "C" void PortUpdateSyntheticInput(unsigned long frame) { (void)frame; }
 #include "dolphin/pad.h"
 #include "port/input.h"
 #include "port/overlay.h"
+#include "port/online.h"
+#include "port/online_panel.h"
 
 namespace
 {
@@ -627,7 +631,31 @@ void poll_controllers(bool report)
     s_padsLooked = true;
 }
 
+bool s_quitPressed = false;
+bool s_escapePressed = false;
+
+void poll_quit()
+{
+    s_quitPressed = s_escapePressed;
+    s_escapePressed = false;
+}
+
 }   // namespace
+
+extern "C" int PortInputQuitPressed(void) { return s_quitPressed ? 1 : 0; }
+
+// From the event pump, since a tap shorter than a frame never shows in the polled keyboard state.
+extern "C" void PortInputNoteKey(int scancode)
+{
+    // The online panel takes Escape as back, and a player in a room leaves through the panel.
+    if (scancode != SDL_SCANCODE_ESCAPE || !PortInputKeyboardEnabled() || PortOverlayMenuOpen() ||
+        PortOnlinePanelOpen() || PortOnlineActive())
+        return;
+    for (int i = 0; i < KEY_COUNT; i++)
+        if (s_keyCode[i] == SDL_SCANCODE_ESCAPE)
+            return;   // bound to a GameCube button
+    s_escapePressed = true;
+}
 
 extern "C" int PortInputKeyboardEnabled(void)
 {
@@ -1011,6 +1039,7 @@ extern "C" void PortUpdateSyntheticInput(unsigned long frame)
     // it.
     poll_controllers(probe_pad());
     update_fake_pad(frame, kHoldFrames);
+    poll_quit();
 
     record_pad(frame);
 

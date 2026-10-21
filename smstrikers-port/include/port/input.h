@@ -33,6 +33,10 @@ unsigned int PortInputButtonFromName(const char* name, int len);
 
 unsigned long PortInputFrame(void);
 
+// Non-zero on the frame an unbound Escape goes down.
+int PortInputQuitPressed(void);
+void PortInputNoteKey(int scancode);
+
 #ifdef __cplusplus
 }
 #endif

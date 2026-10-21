@@ -241,6 +241,9 @@ void userAppInit(void)
         exit(1);
     }
 
+    // HOME > Close then ends appletMainLoop rather than the process, so a save can finish first.
+    appletLockExit();
+
     // start_recording reads the ini, which is otherwise first loaded as the disc opens.
     PortConfigLoad();
     start_recording();
@@ -297,6 +300,7 @@ __attribute__((noreturn)) void abort(void)
 void userAppExit(void)
 {
     PortSwitchCpuBoost(0);
+    appletUnlockExit();
     if (s_logSyncRunning)
     {
         s_logSyncStop = true;

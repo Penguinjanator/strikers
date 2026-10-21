@@ -18,6 +18,7 @@
 #include <SDL3/SDL_video.h>
 #endif
 #include "port/overlay.h"
+#include "port/input.h"
 extern "C" void PortDebugFrame(void);   // PORT: defined in Game.cpp
 #include "port/launch.h"
 #include "port/discord.h"
@@ -84,6 +85,7 @@ extern "C" void PortDebugFrame(void);   // PORT: defined in Game.cpp
 #include "Game/GameInfo.h"
 #include "Game/DB/StatsTracker.h"
 #include "Game/DB/SaveLoad.h"
+#include "Game/SH/SHSaveLoad.h"
 #include "Game/Render/Wiper.h"
 #include "Game/Render/depthoffield.h"
 #include "Game/Render/FlareHandler.h"
@@ -652,6 +654,26 @@ static void PortFollowDisplayRefresh()
                           aurora_present_waits_for_vblank() ? 1 : 0);
 }
 
+// PORT: every way out lets a waiting save run first, as the console's reset button did.
+static bool PortReadyToQuit()
+{
+    static unsigned long long s_since = 0;
+    if (s_since == 0)
+    {
+        s_since = port_monotonic_ns();
+        SaveLoadScene::StartSaveNow();
+    }
+    if (!SaveLoad::CardBusy())
+        return true;
+    // PORT: well inside the Switch's 15 s before a locked exit is killed anyway.
+    if (port_monotonic_ns() - s_since > 10000000000ull)
+    {
+        fprintf(stderr, "[port] quitting with the memory card still busy\n");
+        return true;
+    }
+    return false;
+}
+
 static void PortPumpAuroraEvents()
 {
     // PORT: polled rather than waited for; the event below is only the fast path.
@@ -660,7 +682,7 @@ static void PortPumpAuroraEvents()
     for (const AuroraEvent* ev = aurora_update(); ev && ev->type != AURORA_NONE; ++ev)
     {
         if (ev->type == AURORA_EXIT)
-            s_portRunning = false;
+            PortRequestQuit();
 
         // PORT: the picture follows the window rather than the shape the window had at startup, so maximising it does not put black bars down the sides.
         if (ev->type == AURORA_WINDOW_RESIZED
@@ -685,6 +707,8 @@ static void PortPumpAuroraEvents()
         {
             PortOverlayHandleKey((int)ev->sdl.key.scancode,
                                  ev->sdl.type == SDL_EVENT_KEY_DOWN ? 1 : 0);
+            if (ev->sdl.type == SDL_EVENT_KEY_DOWN)
+                PortInputNoteKey((int)ev->sdl.key.scancode);
         }
 
         if (ev->type == AURORA_SDL_EVENT)
@@ -863,7 +887,7 @@ int main(int argc, char* argv[])
 #if defined(PORT_USE_AURORA)
     PortShaderStageBegin();   // PORT: logs the pipeline queue the boot memory card screen waits for
 
-    while (s_portRunning && !PortQuitRequested())
+    while (s_portRunning && !(PortQuitRequested() && PortReadyToQuit()))
     {
         // PORT: the deferred limiter sleep goes before the event pump so the frame reads input after it.
         PortLimiterFlush();

@@ -28,6 +28,9 @@ void PortFESetPosition(TLInstance* node, float x, float y, float z);
 // Depth-first by name hash. A menu row's label is an 'R JUST' text instance.
 TLInstance* PortFEFindChild(TLInstance* parent, const char* name);
 
+// Hand an nlMalloc'd block to PortFEReleaseClones, for anything built beside a clone. Returns it.
+void* PortFETrack(void* p);
+
 unsigned long PortFECloneCount(void);
 void PortFEReleaseClones(void);
 

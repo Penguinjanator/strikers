@@ -7,9 +7,13 @@
 #include "Game/FE/feMusic.h"
 #include "Game/FE/fePopupMenu.h"
 #include "Game/FE/feScene.h"
+#include "Game/FE/feAnimation.h"
 #include "Game/FE/tlImageInstance.h"
 #include "Game/SH/SHBackground.h"
 #include "Game/main.h"
+#include "port/fe_clone.h"
+#include "port/input.h"
+#include "port/overlay.h"
 #include "NL/gl/glStruct.h"
 #include "NL/nlLocalization.h"
 #include "NL/nlPrint.h"
@@ -28,7 +32,8 @@ int SHMainMenu::mLastMenuItem = 0;
 static char sSlideIn[] = "in";
 static char sSlideOut[] = "out";
 
-static unsigned long sUnlockedTickerMessages[SHMainMenu::NUM_ITEMS] = {
+// PORT: one more for the Quit row, which reuses the Options description.
+static unsigned long sUnlockedTickerMessages[SHMainMenu::NUM_ITEMS + 1] = {
     0x10B8D08F,
     0xDB24E3FA,
     0x0755A109,
@@ -36,15 +41,18 @@ static unsigned long sUnlockedTickerMessages[SHMainMenu::NUM_ITEMS] = {
     0x1B176F3B,
     0x268EF6F5,
     0x7B1F3B7E,
+    0x7B1F3B7E,
 };
 
-static unsigned long sLockedTickerMessages[SHMainMenu::NUM_ITEMS] = {
+// PORT: one more for the Quit row, which reuses the Options description.
+static unsigned long sLockedTickerMessages[SHMainMenu::NUM_ITEMS + 1] = {
     0x10B8D08F,
     0xDB24E3FA,
     0x0F4F37A4,
     0x35AABB0D,
     0x1B176F3B,
     0x268EF6F5,
+    0x7B1F3B7E,
     0x7B1F3B7E,
 };
 
@@ -186,6 +194,150 @@ static void onSelectOptions(TLComponentInstance*)
     FEMusic::StartStreamIfDifferent(7);
 }
 
+// PORT: the Quit row; a computer has no power button to end the game with.
+static void onSelectQuit(TLComponentInstance*)
+{
+    PortRequestQuit();
+}
+
+// PORT: the disc's "QUIT", from the pause menu.
+static const unsigned long kQuitLocStrId = 0xE37945FF;
+
+// PORT: the disc's rows are 40 apart and fill the panel; eight at 35 fit above the ticker.
+static const float kRowTop = 129.0f;
+static const float kRowStep = 35.0f;
+
+// PORT: everything on the slide expires at its end, so eight rows land closer than the disc's 0.15 s.
+static const float kRowStagger = 0.15f * 6.0f / 7.0f;
+
+static void ShiftRowAnimation(FEAnimation* anim, float y, float dt)
+{
+    v3AnimationKeyframe* head = (v3AnimationKeyframe*)anim->m_DLRingHead;
+    v3AnimationKeyframe* k = head;
+    while (k != NULL)
+    {
+        k->pKeyFrameDataX.m_fTime += dt;
+        k->pKeyFrameDataY.m_fTime += dt;
+        k->pKeyFrameDataZ.m_fTime += dt;
+        k->pKeyFrameDataY.m_fPoint = y;
+        if (k->pKeyFrameDataY.m_fControl1 != -1.0f)
+            k->pKeyFrameDataY.m_fControl1 = y;
+        if (k->pKeyFrameDataY.m_fControl2 != -1.0f)
+            k->pKeyFrameDataY.m_fControl2 = y;
+        k = k->m_next;
+        if (k == head)
+            break;
+    }
+}
+
+static float KeyframeStart(FEAnimation* anim)
+{
+    v3AnimationKeyframe* first = nlDLRingGetStart<v3AnimationKeyframe>((v3AnimationKeyframe*)anim->m_DLRingHead);
+    return first->pKeyFrameDataX.m_fTime;
+}
+
+// PORT: a clone shares its source's fly-in keyframes unless they are copied.
+static void* CopyKeyframeRing(void* src)
+{
+    v3AnimationKeyframe* head = (v3AnimationKeyframe*)src;
+    v3AnimationKeyframe* first = NULL;
+    v3AnimationKeyframe* prev = NULL;
+    v3AnimationKeyframe* k = head;
+    while (k != NULL)
+    {
+        v3AnimationKeyframe* copy = (v3AnimationKeyframe*)PortFETrack(nlMalloc(sizeof(v3AnimationKeyframe), 8, false));
+        if (copy == NULL)
+            return NULL;
+        *copy = *k;
+        if (first == NULL)
+            first = copy;
+        else
+        {
+            prev->m_next = copy;
+            copy->m_prev = prev;
+        }
+        prev = copy;
+        k = k->m_next;
+        if (k == head)
+            break;
+    }
+    if (first != NULL)
+    {
+        prev->m_next = first;
+        first->m_prev = prev;
+    }
+    return first;
+}
+
+static TLComponentInstance* AddQuitRow(TLSlide* slide, const char* const* names, int count)
+{
+    FEAnimation* rowAnim[SHMainMenu::NUM_ITEMS] = { NULL };
+    TLInstance* row[SHMainMenu::NUM_ITEMS] = { NULL };
+
+    for (int i = 0; i < count; i++)
+    {
+        row[i] = FEFinder<TLInstance, 4>::Find<TLSlide>(slide, InlineHasher(nlStringLowerHash("Layer")),
+                                                        InlineHasher(nlStringLowerHash(names[i])));
+        FEAnimation* anim = nlDLRingGetStart<FEAnimation>(slide->m_animations);
+        while (anim != NULL)
+        {
+            if (anim->m_pTLInstanceTarget == row[i] && anim->m_type == eAnimPosition)
+                rowAnim[i] = anim;
+            if (nlDLRingIsEnd<FEAnimation>(slide->m_animations, anim))
+                break;
+            anim = anim->m_next;
+        }
+        if (row[i] == NULL || rowAnim[i] == NULL)
+            return NULL;
+    }
+
+    TLInstance* last = row[count - 1];
+    TLInstance* quit = PortFEClone(last, "MENU ITEM QUIT");
+    if (quit == NULL || PortFECloneOverflowed())
+        return NULL;
+
+    void* keys = CopyKeyframeRing(rowAnim[count - 1]->m_DLRingHead);
+    void* mem = PortFETrack(nlMalloc(sizeof(FEAnimation), 8, false));
+    if (keys == NULL || mem == NULL)
+        return NULL;
+    FEAnimation* quitAnim = new (mem) FEAnimation();
+    quitAnim->m_cast_type = rowAnim[count - 1]->m_cast_type;
+    quitAnim->m_type = eAnimPosition;
+    quitAnim->m_DLRingHead = keys;
+    quitAnim->m_pTLInstanceTarget = quit;
+
+    PortFEInsertAfter(last, quit);
+    // PORT: not AddEnd; with this as the ring head the highlight and ticker stop drawing.
+    nlDLRingAddStart(&slide->m_animations, quitAnim);
+
+    const float firstStart = KeyframeStart(rowAnim[0]);
+    for (int i = 0; i < count; i++)
+    {
+        const float want = firstStart + kRowStagger * i;
+        ShiftRowAnimation(rowAnim[i], kRowTop - kRowStep * i, want - KeyframeStart(rowAnim[i]));
+        row[i]->m_overloadedAttributes.v3Position.f.y = kRowTop - kRowStep * i;
+    }
+    ShiftRowAnimation(quitAnim, kRowTop - kRowStep * count,
+                      firstStart + kRowStagger * count - KeyframeStart(quitAnim));
+    quit->m_overloadedAttributes.v3Position.f.y = kRowTop - kRowStep * count;
+
+    // PORT: the "in" and "out" slides each carry their own label.
+    TLSlide* head = quit->m_component->pChildren;
+    for (TLSlide* cs = head; cs != NULL;)
+    {
+        TLTextInstance* label = FEFinder<TLTextInstance, 3>::Find<TLSlide>(cs, InlineHasher(nlStringLowerHash("R JUST")));
+        if (label != NULL)
+        {
+            label->m_LocStrId = kQuitLocStrId;
+            label->m_OverloadFlags |= 8;
+        }
+        cs = cs->m_next;
+        if (cs == head)
+            break;
+    }
+    return (TLComponentInstance*)quit;
+}
+
 /**
  * Offset/Address/Size: 0x1538 | 0x800AAF94 | size: 0xB0
  */
@@ -207,6 +359,8 @@ SHMainMenu::~SHMainMenu()
     {
         delete m_itemDescriptions;
     }
+    // PORT: the Quit row lives outside the package, which is freed after this.
+    PortFEReleaseClones();
 }
 
 static BackgroundScene* GetBackgroundScene()
@@ -296,6 +450,23 @@ void SHMainMenu::SceneCreated()
             lockedComp->m_bVisible = (bool)locked;
         }
     }
+    // PORT: an eighth row to quit the game.
+    if (TLComponentInstance* quit = AddQuitRow(presentation->m_currentSlide, MenuNameTable, NUM_ITEMS))
+    {
+        item = mMenuItems.AddItem(quit);
+        MenuCallback openFunc(Bind<void>(MemFun<SHMainMenu, void, TLComponentInstance*>(&SHMainMenu::OpenItem), this, placeholder0));
+        MenuCallback closeFunc(Bind<void>(MemFun<SHMainMenu, void, TLComponentInstance*>(&SHMainMenu::CloseItem), this, placeholder0));
+        item->SetCallback(ON_HIGHLIGHT, openFunc);
+        item->SetCallback(ON_UNHIGHLIGHT, closeFunc);
+        item->SetCallback(ON_APPLY, MenuCallback(onSelectQuit));
+        item->SetLockedFlag(false);
+        if (mLastMenuItem == NUM_ITEMS)
+            OpenItem(quit);
+        else
+            CloseItem(quit);
+    }
+    if (mLastMenuItem >= mMenuItems.GetNumItemsAdded())
+        mLastMenuItem = 0;
     mMenuItems.SetItem(mLastMenuItem);
     mMenuItems.SetFlag(1);
     scene->SetVisible(true);
@@ -511,4 +682,8 @@ void SHMainMenu::Update(float fDeltaT)
         GameSceneManager::Instance()->PopEntireStack();
         GameSceneManager::Instance()->Push(SCENE_TITLE, SCREEN_BACK, false);
     }
+
+    // PORT: Escape does what the Quit row does.
+    if (g_pFEInput->m_bInputAllowed && PortInputQuitPressed())
+        PortRequestQuit();
 }
