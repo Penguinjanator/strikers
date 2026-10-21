@@ -477,6 +477,11 @@ vigueur, ce qui répond aussi à la question «&#x202f;quelles sont mes commande
         <translation type="vanished">Dossier</translation>
     </message>
     <message>
+        <location filename="../src/mainwindow.cpp" line="1037"/>
+        <source>Storage</source>
+        <translation>Stockage</translation>
+    </message>
+    <message>
         <location filename="../src/mainwindow.cpp" line="1028"/>
         <source>Options</source>
         <translation>Options</translation>
@@ -721,6 +726,30 @@ Le jeu utilise désormais ce dossier ; l&apos;image peut donc être déplacée o
         <location filename="../src/mainwindow.cpp" line="1683"/>
         <source>Could not create %1.</source>
         <translation>Impossible de créer %1.</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1783"/>
+        <source>Saves go to %1</source>
+        <translation>Les sauvegardes vont dans %1</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1414"/>
+        <source>Portable</source>
+        <translation>Portable</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1415"/>
+        <source>Move your saves, controls and shader cache into the game folder?
+
+%1</source>
+        <translation>Déplacer vos sauvegardes, commandes et cache des shaders dans le dossier du jeu ?
+
+%1</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1432"/>
+        <source>Could not move %1. Whatever moved is in the game folder, and the rest is where it was.</source>
+        <translation>Impossible de déplacer %1. Ce qui a été déplacé se trouve dans le dossier du jeu, le reste est toujours à sa place.</translation>
     </message>
     <message>
         <location filename="../src/mainwindow.cpp" line="1701"/>
@@ -1161,6 +1190,21 @@ Le jeu utilise désormais ce dossier ; l&apos;image peut donc être déplacée o
         <location filename="../src/schema.cpp" line="236"/>
         <source>Japanese</source>
         <translation>Japonais</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="238"/>
+        <source>Portable</source>
+        <translation>Portable</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="239"/>
+        <source>Keep saves and caches in the game folder</source>
+        <translation>Garder sauvegardes et caches dans le dossier du jeu</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="240"/>
+        <source>Saves, controls and the shader cache stay in the game folder instead of your user profile, so the folder can be moved or copied whole.</source>
+        <translation>Les sauvegardes, les commandes et le cache des shaders restent dans le dossier du jeu au lieu de votre profil utilisateur : le dossier peut être déplacé ou copié en entier.</translation>
     </message>
     <message>
         <location filename="../src/schema.cpp" line="238"/>

@@ -1,11 +1,16 @@
 #include "apppaths.h"
 
+#include "inifile.h"
 #include "port/disc.h"
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QSettings>
+
+#include <algorithm>
 
 namespace {
 
@@ -117,6 +122,79 @@ QString AppPaths::userFolder(const QString& configured)
     while (dir.size() > 1 && dir.endsWith(QLatin1Char('/')))
         dir.chop(1);
     return dir;
+}
+
+QString AppPaths::portableUserFolder()
+{
+    return archiveRoot() + QStringLiteral("/user");
+}
+
+bool AppPaths::iniIsPortable(const QString& iniPath)
+{
+    IniFile ini;
+    if (!QFileInfo::exists(iniPath) || !ini.load(iniPath, nullptr))
+        return false;
+    const QString v = ini.value(QStringLiteral("PORTABLE")).trimmed().toLower();
+    return !v.isEmpty() && v != QLatin1String("0") && v != QLatin1String("false")
+           && v != QLatin1String("no") && v != QLatin1String("off");
+}
+
+void AppPaths::keepAppSettings(bool portable)
+{
+    // Every QSettings() constructed after this uses the format set here.
+    if (portable)
+    {
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, portableUserFolder());
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+    }
+    else
+        QSettings::setDefaultFormat(QSettings::NativeFormat);
+}
+
+bool AppPaths::moveToPortable(const QString& from, const QString& root, QString* error)
+{
+    const QDir src(from);
+    QStringList files;
+    QStringList dirs;
+    QDirIterator it(from, QDir::Files | QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot,
+                    QDirIterator::Subdirectories);
+    while (it.hasNext())
+    {
+        const QString path = it.next();
+        (it.fileInfo().isDir() ? dirs : files) << path;
+    }
+
+    for (const QString& path : files)
+    {
+        const QString rel = src.relativeFilePath(path);
+        if (QFileInfo(rel).fileName() == QLatin1String(".DS_Store"))
+        {
+            QFile::remove(path);
+            continue;
+        }
+        const bool cache = rel.startsWith(QLatin1String("dawn_cache.db"))
+                           || rel.startsWith(QLatin1String("pipeline_cache.db"));
+        const QString to =
+            root + (cache ? QStringLiteral("/cache/") : QStringLiteral("/user/")) + rel;
+        if (QFileInfo::exists(to))
+            continue;
+        // QFile::rename copies and removes when the two are on different drives.
+        if (!QDir().mkpath(QFileInfo(to).absolutePath()) || !QFile::rename(path, to))
+        {
+            if (error != nullptr)
+                *error = QDir::toNativeSeparators(path);
+            return false;
+        }
+    }
+
+    // Deepest first, so a parent is empty by the time it is reached.
+    std::sort(dirs.begin(), dirs.end(), [](const QString& a, const QString& b) {
+        return a.size() > b.size();
+    });
+    for (const QString& dir : dirs)
+        QDir().rmdir(dir);
+    QDir().rmdir(from);
+    return true;
 }
 
 QString AppPaths::modsFolder(const QString& root, const QString& kind)

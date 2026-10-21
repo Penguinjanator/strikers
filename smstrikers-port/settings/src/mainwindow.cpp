@@ -1034,6 +1034,25 @@ QWidget* MainWindow::buildGameTab()
         dumpLead->setMinimumWidth(w);
     }
 
+    page->beginSection(tr("Storage"));
+
+    {
+        const Setting& s = Schema::get(QStringLiteral("portable"));
+        m_portableBox = new QCheckBox(s.check);
+        page->addSetting(s.label, m_portableBox, infoFor(s));
+        m_portableState = SettingsPage::note(QString());
+        m_portableState->setTextFormat(Qt::PlainText);
+        page->addFieldNote(m_portableState);
+        connect(m_portableBox, &QCheckBox::toggled, this, [this] {
+            updatePortableState();
+            updateTexturePacks();
+            markDirty();
+        });
+        registerControl(
+            s, [this] { return QString(m_portableBox->isChecked() ? "1" : "0"); },
+            [this](const QString& v) { m_portableBox->setChecked(truthy(v)); });
+    }
+
     page->beginSection(tr("Options"));
 
     // The combo's first entry writes nothing, which leaves each disc its own language.
@@ -1289,6 +1308,7 @@ void MainWindow::loadIntoUi()
     updateConflicts();
     updateDataState();
     updateTexturePacks();
+    updatePortableState();
     m_loading = false;
 }
 
@@ -1371,8 +1391,56 @@ void MainWindow::applyAdvancedTable()
 
 bool MainWindow::saveTo(const QString& path, QString* error)
 {
+    const bool wasPortable = AppPaths::iniIsPortable(path);
     collectFromUi();
-    return m_ini.save(path, error);
+    if (!m_ini.save(path, error))
+        return false;
+    const bool portable = m_portableBox != nullptr && m_portableBox->isChecked();
+    if (portable && !wasPortable)
+        offerPortableMove();
+    AppPaths::keepAppSettings(portable);
+    return true;
+}
+
+void MainWindow::offerPortableMove()
+{
+    const QString from = AppPaths::userFolder();
+    const QString to = AppPaths::portableUserFolder();
+    if (m_ini.has(QStringLiteral("USER_DIR")) || QFileInfo::exists(to)
+        || QDir(from).isEmpty(QDir::AllEntries | QDir::NoDotAndDotDot))
+        return;
+
+    const auto answer = QMessageBox::question(
+        this, tr("Portable"),
+        tr("Move your saves, controls and shader cache into the game folder?\n\n%1")
+            .arg(QDir::toNativeSeparators(from)));
+    if (answer != QMessageBox::Yes)
+        return;
+
+    // Fallbacks off, or macOS lists the global domain's keys too.
+    QSettings system;
+    system.setFallbacksEnabled(false);
+    const QStringList keys = system.allKeys();
+    QHash<QString, QVariant> own;
+    for (const QString& k : keys)
+        own.insert(k, system.value(k));
+
+    QString failed;
+    if (!AppPaths::moveToPortable(from, AppPaths::archiveRoot(), &failed))
+    {
+        QMessageBox::warning(this, tr("Portable"),
+                             tr("Could not move %1. Whatever moved is in the game folder, and the "
+                                "rest is where it was.").arg(failed));
+        return;
+    }
+
+    AppPaths::keepAppSettings(true);
+    QSettings portable;
+    for (auto it = own.constBegin(); it != own.constEnd(); ++it)
+        portable.setValue(it.key(), it.value());
+    portable.sync();
+    AppPaths::keepAppSettings(false);
+    QSettings().clear();
 }
 
 void MainWindow::onSave()
@@ -1488,7 +1556,8 @@ void MainWindow::onChooseFolder()
 
 QString MainWindow::extractTarget(const QString& gameId, qint64 bytes)
 {
-    QString target = DiscImage::defaultExtractDir(gameId);
+    QString target = DiscImage::defaultExtractDir(
+        gameId, m_portableBox != nullptr && m_portableBox->isChecked() ? userFolder() : QString());
     for (;;)
     {
         const QString files = QDir(target).filePath(QStringLiteral("files"));
@@ -1745,9 +1814,18 @@ QString MainWindow::gamePath(const QString& path)
 
 QString MainWindow::userFolder() const
 {
-    return AppPaths::userFolder(m_ini.has(QStringLiteral("USER_DIR"))
-                                    ? gamePath(m_ini.value(QStringLiteral("USER_DIR")))
-                                    : QString());
+    if (m_ini.has(QStringLiteral("USER_DIR")))
+        return AppPaths::userFolder(gamePath(m_ini.value(QStringLiteral("USER_DIR"))));
+    if (m_portableBox != nullptr && m_portableBox->isChecked())
+        return AppPaths::portableUserFolder();
+    return AppPaths::userFolder();
+}
+
+void MainWindow::updatePortableState()
+{
+    if (m_portableState == nullptr)
+        return;
+    m_portableState->setText(tr("Saves go to %1").arg(QDir::toNativeSeparators(userFolder())));
 }
 
 void MainWindow::openFolder(const QString& path)

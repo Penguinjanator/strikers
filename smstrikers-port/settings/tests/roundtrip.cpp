@@ -636,6 +636,42 @@ int main(int argc, char** argv)
         }
     }
 
+    // 14. Turning portable on moves the system user folder, caches apart, and overwrites nothing.
+    {
+        QTemporaryDir from;
+        QTemporaryDir root;
+        auto write = [](const QString& path, const QByteArray& bytes) {
+            QDir().mkpath(QFileInfo(path).absolutePath());
+            QFile f(path);
+            return f.open(QIODevice::WriteOnly) && f.write(bytes) == bytes.size();
+        };
+        write(from.filePath(QStringLiteral("USA/MemoryCardA.USA.raw")), "card");
+        write(from.filePath(QStringLiteral("imgui.ini")), "ui");
+        write(from.filePath(QStringLiteral("pipeline_cache.db")), "p");
+        write(from.filePath(QStringLiteral("dawn_cache.db-wal")), "d");
+        write(from.filePath(QStringLiteral(".DS_Store")), "x");
+        write(root.filePath(QStringLiteral("user/imgui.ini")), "kept");
+
+        QString failed;
+        check(AppPaths::moveToPortable(from.path(), root.path(), &failed),
+              QStringLiteral("the move succeeds"), failed);
+        check(readAll(root.filePath(QStringLiteral("user/USA/MemoryCardA.USA.raw"))) == "card",
+              QStringLiteral("saves go to user/"));
+        check(readAll(root.filePath(QStringLiteral("cache/pipeline_cache.db"))) == "p"
+                  && readAll(root.filePath(QStringLiteral("cache/dawn_cache.db-wal"))) == "d",
+              QStringLiteral("the shader caches go to cache/"));
+        check(!QFileInfo::exists(root.filePath(QStringLiteral("user/pipeline_cache.db"))),
+              QStringLiteral("... and not to user/"));
+        check(readAll(root.filePath(QStringLiteral("user/imgui.ini"))) == "kept",
+              QStringLiteral("an existing file is not overwritten"));
+        check(!QFileInfo::exists(root.filePath(QStringLiteral("user/.DS_Store"))),
+              QStringLiteral("Finder's own files are not carried over"));
+        check(!QFileInfo::exists(from.filePath(QStringLiteral("USA"))),
+              QStringLiteral("a moved folder is gone from the old place"));
+        check(readAll(from.filePath(QStringLiteral("imgui.ini"))) == "ui",
+              QStringLiteral("a file that would overwrite stays in the old place"));
+    }
+
     QTextStream out(stdout);
     out << (g_failures == 0 ? "\nall checks passed\n"
                             : QStringLiteral("\n%1 check(s) failed\n").arg(g_failures));

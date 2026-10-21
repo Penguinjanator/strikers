@@ -163,6 +163,10 @@
 # 1 saves to texture_dumps/ in the user folder; a path saves there.
 # texture_dump = 1
 
+# 1 keeps the user folder and the shader cache in user/ and cache/ beside the game, so the game
+# folder can be moved or copied whole. user_dir and cache_dir still apply when set.
+# portable = 1
+
 # The user folder: saves, texture packs and texture dumps. Unset, it is %APPDATA%\Super Mario
 # Strikers on Windows, ~/Library/Application Support/Super Mario Strikers on macOS and
 # ~/.local/share/Super Mario Strikers on Linux.

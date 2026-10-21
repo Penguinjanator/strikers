@@ -250,12 +250,31 @@ static void open_log(void)
     setvbuf(stderr, NULL, _IONBF, 0);
 }
 
+// portable = 1 defaults user_dir and cache_dir to user/ and cache/ beside the game.
+static void portable_folders(void)
+{
+    char dir[1024];
+    char path[1100];
+    const char* v = getenv("STRIKERS_PORTABLE");
+
+    if (v == NULL || *v == '\0' || strcmp(v, "0") == 0 || strcmp(v, "false") == 0 ||
+        strcmp(v, "no") == 0 || strcmp(v, "off") == 0 || strcmp(v, "FALSE") == 0)
+        return;
+    if (port_executable_dir(dir, sizeof dir) != 0)
+        return;
+    snprintf(path, sizeof path, "%s/user", dir);
+    port_setenv_default("STRIKERS_USER_DIR", path);
+    snprintf(path, sizeof path, "%s/cache", dir);
+    port_setenv_default("STRIKERS_CACHE_DIR", path);
+}
+
 int PortConfigLoad(void)
 {
     if (s_loaded)
         return s_applied;
 
     s_applied = load_config();
+    portable_folders();
     // After the file, not before: `log` is a key like any other, and a player asked to turn logging
     // on will put it in strikers.ini rather than set an environment variable.
     open_log();

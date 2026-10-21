@@ -25,7 +25,8 @@ Info inspect(const QString& path);
 
 QStringList nameFilters();
 
-QString defaultExtractDir(const QString& gameId);
+// Under `base` when given, else the system's data folder.
+QString defaultExtractDir(const QString& gameId, const QString& base = QString());
 
 QString extractedGameId(const QString& files);
 

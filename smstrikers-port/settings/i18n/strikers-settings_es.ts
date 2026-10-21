@@ -475,6 +475,11 @@ que es además la respuesta a «¿cuáles son mis controles?».</translation>
         <translation type="vanished">Carpeta</translation>
     </message>
     <message>
+        <location filename="../src/mainwindow.cpp" line="1037"/>
+        <source>Storage</source>
+        <translation>Almacenamiento</translation>
+    </message>
+    <message>
         <location filename="../src/mainwindow.cpp" line="1028"/>
         <source>Options</source>
         <translation>Opciones</translation>
@@ -719,6 +724,30 @@ El juego usa ahora esa carpeta, así que la imagen se puede mover o borrar. El c
         <location filename="../src/mainwindow.cpp" line="1683"/>
         <source>Could not create %1.</source>
         <translation>No se pudo crear %1.</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1783"/>
+        <source>Saves go to %1</source>
+        <translation>Las partidas se guardan en %1</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1414"/>
+        <source>Portable</source>
+        <translation>Portátil</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1415"/>
+        <source>Move your saves, controls and shader cache into the game folder?
+
+%1</source>
+        <translation>¿Mover tus partidas, controles y caché de shaders a la carpeta del juego?
+
+%1</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="1432"/>
+        <source>Could not move %1. Whatever moved is in the game folder, and the rest is where it was.</source>
+        <translation>No se pudo mover %1. Lo que se movió está en la carpeta del juego y el resto sigue donde estaba.</translation>
     </message>
     <message>
         <location filename="../src/mainwindow.cpp" line="1701"/>
@@ -1159,6 +1188,21 @@ El juego usa ahora esa carpeta, así que la imagen se puede mover o borrar. El c
         <location filename="../src/schema.cpp" line="236"/>
         <source>Japanese</source>
         <translation>Japonés</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="238"/>
+        <source>Portable</source>
+        <translation>Portátil</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="239"/>
+        <source>Keep saves and caches in the game folder</source>
+        <translation>Guardar partidas y cachés en la carpeta del juego</translation>
+    </message>
+    <message>
+        <location filename="../src/schema.cpp" line="240"/>
+        <source>Saves, controls and the shader cache stay in the game folder instead of your user profile, so the folder can be moved or copied whole.</source>
+        <translation>Las partidas, los controles y la caché de shaders se quedan en la carpeta del juego en lugar de en tu perfil de usuario, así que la carpeta se puede mover o copiar entera.</translation>
     </message>
     <message>
         <location filename="../src/schema.cpp" line="238"/>

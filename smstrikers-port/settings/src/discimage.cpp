@@ -182,12 +182,14 @@ QStringList nameFilters()
              QStringLiteral("*.gcz") };
 }
 
-QString defaultExtractDir(const QString& gameId)
+QString defaultExtractDir(const QString& gameId, const QString& base)
 {
-    QString base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
-    if (base.isEmpty())
-        base = QDir::homePath();
-    return QDir::cleanPath(base + QStringLiteral("/Super Mario Strikers/Game Data/") + gameId);
+    if (!base.isEmpty())
+        return QDir::cleanPath(base + QStringLiteral("/Game Data/") + gameId);
+    QString data = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+    if (data.isEmpty())
+        data = QDir::homePath();
+    return QDir::cleanPath(data + QStringLiteral("/Super Mario Strikers/Game Data/") + gameId);
 }
 
 QString extractedGameId(const QString& files)

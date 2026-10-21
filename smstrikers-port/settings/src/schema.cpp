@@ -235,6 +235,15 @@ QVector<Setting> makeGame()
         { Text::tr("Disc default"), Text::tr("English"), Text::tr("German"), Text::tr("French"),
           Text::tr("Spanish"), Text::tr("Italian"), Text::tr("Japanese") }));
 
+    v.push_back(toggle("portable", "paths", Text::tr("Portable"), "0",
+        Text::tr("Keep saves and caches in the game folder"),
+        Text::tr(
+        "Saves, controls and the shader cache stay in the game folder instead "
+        "of your user profile, so the folder can be moved or copied whole."),
+        QStringLiteral(
+        "1 keeps the user folder and the shader cache in user/ and cache/ beside the game, so the "
+        "game folder can be moved or copied whole. user_dir and cache_dir still apply when set.")));
+
     v.push_back(toggle("unlock_all", "game", Text::tr("Extras"), "0",
         Text::tr("Unlock every stadium, team and cup"),
         Text::tr(

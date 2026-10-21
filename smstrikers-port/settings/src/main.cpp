@@ -647,14 +647,24 @@ int main(int argc, char** argv)
             iniPath = a;
     }
 
+    if (iniPath.isEmpty())
+    {
+        // Beside the game, not in the working directory: a shortcut, Explorer and a terminal each
+        // set that somewhere different, and the game's own config.c looks beside itself for the
+        // same reason.
+        iniPath = AppPaths::defaultIniPath();
+    }
+
+    // Before WindowLanguage::install, which reads QSettings.
+    AppPaths::keepAppSettings(AppPaths::iniIsPortable(iniPath));
+
     // After the arguments, because --lang decides it; before anything reads the schema, because the
     // schema is data built once on first use and a table built one call early would be English for
     // the rest of the run.
     WindowLanguage::install(language);
     Schema::retranslate();
 
-    // Before the ini path is resolved: this asks nothing of the file system and a machine with no
-    // game folder still has to be able to run it.
+    // None of these needs a game folder.
     if (wantLanguages)
         return languages();
     if (!inspectPath.isEmpty())
@@ -663,14 +673,6 @@ int main(int argc, char** argv)
         return extractImage(extractFrom, extractTo);
     if (!selftestExtractPath.isEmpty())
         return selftestExtract(selftestExtractPath);
-
-    if (iniPath.isEmpty())
-    {
-        // Beside the game, not in the working directory: a shortcut, Explorer and a terminal each
-        // set that somewhere different, and the game's own config.c looks beside itself for the
-        // same reason.
-        iniPath = AppPaths::defaultIniPath();
-    }
 
     if (wantPaths)
         return paths(iniPath);

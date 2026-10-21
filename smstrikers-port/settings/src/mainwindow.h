@@ -124,6 +124,8 @@ private:
     void updateLanguageState(const QString& gameId);
     void updateTexturePacks();
     QString userFolder() const;
+    void updatePortableState();
+    void offerPortableMove();
     // A path from the file as the game reads it: relative to the folder Play starts it in.
     static QString gamePath(const QString& path);
     void openFolder(const QString& path);
@@ -166,6 +168,9 @@ private:
     bool m_fillingPacks = false;
     QCheckBox* m_dumpBox = nullptr;
     QString m_dumpFolder;
+
+    QCheckBox* m_portableBox = nullptr;
+    QLabel* m_portableState = nullptr;
 
     QTableWidget* m_advanced = nullptr;
 
