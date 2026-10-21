@@ -24,8 +24,8 @@ if [ -z "${CMAKE_TOOLCHAIN_FILE:-}" ]; then
 fi
 
 # Hermetic dependencies, and this is the whole of why: Aurora asks find_package for libpng,
-# Freetype, zstd, SQLite3 and abseil before it builds its own, and a CI runner has Homebrew, so it
-# found them and linked them by absolute path.
+# Freetype, zstd, SQLite3, abseil and fmt before it builds its own, and a CI runner has Homebrew, so
+# it found them and linked them by absolute path.
 set -- -S . -B "$BUILD" -G "$GENERATOR" \
     -DCMAKE_BUILD_TYPE="$TYPE" \
     -DSTRIKERS_AURORA=ON \
@@ -35,6 +35,7 @@ set -- -S . -B "$BUILD" -G "$GENERATOR" \
     -DCMAKE_DISABLE_FIND_PACKAGE_zstd=ON \
     -DCMAKE_DISABLE_FIND_PACKAGE_SQLite3=ON \
     -DCMAKE_DISABLE_FIND_PACKAGE_absl=ON \
+    -DCMAKE_DISABLE_FIND_PACKAGE_fmt=ON \
     -DAURORA_CACHE_USE_ZSTD=OFF \
     -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 
@@ -42,6 +43,11 @@ set -- -S . -B "$BUILD" -G "$GENERATOR" \
 if [ "$(uname -s)" = Linux ]; then
     set -- "$@" -DAURORA_DAWN_PROVIDER=vendor
 fi
+
+# A system SDL3's include path puts another abseil's headers ahead of the one Aurora links.
+case "$(uname -s)" in
+Darwin|Linux) set -- "$@" -DAURORA_SDL3_PROVIDER=vendor ;;
+esac
 
 if [ -n "${CMAKE_TOOLCHAIN_FILE:-}" ]; then
     set -- "$@" -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE"

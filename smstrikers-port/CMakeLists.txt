@@ -18,6 +18,12 @@ if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT (NX AND CMAKE_CXX_COMPILER_
         "See the toolchain contract in CMakeLists.txt.")
 endif()
 
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    message(FATAL_ERROR
+        "In-source builds are not supported; Freetype refuses them. Remove CMakeCache.txt and "
+        "CMakeFiles/ from this folder, then run: tools/configure.sh build Release")
+endif()
+
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/Game/main.cpp")
     message(FATAL_ERROR
         "src/Game/main.cpp is missing. The game sources are committed in this "
@@ -243,6 +249,8 @@ else()
     target_compile_options(port_flags INTERFACE
         $<$<NOT:$<BOOL:${NX}>>:-fdeclspec>
         -fshort-wchar
+        # LLVM 20+ turns 16-bit strlen loops into calls to the C library's 32-bit wcslen.
+        -fno-builtin-wcslen
         -include "${CMAKE_CURRENT_SOURCE_DIR}/include/port/prelude.h"
         -fno-strict-aliasing
         -fsigned-char

@@ -7,16 +7,23 @@
 #include "stdlib.h"
 #include "types.h"
 
+// PORT: libc++ forward-declares std::less, which makes MSL's own ambiguous.
+#if defined(_LIBCPP_VERSION)
+#include <__functional/operations.h>
+#endif
+
 namespace std
 {
 
+#if !defined(_LIBCPP_VERSION)
 template <class Arg1, class Arg2, class Result>
 struct binary_function
 {
 };
+#endif
 
 // PORT: MSVC's <type_traits> already defines std::less.
-#if !defined(_MSC_VER)
+#if !defined(_MSC_VER) && !defined(_LIBCPP_VERSION)
 template <class T>
 struct less : public binary_function<T, T, bool>
 {
