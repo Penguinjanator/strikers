@@ -1,4 +1,5 @@
 #include "Game/AI/FielderActions.h"
+#include "port/simhygiene.h"
 #include "Game/Camera/CameraMan.h"
 #include "Game/Camera/animcam.h"
 #include "Game/Camera/rumblefilter.h"
@@ -37,6 +38,7 @@
 #include "NL/nlFunction.h"
 #include "NL/nlMath.h"
 #include "NL/plat/plataudio.h"
+#include "port/lockstep.h"
 #include "types.h"
 
 static f32 CANT_COLLIDE = *(f32*)__float_max;
@@ -101,6 +103,14 @@ static bool sbDoShatteredGlassTransition;
 static u16 g_IdleTurnCompletionDelta = DegreesToAngle(1.0f);
 
 static cRumbleFilter rumbleFilter;
+
+// PORT: hoisted out of ActionShootToScore so BeginGame can restart it; retail kept it across matches.
+static float sfTimeSinceLastRumbleFilter = 0.0f;
+
+void PortResetFielderActionsStatics(void)
+{
+    sfTimeSinceLastRumbleFilter = 0.0f;
+}
 
 extern cCharacter* g_pCurrentlyUpdatingCharacter;
 extern float g_fFixedUpdateTick;
@@ -2959,7 +2969,11 @@ void cFielder::InitActionShootToScore()
 void MatrixCamFinishedCallback(MatrixEffectCam* pMatrixCam)
 {
     const float timeScale = 1.0f;
-    FixedUpdateTask::mTimeScale = timeScale;
+    // PORT: called on render time every frame after the spin; in lockstep mode it ends only its own slow motion, from the next tick.
+    if (!g_simLockstep)
+        FixedUpdateTask::mTimeScale = timeScale;
+    else if (FixedUpdateTask::mTimeScale == sfMatrixCamTimeScale)
+        PortSimSetTimeScale(timeScale);
     ParticleUpdateTask::SetTimeScale(timeScale);
 }
 
@@ -3391,8 +3405,6 @@ void cFielder::ActionShootToScore(float fDeltaT)
     float firstKickTime = sfFirstKickFrame / (float)nTotalFrames2;
     float shaolinTime = 67.0f / (float)nTotalFrames2;
     hyperStrikeAnimCamBeginTime = sfHyperStrikeAnimCamBeginFrame / (float)nTotalFrames2;
-
-    static float sfTimeSinceLastRumbleFilter = 0.0f;
 
     if (mActionShootToScoreVars.isCaptainSts)
     {

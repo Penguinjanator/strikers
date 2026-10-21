@@ -6,6 +6,7 @@
 #include "NL/nlString.h"
 #include "NL/nlDLRing.h"
 #include "NL/nlMemory.h"
+#include "port/lockstep.h"
 
 EventManager* g_pEventManager = 0;
 
@@ -237,6 +238,9 @@ Event* EventManager::CreateValidEvent(unsigned long eventID, unsigned long uSize
 
     e->m_uEventID = eventID; // stw at +0x08
 
+    // PORT: in lockstep mode the event is held until the simulation handlers have had it at a tick end.
+    PortSimHoldEvent(this, e);
+
     // PORT: Off unless asked for: the walk is O(pool) and this is called a hundred times a second.
     if (port_ev_logging())
     {
@@ -293,7 +297,8 @@ void EventManager::DispatchEvents()
             do
             {
                 u32 mask = m_dest[e->m_uEventID]; // dest[type]
-                if ((it->m_uDestinationMask & mask) != 0)
+                // PORT: in lockstep mode the simulation handlers had the event at a tick end.
+                if ((it->m_uDestinationMask & mask) != 0 && !(g_simLockstep && PortSimEventHandler(it)))
                 {
                     void (*fn)(Event*, void*) = it->m_pCBFunction;
                     void* ud = it->m_pCBParam;

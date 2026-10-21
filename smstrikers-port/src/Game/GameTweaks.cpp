@@ -7,6 +7,7 @@
 #include "NL/nlPrint.h"
 
 #include "Game/GameInfo.h"
+#include "port/lockstep.h"
 
 SkillTweaks g_sSkillTweaks[2];
 const char* g_sDifficultyFileNames[7] = {
@@ -40,7 +41,8 @@ void GameTweaks::Init()
 
     const GameplaySettings& gameSettings = GameInfoManager::Instance()->GetGameplayOptions();
 
-    if (Config::Global().Exists("Game Duration"))
+    // PORT: in lockstep mode the ini files and the overlay do not change the match.
+    if (!g_simLockstep && Config::Global().Exists("Game Duration"))
     {
         fGameDuration = Config::Global().Get<float>("Game Duration", 0.0f);
     }

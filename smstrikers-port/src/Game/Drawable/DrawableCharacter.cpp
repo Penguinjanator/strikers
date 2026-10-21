@@ -253,8 +253,9 @@ void DrawableCharacter::Grab(cCharacter& character)
     mHeight = mBip01Position.z;
     mVelocity = character.m_v3Velocity;
     mFacingDirection = character.m_aActualFacingDirection;
-    mHeadSpin = (unsigned short)character.m_pHeadTrack->m_fHeadSpin;
-    mHeadTilt = (unsigned short)character.m_pHeadTrack->m_fHeadTilt;
+    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+    mHeadSpin = (unsigned short)(s32)character.m_pHeadTrack->m_fHeadSpin;
+    mHeadTilt = (unsigned short)(s32)character.m_pHeadTrack->m_fHeadTilt;
     mPoseTree = character.m_pPoseTree;
     mVisible = true;
     mDirt = (unsigned char)(255.0f * character.m_Dirt);

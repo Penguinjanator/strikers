@@ -121,6 +121,15 @@ jobs:
         shell: bash
         run: ./tools/rebuild.sh build-aur
 
+      - name: Port tests
+        if: runner.os != 'Linux'
+        working-directory: smstrikers-port
+        shell: bash
+        # rebuild.sh's first pass stops at the expected link failure, so build what it skipped.
+        run: |
+          cmake --build build-aur -j10
+          ctest --test-dir build-aur/tests --output-on-failure
+
       - name: Start the Ubuntu 22.04 container (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -147,6 +156,12 @@ jobs:
       - name: Build (Linux)
         if: runner.os == 'Linux'
         run: docker exec build ./tools/rebuild.sh build-aur
+
+      - name: Port tests (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          docker exec build cmake --build build-aur -j10
+          docker exec build ctest --test-dir build-aur/tests --output-on-failure
 
       - name: Return the tree to the runner user (Linux)
         if: runner.os == 'Linux'

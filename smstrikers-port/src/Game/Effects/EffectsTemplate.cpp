@@ -11,9 +11,16 @@
 #include "NL/gl/glState.h"
 #include "NL/glx/glxTexture.h"
 #include "Game/Sys/simpleparser.h"
+#include "port/simhygiene.h"
 
 static nlAVLTree<unsigned long, EffectsTemplate*, DefaultKeyCompare<unsigned long> >* pTemplateMap = nullptr;
 static unsigned int uSeed = 0x9184EB0C;
+
+// PORT: BeginGame restarts it; effect lifetimes drawn from it gate some gameplay draws and sounds.
+void PortResetEffectsStatics(void)
+{
+    uSeed = 0x9184EB0C;
+}
 
 struct ColourKey
 {

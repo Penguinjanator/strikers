@@ -13,6 +13,7 @@
 #include "Game/ReplayManager.h"
 #include "Game/Team.h"
 #include "NL/platpad.h"
+#include "port/lockstep.h"
 
 float g_fFixedUpdateTick = 0.02f;
 extern PhysicsWorld* g_PhysicsWorld;
@@ -74,7 +75,10 @@ void FixedUpdateTask::DecrementFrameLock(float fDeltaT)
  */
 void FixedUpdateTask::Run(float dt)
 {
-    if (nlTaskManager::m_pInstance->m_CurrState == 2)
+    // PORT: in lockstep mode ticks follow an integer schedule, barriers and per-tick input, not frame time.
+    if (g_simLockstep && nlTaskManager::m_pInstance->m_CurrState == 2)
+        PortLockstepRunTicks(dt);
+    else if (nlTaskManager::m_pInstance->m_CurrState == 2)
     {
         float simulationTick;
 

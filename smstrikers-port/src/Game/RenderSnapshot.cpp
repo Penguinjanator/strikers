@@ -15,6 +15,7 @@
 #include "NL/gl/glState.h"
 #include "Game/Render/CrowdManager.h"
 #include "Game/Effects/EmissionManager.h"
+#include "port/lockstep.h"
 
 extern bool g_GoalLightEnabled;
 float g_AllActorsHidden;
@@ -284,7 +285,9 @@ void RenderSnapshot::Render(float deltaTime) const
     SidelineExplodableManager::SetVisibilityOfUnexplodedModels((bool*)mpExplodableVisibilityRecords, mNumExplodables);
 
     int stackSize = cCameraManager::m_UpVectorStackSize;
-    cCameraManager::m_UpVectorStack[stackSize] = mCameraUp;
+    // PORT: under lockstep the world up vector the tick sets stays the tick's; only a replay's own slot takes the blend.
+    if (!g_simLockstep || stackSize != 0)
+        cCameraManager::m_UpVectorStack[stackSize] = mCameraUp;
 
     static u32 texanim = glGetTexture("wario_stadium/goallight.ifl");
 

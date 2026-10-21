@@ -16,6 +16,7 @@
 #include "types.h"
 
 #include "NL/nlBind.h"
+#include "port/simcamera.h"
 
 extern PhysicsWorld* g_PhysicsWorld;
 
@@ -334,7 +335,9 @@ void SidelineExplodable::Explode()
     nlMatrix4 worldMatrix;
     worldMatrix.SetIdentity();
     worldMatrix.SetTranslation(GetWorldMatrix().GetTranslation());
-    if (!WorldManager::s_World->IsSphereInFrustum(worldMatrix, 1.0f))
+    // PORT: under lockstep the simulation camera's frustum decides, not the one the last frame drew.
+    const nlVector4* simFrustum = PortSimCameraFrustum();
+    if (simFrustum != NULL ? !World::IsSphereInFrustum(simFrustum, worldMatrix, 1.0f) : !WorldManager::s_World->IsSphereInFrustum(worldMatrix, 1.0f))
         return;
 
     mbIsMainModelVisible = false;

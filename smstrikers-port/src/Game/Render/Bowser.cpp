@@ -22,6 +22,7 @@
 #include "Game/Game.h"
 #include "Game/World/worldanim.h"
 #include "Game/Audio/AudioLoader.h"
+#include "port/simcamera.h"
 
 #include "math.h"
 
@@ -230,7 +231,8 @@ void Bowser::Update(float fDeltaT)
         {
             if (mAttackType != BOWSER_ATTACK_STOMP)
             {
-                if (fabsf(mv3TargetPos.x - nlDLRingGetStart<cBaseCamera>(cCameraManager::m_cameraStack)->GetTargetPosition().x) > 8.0f)
+                // PORT: under lockstep Bowser follows the simulation camera, not the one on screen.
+                if (fabsf(mv3TargetPos.x - PortSimCameraTarget().x) > 8.0f)
                 {
                     return;
                 }
@@ -806,8 +808,8 @@ void Bowser::ActionInit()
         return;
     if (mStompStage == 0)
     {
-        cBaseCamera* cam = nlDLRingGetStart(cCameraManager::m_cameraStack);
-        const nlVector3& target = cam->GetTargetPosition();
+        // PORT: under lockstep Bowser follows the simulation camera, not the one on screen.
+        const nlVector3& target = PortSimCameraTarget();
         mv3TargetPos = target;
     }
     else
@@ -1025,8 +1027,8 @@ void Bowser::ActionFall()
     meBowserState = BOWSER_STATE_FALL;
     mfDesiredSpeed = 0.0f;
 
-    cBaseCamera* camera = nlDLRingGetStart<cBaseCamera>(cCameraManager::m_cameraStack);
-    mv3TargetPos = camera->GetTargetPosition();
+    // PORT: under lockstep Bowser lands where the simulation camera looks.
+    mv3TargetPos = PortSimCameraTarget();
 
     nlVector3 targetPos = mv3TargetPos;
 
@@ -1295,8 +1297,8 @@ void Bowser::ActionLeave()
 
     SetBowserAnimState(BOWSER_ANIM_JUMP, PM_HOLD, 0.2f);
 
-    cBaseCamera* camera = nlDLRingGetStart<cBaseCamera>(cCameraManager::m_cameraStack);
-    nlVector3 v3CameraTarget = camera->GetTargetPosition();
+    // PORT: under lockstep Bowser leaves by the simulation camera.
+    nlVector3 v3CameraTarget = PortSimCameraTarget();
 
     nlVector3 v3Velocity = { 25.0f, 0.0f, 25.0f };
 

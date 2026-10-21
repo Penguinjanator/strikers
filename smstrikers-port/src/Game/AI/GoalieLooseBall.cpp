@@ -52,7 +52,8 @@ void LooseBallInfo::InitInstance(cPlayer* pPlayer, int nAnimID, eLooseBallAnimTy
     GetAnimTriggerInfo(pPlayer, nAnimID, LooseBallCallback, this);
     pPlayer->GetJointPositionFuture(&mv3PickupPos, nAnimID, pPlayer->m_nBallJointIndex, mfPickupTime, true, true, false);
     mfPickupDistance = nlSqrt(mv3PickupPos.e[0] * mv3PickupPos.e[0] + mv3PickupPos.e[1] * mv3PickupPos.e[1], true);
-    maPickupAngle = (unsigned short)(s16)(10430.378f * nlATan2f(mv3PickupPos.y, mv3PickupPos.x));
+    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+    maPickupAngle = (unsigned short)(s16)(s32)(10430.378f * nlATan2f(mv3PickupPos.y, mv3PickupPos.x));
 }
 
 /**

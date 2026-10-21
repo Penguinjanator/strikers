@@ -14,6 +14,8 @@
 #include "Game/FE/Overlay/OverlayHandlerSummary.h"
 #include "NL/nlLocalization.h"
 #include "NL/nlString.h"
+#include "port/lockstep.h"
+#include "port/online.h"
 
 #include "NL/nlBind.h"
 
@@ -353,6 +355,12 @@ void PausePostGameScene::Update(float dt)
 void PausePostGameScene::OnSelectRematch()
 {
     OSReport("[fe] rematch\n");
+    // PORT: online, each item is a vote; the room decides between a rematch and the room.
+    if (PortSimOnline())
+    {
+        PortOnlineVote(-1, ONLINE_VOTE_REMATCH);
+        return;
+    }
     Config& cfg = Config::Global();
     TagValuePair& tvp = cfg.FindTvp("save_stats");
     bool saveStats;
@@ -408,6 +416,12 @@ void PausePostGameScene::OnSelectRematch()
 void PausePostGameScene::OnSelectQuit()
 {
     OSReport("[fe] postgame-quit\n");
+    // PORT: online, a vote to go back to the room.
+    if (PortSimOnline())
+    {
+        PortOnlineVote(-1, ONLINE_VOTE_BACK_TO_ROOM);
+        return;
+    }
     if (GameInfoManager::Instance()->GetNumPlayers() > 1)
     {
         OverlayManager::Instance()->Push(OVERLAY_BRAG, SCREEN_NOTHING, true);
@@ -424,6 +438,12 @@ void PausePostGameScene::OnSelectQuit()
 void PausePostGameScene::OnSelectChangeTeams()
 {
     OSReport("[fe] change-teams\n");
+    // PORT: online, a vote to choose teams again in the room.
+    if (PortSimOnline())
+    {
+        PortOnlineVote(-1, ONLINE_VOTE_CHANGE_TEAMS);
+        return;
+    }
     GameInfoManager::Instance()->mGoToChooseCaptains = true;
     GameInfoManager::Instance()->mMainUserPadNumber = (eFEINPUT_PAD)gPadThatQuit;
     if (GameInfoManager::Instance()->GetNumPlayers() > 1)

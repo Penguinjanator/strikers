@@ -128,7 +128,8 @@ void nlMakeRotationMatrixX(nlMatrix4& out, float theta)
     f32 sn;
     f32 cs;
 
-    nlSinCos(&sn, &cs, (short)(RAD_TO_FIXED16 * theta));
+    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+    nlSinCos(&sn, &cs, (short)(s32)(RAD_TO_FIXED16 * theta));
     PSMTX44Identity(out.e2);
     out.e2[1][1] = cs;            // cos(theta) at offset 0x14
     out.e2[1][2] = sn;            // sin(theta) at offset 0x18
@@ -144,7 +145,8 @@ void nlMakeRotationMatrixY(nlMatrix4& out, float theta)
     f32 sn;
     f32 cs;
 
-    nlSinCos(&sn, &cs, (short)(RAD_TO_FIXED16 * theta));
+    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+    nlSinCos(&sn, &cs, (short)(s32)(RAD_TO_FIXED16 * theta));
     PSMTX44Identity(out.e2);
     out.e2[0][0] = cs;            // cos(theta) at offset 0x00
     out.e2[0][2] = -sn;           // sin(theta) at offset 0x08
@@ -159,7 +161,8 @@ void nlMakeRotationMatrixZ(nlMatrix4& out, float theta)
     f32 sn;
     f32 cs;
 
-    nlSinCos(&sn, &cs, (short)(RAD_TO_FIXED16 * theta));
+    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+    nlSinCos(&sn, &cs, (short)(s32)(RAD_TO_FIXED16 * theta));
     PSMTX44Identity(out.e2);
 
     out.e2[0][0] = cs;            // cos(theta) at offset 0x00
@@ -176,7 +179,8 @@ void nlMakeRotationMatrixZ(nlMatrix3& out, float theta)
     f32 sn;
     f32 cs;
 
-    nlSinCos(&sn, &cs, (short)(10430.378f * theta));
+    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+    nlSinCos(&sn, &cs, (short)(s32)(10430.378f * theta));
 
     out.SetIdentity();
 
@@ -200,9 +204,10 @@ void nlMakeRotationMatrixEulerAngles(nlMatrix4& m, float pitch, float yaw, float
     f32 sinPitch;
     f32 cosPitch;
 
-    nlSinCos(&sinRoll, &cosRoll, (short)(RAD_TO_FIXED16 * roll));
-    nlSinCos(&sinYaw, &cosYaw, (short)(RAD_TO_FIXED16 * yaw));
-    nlSinCos(&sinPitch, &cosPitch, (short)(RAD_TO_FIXED16 * pitch));
+    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+    nlSinCos(&sinRoll, &cosRoll, (short)(s32)(RAD_TO_FIXED16 * roll));
+    nlSinCos(&sinYaw, &cosYaw, (short)(s32)(RAD_TO_FIXED16 * yaw));
+    nlSinCos(&sinPitch, &cosPitch, (short)(s32)(RAD_TO_FIXED16 * pitch));
 
     m.e2[2][3] = zero;
     m.e2[1][3] = zero;

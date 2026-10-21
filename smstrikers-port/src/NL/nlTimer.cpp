@@ -48,5 +48,6 @@ f32 Timer::GetSeconds() const
  */
 void Timer::SetSeconds(float seconds)
 {
-    m_uPackedTime = (u32)(1024.0f * seconds + 0.5f);
+    // PORT: the console's saturating conversion; x86-64 wraps a negative or huge float into range.
+    m_uPackedTime = __cvt_fp2unsigned(1024.0f * seconds + 0.5f);
 }

@@ -10,6 +10,8 @@
 #include "NL/gl/glStruct.h"
 #include "NL/nlPrint.h"
 #include "types.h"
+#include "port/online_game.h"
+#include "port/online.h"
 
 static const eStadiumID STADIUM_ORDER[7] = {
     STAD_MARIO_STADIUM,
@@ -114,6 +116,11 @@ void StadiumSelectSceneV2::SceneCreated()
     }
 
     mStadiumIndex = 0;
+    // PORT: both screens start on the room's agreed stadium.
+    if (PortOnlineGameSelecting())
+        for (int i = 0; i < 7; i++)
+            if (StadiumEntries[i].mStadiumID == PortOnlineGetState()->desc.stadium)
+                mStadiumIndex = i;
 
     {
 
@@ -291,6 +298,8 @@ void StadiumSelectSceneV2::SceneCreated()
             InlineHasher(nlStringLowerHash("buttons")));
         mButtons.mButtonInstance = buttonsComp;
         mButtons.SetState(ButtonComponent::BS_A_AND_B);
+        // PORT: online, only the host may confirm, and only an unlocked stadium.
+        PortOnlineGameStadiumButtons(&mButtons, IsStadiumUnlocked(GetSelectedStadium()));
     }
 }
 
@@ -307,6 +316,14 @@ void StadiumSelectSceneV2::Update(float fDeltaT)
         m_pTicker->Update(fDeltaT);
         bool rightPressed = g_pFEInput->IsAutoPressed(FE_ALL_PADS, 0xC, true, NULL);
         bool leftPressed = g_pFEInput->IsAutoPressed(FE_ALL_PADS, 0xB, true, NULL);
+        // PORT: guests follow the host's stadium cursor without generating menu input.
+        const OnlineState& online = *PortOnlineGetState();
+        const bool remote = PortOnlineGameSelecting() && online.self != online.host;
+        if (remote)
+        {
+            rightPressed = GetSelectedStadium() != online.desc.stadium;
+            leftPressed = false;
+        }
 
         if (rightPressed || leftPressed)
         {
@@ -328,6 +345,13 @@ void StadiumSelectSceneV2::Update(float fDeltaT)
                 newIndex %= 7;
             }
             mStadiumIndex = newIndex;
+            // PORT: share the highlighted stadium before either machine confirms it.
+            if (PortOnlineGameSelecting() && !remote)
+            {
+                OnlineMatchDesc d = online.desc;
+                d.stadium = GetSelectedStadium();
+                PortOnlineSetDesc(&d);
+            }
 
             m_pFEPresentation->SetActiveSlide(rightPressed ? "LEFT" : "RIGHT");
 
@@ -338,6 +362,8 @@ void StadiumSelectSceneV2::Update(float fDeltaT)
                     InlineHasher(nlStringLowerHash("buttons")));
                 mButtons.mButtonInstance = buttonsComp;
                 mButtons.SetState(ButtonComponent::BS_A_AND_B);
+                // PORT: online, only the host may confirm, and only an unlocked stadium.
+                PortOnlineGameStadiumButtons(&mButtons, IsStadiumUnlocked(GetSelectedStadium()));
             }
 
             if (rightPressed)
@@ -442,7 +468,8 @@ void StadiumSelectSceneV2::Update(float fDeltaT)
         }
         else
         {
-            if (g_pFEInput->JustPressed(FE_ALL_PADS, PAD_BUTTON_A, false, NULL))
+            // PORT: only the selecting machine can confirm the stadium.
+            if (!remote && g_pFEInput->JustPressed(FE_ALL_PADS, PAD_BUTTON_A, false, NULL))
             {
                 OnSelectStadium();
                 return;
@@ -450,6 +477,9 @@ void StadiumSelectSceneV2::Update(float fDeltaT)
 
             if (g_pFEInput->JustPressed(FE_ALL_PADS, PAD_BUTTON_B, false, NULL))
             {
+                // PORT: going back reopens selection for both machines.
+                if (PortOnlineGameSelectionBack())
+                    return;
                 ChooseCaptainsSceneV2* scene = (ChooseCaptainsSceneV2*)GameSceneManager::Instance()->Push(
                     SCENE_CHOOSE_CAPTAINS, SCREEN_BACK, true);
                 scene->mDesiredSceneType = ChooseCaptainsSceneV2::ST_CHOOSE_SIDES;
@@ -562,6 +592,9 @@ void StadiumSelectSceneV2::OnSelectStadium()
 
     if (isUnlocked)
     {
+        // PORT: the session agrees the selected stadium before either machine loads.
+        if (PortOnlineGameSelectStadium(stadium))
+            return;
         GameSceneManager::Instance()->PushLoadingScene(true);
         GameInfoManager::Instance()->SetStadium(stadium);
         FEAudio::PlayAnimAudioEvent("sfx_accept_stadium", false);

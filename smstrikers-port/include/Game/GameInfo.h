@@ -195,6 +195,8 @@ public:
     AudioSettings& GetAudioOptions();
     const GameplaySettings& GetGameplayOptions() const;
     const PowerupSettings& GetPowerupOptions() const;
+    // PORT: the cheats a match reads; a lockstep match's come from the current-game copy.
+    const CheatSettings& GetCheatOptions() const;
     void OnPreGameState();
     void OnPostGameState();
     void ApplyDifficultySettings();
@@ -270,6 +272,9 @@ public:
     /* 0x4C58 */ u32 mUnlockedTriggers;
     /* 0x4C5C */ eStadiumID mLastHumanStadium;
     /* 0x4C60 */ AudioSettings mCurGameAudioSettings;
-}; // total size: 0x4C80
+    // PORT: current-game copies, so a lockstep match's settings never reach the memory-card record.
+    /* 0x4C80 */ PowerupSettings mCurGamePowerupOptions;
+    /* 0x4C88 */ CheatSettings mCurGameCheatOptions;
+}; // total size: 0x4C90
 
 #endif // _GAMEINFO_H_

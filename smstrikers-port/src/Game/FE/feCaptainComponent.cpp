@@ -3,6 +3,7 @@
 #include "Game/FE/feFinder.h"
 #include "Game/FE/fePresentation.h"
 #include "Game/FE/tlSlide.h"
+#include "port/online_game.h"
 
 extern bool g_e3_Build;
 
@@ -110,10 +111,15 @@ void IChooseCaptain::UpdateSound(float dt)
  */
 UpdateResult IChooseCaptain::Update(float dt)
 {
-    CheckForDisconnectedHumanPlayers();
-    FindAliveHumanPlayers();
-
-    UpdateSinglePlayerState();
+    // PORT: online input belongs to the room's team owners, including remote teams.
+    if (!PortOnlineGameSelecting())
+    {
+        CheckForDisconnectedHumanPlayers();
+        FindAliveHumanPlayers();
+        UpdateSinglePlayerState();
+    }
+    else
+        mIsSinglePlayerInput = false;
 
     unsigned char goback;
     unsigned char isdoneanimating;
@@ -596,6 +602,9 @@ void IChooseCaptain::FindAliveHumanPlayers()
 
 int IChooseCaptain::GetSide(int padid)
 {
+    // PORT: remote teams are display-only; local pads keep their device indices.
+    if (PortOnlineGameSelecting())
+        return PortOnlineGameSelectionSide(padid);
     if (mIsSinglePlayerInput)
     {
         if (mComponentState[0].mCurrentPhase < PHASE_READY)

@@ -1,4 +1,6 @@
 #include "NL/platpad.h"
+#include "port/lockstep.h"
+#include "port/online.h"
 #include "port/overlay.h"
 #include <stdlib.h>
 #include "dolphin/os.h"
@@ -21,6 +23,14 @@ namespace
 {
 PadStatus padCategories[2];
 PadStatus* padStatus = &padCategories[0];
+
+// PORT: in an online match a pad index is a slot; only a slot a device here feeds rumbles, on it.
+static inline void PortControlMotor(int slot, u32 command)
+{
+    const int port = PortSimOnline() ? PortOnlineSlotLocalPort(slot) : slot;
+    if (port >= 0)
+        PADControlMotor(port, command);
+}
 
 // PORT: delta is real elapsed time; the console added a sixtieth per retrace.
 static inline void UpdateButtonStateTime(PadStatus* pPadStatus, int padIdx, float delta)
@@ -190,7 +200,7 @@ void VBlankPadUpdate()
 void cPlatPad::StopRumble()
 {
     padStatus[0].m_GameCubePads[m_padIndex].bRumbleActive = 0;
-    PADControlMotor(m_padIndex, 2);
+    PortControlMotor(m_padIndex, 2);   // PORT: the slot's own device online
 }
 
 /**
@@ -200,7 +210,7 @@ void cPlatPad::StartRumble(float fDuration, float fIntensity, float fFrequency)
 {
     if (m_bDisableRumble == 0)
     {
-        PADControlMotor(m_padIndex, 1);
+        PortControlMotor(m_padIndex, 1);   // PORT: the slot's own device online
         padStatus[0].m_GameCubePads[m_padIndex].fRumbleTimer = fDuration;
         padStatus[0].m_GameCubePads[m_padIndex].bRumbleActive = 1;
     }
@@ -398,7 +408,7 @@ void PadStatus::Update(float dt)
             if (m_GameCubePads[i].fRumbleTimer < 0.0f)
             {
                 m_GameCubePads[i].bRumbleActive = 0;
-                PADControlMotor(i, 0);
+                PortControlMotor(i, 0);   // PORT: the slot's own device online
             }
         }
     }

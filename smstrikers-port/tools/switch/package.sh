@@ -33,6 +33,7 @@ cp LICENSE-BSD.TXT LICENSE-CC0.txt LICENSE-GPL-2.0.txt LICENSE-LGPL-2.1.txt "$OU
 cp extern/musyx/LICENSE "$OUT/LICENSE-MUSYX.txt"
 cp extern/aurora/LICENSE "$OUT/LICENSE-AURORA.txt"
 for _l in LICENSE-APACHE-2.0.txt LICENSE-DAWN.txt LICENSE-FMT.txt LICENSE-IMGUI.txt LICENSE-LIBNX.txt \
+          LICENSE-MONOCYPHER.txt \
           LICENSE-XXHASH.txt LICENSE-ZSTD.txt; do
     cp "licenses/$_l" "$OUT/"
 done

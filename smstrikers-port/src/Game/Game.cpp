@@ -12,6 +12,7 @@
 #include "Game/MathHelpers.h"
 #include "Game/Camera/CameraMan.h"
 #include "Game/Camera/GameplayCam.h"
+#include "port/simcamera.h"
 #include "Game/BasicStadium.h"
 #include "Game/CharacterTemplate.h"
 #include "Game/DB/StatsTracker.h"
@@ -32,6 +33,7 @@ extern cBall* g_pBall;
 #include <stdlib.h>
 #include "port/discord.h"
 #include "port/overlay.h"
+#include "port/simhygiene.h"
 #include <string.h>
 #include "Game/AnimInventory.h"
 #include "Game/AI/ShotMeter.h"
@@ -50,6 +52,7 @@ extern cBall* g_pBall;
 extern eCameraType g_eCurrentCameraType;   // Camera/CameraMan.cpp
 extern PowerupBase* g_pPowerups[25];       // AI/Powerups.cpp
 #include "port/benchmark.h"
+#include "port/lockstep.h"
 extern PowerupBase* g_pPowerups[];
 extern cCharacter* g_pCurrentlyUpdatingCharacter;
 extern cTeam* g_pCurrentlyUpdatingTeam;
@@ -164,7 +167,8 @@ void CreateGame()
         g_pGame->m_fGameDuration = 10800.0f;
     }
 
-    if (Config::Global().Exists("DifficultyOverride"))
+    // PORT: in lockstep mode the ini files and the overlay do not change the match.
+    if (!g_simLockstep && Config::Global().Exists("DifficultyOverride"))
     {
         eDifficultyID diff = DIFF_MEDIUM;
         BasicString<char, Detail::TempStringAllocator> diffStr = Config::Global().Get<BasicString<char, Detail::TempStringAllocator> >("DifficultyOverride", BasicString<char, Detail::TempStringAllocator>("Professional"));
@@ -398,6 +402,8 @@ void cGame::ResetGameClock()
 void cGame::ResetForKickOff()
 {
     cFielder* pBallCarrier;
+    // PORT: in lockstep mode each kickoff reseeds the simulation's stream, however it is reached.
+    const int portRngScope = PortRngBeginKickoff((unsigned int)(g_pTeams[0]->m_nScore + g_pTeams[1]->m_nScore));
     g_pEventManager->CreateValidEvent(9, 0x14);
     ResetCharacters();
     ResetBall();
@@ -421,6 +427,8 @@ void cGame::ResetForKickOff()
     {
         gpc->m_ForceNeutralAndNearZoom = true;
     }
+    // PORT: the lockstep simulation camera frames the kickoff as the one on screen does.
+    PortSimCameraForceNeutral(true);
     SidelineExplodableManager::DestroyAllActiveFragments(false);
     StopDisplayingElectricFence();
     if (g_pTeams[m_nLastTeamToScore] != NULL)
@@ -432,6 +440,7 @@ void cGame::ResetForKickOff()
             pBallCarrier->InitActionRunningWB(false);
         }
     }
+    PortRngSetScope(portRngScope);
 }
 
 /**
@@ -445,6 +454,8 @@ void cGame::PostResetCallback(uintptr_t userData, unsigned long clockId)
     {
         pCamera->m_ForceNeutralAndNearZoom = false;
     }
+    // PORT: as at the kickoff, for the lockstep simulation camera.
+    PortSimCameraForceNeutral(false);
 }
 
 /**
@@ -454,8 +465,17 @@ void cGame::BeginGame(bool bRematch, bool bStraightToKickoff)
 {
     int i;
 
+    // PORT: one FP environment and fresh statics per match, whatever the process ran before.
+    PortSimHygieneBeginMatch();
     OSReport("[match] begin rematch=%d kickoff=%d\n",
              bRematch ? 1 : 0, bStraightToKickoff ? 1 : 0);
+    // PORT: tick 0 of a match is counted from here, whatever the process ran before.
+    PortSimBeginMatch();
+    // PORT: in lockstep mode the match seeds the simulation's stream, whatever ran before it.
+    const int portRngScope = PortRngBeginMatch();
+    // PORT: in lockstep mode pure_game comes with the match, so every machine agrees on it.
+    if (g_simLockstep)
+        mIsPure = PortSimSettings()->pureGame != 0;
 
     if (m_eGameState != GS_PRE_GAME)
     {
@@ -508,10 +528,14 @@ void cGame::BeginGame(bool bRematch, bool bStraightToKickoff)
     }
     else
     {
+        // PORT: in lockstep mode the intro freezes the tick after exactly ticks 0-2, whatever the frame period.
+        if (g_simLockstep)
+            PortSimBarrierArm(PORT_BARRIER_INTRO);
         Presentation::Instance().Call("GameBegin", "");
     }
 
     ReplayManager::Instance()->ResetSnapshots();
+    PortRngSetScope(portRngScope);
 }
 
 /**
@@ -620,8 +644,16 @@ void cGame::CheckForGoal()
             pGoalScored->data.pLastTouch[0] = m_pTeamTouch[0];
             pGoalScored->data.pLastTouch[1] = m_pTeamTouch[1];
 
+            // PORT: in lockstep mode slow motion ends at the tick after the goal, not at its dispatch.
+            if (g_simLockstep)
+                PortSimSetTimeScale(1.0f);
+
             g_pBall->m_uGoalType = 4;
             m_bBallInNet = true;
+
+            // PORT: in lockstep mode event 7, the freeze and the kickoff follow this tick by rule.
+            if (g_simLockstep)
+                PortSimBarrierArm(PORT_BARRIER_GOAL);
         }
     }
 }
@@ -639,6 +671,9 @@ void cGame::EnterPostGame()
 
     if (!Presentation::Instance().DuringEndOfGamePresentation())
     {
+        // PORT: in lockstep mode the end freezes the tick after this one, not when its cutscene has loaded.
+        if (g_simLockstep)
+            PortSimBarrierArm(PORT_BARRIER_END);
         NisPlayer::Instance()->Reset();
         Presentation::Instance().Call("GameEndNoSuddenDeath", "");
     }
@@ -689,9 +724,10 @@ void cGame::BlowUpPlayers(cFielder* pShooter, float fExplosionRadius)
                         pFielder->m_v3Position.y - pShooter->m_v3Position.y)
                     < fMaxSqDistToShooter)
                 {
+                    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
                     if (pFielder->InitActionHitReact(
                             pShooter,
-                            (unsigned short)(10430.378f * nlATan2f(pFielder->m_v3Position.y - pShooter->m_v3Position.y, pFielder->m_v3Position.x - pShooter->m_v3Position.x)),
+                            (unsigned short)(s32)(10430.378f * nlATan2f(pFielder->m_v3Position.y - pShooter->m_v3Position.y, pFielder->m_v3Position.x - pShooter->m_v3Position.x)),
                             false))
                     {
                         pFielder->PlayAttackReactionSounds(100.0f);
@@ -754,7 +790,8 @@ void cGame::ResetBowser()
         return;
     }
 
-    if (GetConfigBool(Config::Global(), "bowser_repeat", false))
+    // PORT: in lockstep mode bowser_repeat comes with the match, so every machine agrees on it.
+    if (g_simLockstep ? PortSimSettings()->bowserRepeat != 0 : GetConfigBool(Config::Global(), "bowser_repeat", false))
     {
         g_pGame->m_pGameTweaks->fBowserChance = 1.0f;
         g_pGame->m_pGameTweaks->fBowserStartTime = 4.0f;
@@ -883,6 +920,17 @@ extern "C" void PortDebugFrame(void)
         const bool match = (g_pGame != NULL && g_pTeams[0] != NULL && g_pTeams[1] != NULL
                             && g_pBall != NULL && g_pGame->m_pGameClock != NULL);
         const bool team = (c.a == 0 || c.a == 1);
+
+        // PORT: lockstep edits and online match transitions go through the session.
+        if ((g_simLockstep
+             && ((c.op >= PDBG_SET_SCORE && c.op <= PDBG_KILL_EFFECTS && c.op != PDBG_SKIP_PRESENTATION)
+                 || c.op == PDBG_SET_OPTION || c.op == PDBG_SET_CONFIG_STRING))
+            || (PortSimOnline()
+                && (c.op == PDBG_PAUSE_MENU || c.op == PDBG_RETURN_TO_FE || c.op == PDBG_START_MATCH)))
+        {
+            OSReport("[lockstep] debug op %d refused\n", c.op);
+            continue;
+        }
 
         switch (c.op)
         {

@@ -4628,7 +4628,8 @@ void cFielder::SetDesiredSpeedAndDirectionToPosition(float fDeltaT, const nlVect
     {
         fDesiredPositionRateOfChange = nlSqrt(fDeltaXFromDesired * fDeltaXFromDesired + fDeltaYFromDesired * fDeltaYFromDesired + fDeltaZFromDesired * fDeltaZFromDesired, true) / fDeltaT;
         float fAngle = nlATan2f(v3FixedPos.y - m_v3Position.y, v3FixedPos.x - m_v3Position.x);
-        m_aDesiredFacingDirection = (u16)(fAngle * 10430.378f);
+        // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+        m_aDesiredFacingDirection = (u16)(s32)(fAngle * 10430.378f);
         m_aDesiredMovementDirection = m_aDesiredFacingDirection;
     }
 

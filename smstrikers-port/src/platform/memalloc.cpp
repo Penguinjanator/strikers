@@ -131,10 +131,12 @@ void* MemoryAllocator::Allocate(unsigned long size, unsigned int alignment, bool
     const int cls = size_class(want);
 
     char* block;
+    bool recycled = false;
     if (st->freeList[cls] != nullptr)
     {
         block = (char*)st->freeList[cls];
         st->freeList[cls] = *(void**)block;
+        recycled = true;
     }
     else
     {
@@ -152,6 +154,9 @@ void* MemoryAllocator::Allocate(unsigned long size, unsigned int alignment, bool
     h->offset = (std::size_t)(aligned - (std::uintptr_t)block);
     h->owner = st;
     st->live += (std::size_t)size;
+    // Every mode starts allocations zeroed; fresh blocks are zeroed by the system.
+    if (recycled)
+        std::memset((void*)aligned, 0, (std::size_t)size);
     return (void*)aligned;
 }
 

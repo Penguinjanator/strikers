@@ -1,4 +1,5 @@
 #include "Game/AI/FielderDesires.h"
+#include "PowerPC_EABI_Support/Runtime/runtime.h"
 
 #include "Game/AI/AiUtil.h"
 #include "Game/AI/FilteredRandom.h"
@@ -14,6 +15,7 @@
 #include "Game/GameTweaks.h"
 #include "Game/Physics/PhysicsAIBall.h"
 #include "Game/Render/ShootToScoreMeter.h"
+#include "port/lockstep.h"
 
 extern FuzzyVariant fvNotSet;
 extern cTeam* g_pCurrentlyUpdatingTeam;
@@ -2562,7 +2564,8 @@ void cFielder::DesireShoot(float fDeltaT)
             {
                 if (ShouldIClearBall())
                 {
-                    m_pShotMeter->m_fTime = 0.1f + (float)nlRandom((unsigned int)(g_pGame->m_pGameTweaks->fShotWindupTime - 0.2f), &nlDefaultSeed);
+                    // PORT: the console's saturating conversion; x86-64 wraps a negative or huge float into range.
+                    m_pShotMeter->m_fTime = 0.1f + (float)nlRandom(__cvt_fp2unsigned(g_pGame->m_pGameTweaks->fShotWindupTime - 0.2f), &nlDefaultSeed);
                 }
                 m_pShotMeter->ShotReleased(this);
                 InitActionShot(mActionShotVars.bIsChipShot);
@@ -2704,6 +2707,9 @@ void cFielder::DesireRunToLocation(float fDeltaT)
         if ((g_pGame->m_eGameState == GS_POST_GOAL || g_pGame->m_eGameState == GS_END_GAME) && this == g_pCharacters[0])
         {
             g_pEventManager->CreateValidEvent(8, 20);
+            // PORT: in lockstep mode event 8 freezes the next tick, not a rendered frame later.
+            if (g_simLockstep)
+                PortSimBarrierReached(PORT_BARRIER_GOAL);
         }
     }
 }

@@ -1,5 +1,7 @@
 #include "NL/nlMath.h"
 #include "Game/Core/mtRandom.h"
+#include "port/lockstep.h"
+#include "port/fpconv.h"
 
 #include "math.h"
 
@@ -203,11 +205,12 @@ int nlACos(float x)
 
     rad = y * sqrtVal;
 
+    // PORT: fctiwz saturated; |x| well past 1 or NaN puts these out of range, where a cast is undefined.
     if (complement)
     {
-        return (unsigned short)(s32)(10430.378f * (3.1415927f - rad));
+        return (unsigned short)PortFloatToS32(10430.378f * (3.1415927f - rad));
     }
-    return (unsigned short)(s32)(10430.378f * rad);
+    return (unsigned short)PortFloatToS32(10430.378f * rad);
 }
 
 /**
@@ -392,6 +395,7 @@ float nlRandomf(float fMin, float fMax, unsigned int* pSeed)
 
     float range = fMax - fMin;
     float scale = (1.0f / 2147483647.0f) * range;
+    if (g_simLockstep && pSeed == &nlDefaultSeed) pSeed = PortRngStream();   // PORT: separates simulation and cosmetic draws
     mod = (seed = *pSeed) % 0x7FFFFFFFu;
     next = seed ^ 0x1d872b41;
     temp = next ^ (next >> 5);
@@ -410,6 +414,7 @@ float nlRandomf(float fMax, unsigned int* pSeed)
     unsigned int mod;
     unsigned int seed;
 
+    if (g_simLockstep && pSeed == &nlDefaultSeed) pSeed = PortRngStream();   // PORT: separates simulation and cosmetic draws
     mod = (seed = *pSeed) % 0x7FFFFFFFu;
     next = seed ^ 0x1d872b41;
     temp = next ^ (next >> 5);
@@ -425,6 +430,7 @@ uint nlRandom(uint range, uint* seed)
     uint next;
     uint temp;
 
+    if (g_simLockstep && seed == &nlDefaultSeed) seed = PortRngStream();   // PORT: separates simulation and cosmetic draws
     /* PORT: PowerPC's divwu does not trap on a zero divisor and x86's div does. */
     uint result = (range != 0) ? (*seed % range) : 0u;
     next = *seed ^ 0x1d872b41;

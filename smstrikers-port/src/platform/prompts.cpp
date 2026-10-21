@@ -6,7 +6,9 @@ extern "C" void PortPromptsFontLoaded(nlFont*) {}
 extern "C" void PortPromptsFontUnloading(nlFont*) {}
 extern "C" void PortPromptsEvent(const SDL_Event*) {}
 extern "C" void PortPromptsFrame() {}
+extern "C" const unsigned char* PortPromptsMenuImage(unsigned, unsigned*, unsigned*) { return nullptr; }
 extern "C" void PortPromptsLegendsLoaded() {}
+extern "C" void PortPromptsLegendReloaded(unsigned long) {}
 extern "C" void PortPromptsLegendsUnloading() {}
 extern "C" int PortPromptsSetFamily(const char*) { return 0; }
 
@@ -48,9 +50,9 @@ const unsigned kControls[Count] = { PAD_BUTTON_A, PAD_BUTTON_B,  PAD_BUTTON_X,
                                     PAD_BUTTON_Y, PAD_TRIGGER_L, PAD_TRIGGER_R };
 const char kGlyphs[Count] = { '@', '~', '|', '+', '*', '^' };
 
-const int kLegendCount = 4;
-const unsigned long kLegends[kLegendCount] = { 0xecce7182, 0x288d277b, 0x12fa669a, 0xd9104663 };
-const Control kLegendControls[kLegendCount] = { A, B, Y, B };
+const int kLegendCount = 6;
+const unsigned long kLegends[kLegendCount] = { 0xecce7182, 0x288d277b, 0x12fa669a, 0xd9104663, 0x3c4b529a, 0x627747b2 };
+const Control kLegendControls[kLegendCount] = { A, B, Y, B, A, Y };
 
 struct FontState
 {
@@ -62,6 +64,7 @@ struct FontState
 
 std::vector<FontState> s_fonts;
 bool s_loaded[kLegendCount] = {};
+bool s_legendsDirty;
 std::array<unsigned char, 1568> s_originals[kLegendCount];
 Icon s_icons[Count] = {};
 bool s_initialized = false;
@@ -368,7 +371,7 @@ void paintLegends()
     PortTextureDumpSkip(1);
     for (int c = 0; c < kLegendCount; ++c)
     {
-        if (!s_loaded[c])
+        if (!s_loaded[c] || !glx_GetTex(kLegends[c], false, false))
             continue;
         int original = originalLegend(s_icons[kLegendControls[c]], s_loaded, c);
         if (original >= 0)
@@ -544,8 +547,77 @@ void update()
 
 }   // namespace
 
+extern "C" const unsigned char* PortPromptsMenuImage(unsigned button, unsigned* width, unsigned* height)
+{
+    Icon icon = {};
+    bool found = false;
+    for (int c = 0; c < Count; ++c)
+        if (kControls[c] == button)
+        {
+            icon = s_icons[c];
+            found = true;
+            break;
+        }
+    if (!found && (button == PAD_BUTTON_START || button == PAD_TRIGGER_Z))
+    {
+        Input in = defaults(s_icons[A].family);
+        in.connected = padForPort(s_activePort) != nullptr;
+        in.overrides[A] = PortInputPadSetting(button);
+        if (in.overrides[A] == Unset)
+            in.overrides[A] = button == PAD_BUTTON_START ? Start : RightShoulder;
+        if (in.connected)
+        {
+            in.bindings[A].button = -1;
+            u32 count = 0;
+            const auto* mappings = PADGetButtonMappings(s_activePort, &count);
+            for (u32 i = 0; mappings && i < count; ++i)
+                if (mappings[i].padButton == button)
+                {
+                    in.bindings[A].button = mappings[i].nativeButton;
+                    break;
+                }
+            if (s_override == Auto || padFamily(s_activePort) == in.family)
+                for (int i = 0; i < 4; ++i)
+                    in.labels[i] = loneJoyCon(s_activePort) ? Unknown
+                        : labelFor(SDL_GetGamepadButtonLabel(padForPort(s_activePort),
+                                                           static_cast<SDL_GamepadButton>(i)));
+        }
+        char keyName[128] = {};
+        if (in.family == Keyboard)
+        {
+            in.keys[A] = nullptr;
+            u32 count = 0;
+            const auto* keys = PADGetKeyButtonBindings(0, &count);
+            for (u32 i = 0; keys && i < count; ++i)
+                if (keys[i].padButton == button && keys[i].scancode > 0)
+                {
+                    const auto sc = static_cast<SDL_Scancode>(keys[i].scancode);
+                    const char* name = SDL_GetKeyName(SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false));
+                    snprintf(keyName, sizeof keyName, "%s", name && *name ? name : SDL_GetScancodeName(sc));
+                    in.keys[A] = keyName;
+                    break;
+                }
+        }
+        icon = resolve(in, A);
+        found = true;
+    }
+    if (!found)
+        return nullptr;
+    const Image* art = compose(icon, Menu);
+    if (!art)
+        return nullptr;
+    *width = art->width;
+    *height = art->height;
+    return art->rgba.data();
+}
+
 extern "C" void PortPromptsFrame()
 {
+    if (s_legendsDirty)
+    {
+        s_legendsDirty = false;
+        PortPromptsLegendsLoaded();
+    }
     for (const auto& font : s_fonts)
     {
         if (glx_GetTex(font.hash, false, false) != font.page)
@@ -604,6 +676,17 @@ extern "C" void PortPromptsFontUnloading(nlFont* font)
         {
             s_fonts.erase(it);
             return;
+        }
+}
+
+// Repaint replaced legends before the next frame, outside any active render encoder.
+extern "C" void PortPromptsLegendReloaded(unsigned long hash)
+{
+    for (int i = 0; i < kLegendCount; ++i)
+        if (kLegends[i] == hash)
+        {
+            s_loaded[i] = false;
+            s_legendsDirty = true;
         }
 }
 

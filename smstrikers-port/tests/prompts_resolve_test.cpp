@@ -59,9 +59,12 @@ int main()
     check(resolve(in, R).original == R, "adapter digital R without emulation");
     in.bindings[A].button = West;
     check(resolve(in, A).original == B, "adapter west is labelled B");
-    bool loaded[] = { true, true, true, true };
+    bool loaded[] = { true, true, true, true, true, true };
     check(originalLegend(resolve(in, A), loaded) == 1, "A menu slot uses B original");
     check(originalLegend(resolve(in, A), loaded, 3) == 3, "alternate B keeps its own original");
+    Input original = defaults(Gamecube);
+    check(originalLegend(resolve(original, A), loaded, 4) == 4, "alternate A keeps its own original");
+    check(originalLegend(resolve(original, Y), loaded, 5) == 5, "alternate Y keeps its own original");
     in.bindings[L].button = South;
     check(!originalFits(resolve(in, L), L), "face button in shoulder cell needs Kenney art");
     in.bindings[Y].button = RightShoulder;

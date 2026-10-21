@@ -206,10 +206,13 @@ bool originalFits(const Icon& icon, Control target)
     return icon.original >= 0 && ((icon.original < L) == (target < L));
 }
 
-int originalLegend(const Icon& icon, const bool loaded[4], int targetSlot)
+int originalLegend(const Icon& icon, const bool* loaded, int targetSlot)
 {
-    if (targetSlot == 3 && icon.original == B && loaded[3])
-        return 3;
+    if ((targetSlot == 3 && icon.original == B) ||
+        (targetSlot == 4 && icon.original == A) ||
+        (targetSlot == 5 && icon.original == Y))
+        if (loaded[targetSlot])
+            return targetSlot;
     const int i = icon.original == A ? 0 : icon.original == B ? 1 : icon.original == Y ? 2 : -1;
     return i >= 0 && loaded[i] ? i : -1;
 }

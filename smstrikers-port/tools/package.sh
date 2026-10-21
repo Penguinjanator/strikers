@@ -132,14 +132,15 @@ if [ "$WINDOWS" = "0" ] && [ "$(uname -s)" = Linux ]; then
 fi
 
 # The licence texts the program is redistributed under: ODE's BSD, the decompilation's CC0, the
-# eCos files' GPL, and the notices of MusyX, Aurora, borealis and the libraries linked in, renamed
-# so the archive's notices are one flat set.
+# eCos files' GPL, and the notices of MusyX, Aurora, borealis and the
+# libraries linked in, renamed so the archive's notices are one flat set.
 cp LICENSE-BSD.TXT LICENSE-CC0.txt LICENSE-GPL-2.0.txt "$OUT/"
 cp extern/musyx/LICENSE "$OUT/LICENSE-MUSYX.txt"
 cp extern/aurora/LICENSE "$OUT/LICENSE-AURORA.txt"
 cp extern/borealis/LICENSE "$OUT/LICENSE-BOREALIS.txt"
 LINKED_LICENSES="LICENSE-APACHE-2.0.txt LICENSE-DAWN.txt LICENSE-FMT.txt LICENSE-FREETYPE.txt
-                 LICENSE-IMGUI.txt LICENSE-NLOHMANN-JSON.txt LICENSE-XXHASH.txt LICENSE-ZSTD.txt"
+                 LICENSE-IMGUI.txt LICENSE-MONOCYPHER.txt LICENSE-NLOHMANN-JSON.txt LICENSE-XXHASH.txt
+                 LICENSE-ZSTD.txt"
 for _l in $LINKED_LICENSES; do
     cp "licenses/$_l" "$OUT/"
 done

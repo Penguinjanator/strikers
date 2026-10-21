@@ -16,6 +16,7 @@
 #include "NL/nlLocalization.h"
 #include "NL/nlPrint.h"
 #include "NL/nlTask.h"
+#include "port/lockstep.h"
 
 extern FEInput* g_pFEInput;
 extern nlColour MenuHighliteColour;
@@ -132,6 +133,11 @@ void PauseMenuScene::OnSelectQUIT(TLComponentInstance* instance)
  */
 void PauseMenuScene::OnSelectCHOOSESIDES(TLComponentInstance* instance)
 {
+    // PORT: in lockstep mode sides stay as the match began; saving them writes the match between ticks.
+    if (g_simLockstep)
+    {
+        return;
+    }
     OverlayManager::Instance()->Push(IGSCENE_CHOOSE_SIDES, SCREEN_FORWARD, true);
 }
 
@@ -480,7 +486,8 @@ void PauseMenuScene::Update(float fDeltaT)
 
         if (!g_pFEInput->IsConnected((eFEINPUT_PAD)i))
         {
-            if (nlSingleton<GameInfoManager>::Instance()->GetPlayingSide((unsigned short)i) != -1)
+            // PORT: in lockstep mode sides stay as the match began, so a lost pad does not open Choose Sides.
+            if (!g_simLockstep && nlSingleton<GameInfoManager>::Instance()->GetPlayingSide((unsigned short)i) != -1)
             {
                 if (!goToChooseSides)
                 {

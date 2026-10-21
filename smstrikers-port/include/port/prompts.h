@@ -12,9 +12,13 @@ void PortPromptsFontUnloading(nlFont* font);
 void PortPromptsEvent(const SDL_Event* event);
 #endif
 
+// RGBA menu art from the same resolved binding as the retail prompts; stable until exit.
+const unsigned char* PortPromptsMenuImage(unsigned button, unsigned* width, unsigned* height);
+
 void PortPromptsFrame(void);
 
 void PortPromptsLegendsLoaded(void);
+void PortPromptsLegendReloaded(unsigned long hash);
 void PortPromptsLegendsUnloading(void);
 
 int PortPromptsSetFamily(const char* family);

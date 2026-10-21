@@ -1,4 +1,5 @@
 #include "Game/GL/gluMeshWriter.h"
+#include "port/fpconv.h"
 
 #include "dolphin/PPCArch.h"
 #include "dolphin/os/OSCache.h"
@@ -43,9 +44,10 @@ void GLMeshWriter::Normal(const nlVector3& n)
         float ny = len * n.y;
         float nz = len * n.z;
 
-        p[0] = (s8)(64.0f * nx);
-        p[1] = (s8)(64.0f * ny);
-        p[2] = (s8)(64.0f * nz);
+        // PORT: fctiwz wrote a NaN from a zero-length normal as 0; a host cast of NaN is undefined.
+        p[0] = (s8)PortFloatToS32(64.0f * nx);
+        p[1] = (s8)PortFloatToS32(64.0f * ny);
+        p[2] = (s8)PortFloatToS32(64.0f * nz);
     }
     else
     {
@@ -63,8 +65,9 @@ void GLMeshWriter::Texcoord(const nlVector2& uv)
     unsigned long offset = (unsigned long)currentIndex << 2;
 
     short* p = (short*)((unsigned char*)base + offset);
-    p[0] = 1024.0f * uv.x;
-    p[1] = 1024.0f * uv.y;
+    // PORT: fctiwz wrote a NaN coordinate as 0; a host cast of NaN is undefined.
+    p[0] = (short)PortFloatToS32(1024.0f * uv.x);
+    p[1] = (short)PortFloatToS32(1024.0f * uv.y);
 
     elementCount++;
 }

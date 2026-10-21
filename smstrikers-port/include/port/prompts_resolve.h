@@ -131,7 +131,7 @@ Input defaults(Family family);
 Binding bindingFor(const Input& input, Control control);
 Icon resolve(const Input& input, Control control);
 bool originalFits(const Icon& icon, Control target);
-int originalLegend(const Icon& icon, const bool loaded[4], int targetSlot = -1);
+int originalLegend(const Icon& icon, const bool* loaded, int targetSlot = -1);
 size_t c8Size(unsigned w, unsigned h);
 void c8Tile(const uint8_t* rows, unsigned w, unsigned h, uint8_t* out);
 

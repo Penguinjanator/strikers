@@ -226,7 +226,8 @@ void CalcInterceptXY(const nlVector3& pos1, f32 speed1, f32 speed2, const nlVect
         return;
     }
 
-    for (int i = 0; i < 2; i++)
+    // PORT: SolveQuadratic leaves t[1] unwritten for one root, and reading it took stale stack.
+    for (int i = 0; i < numRoots; i++)
     {
         f32 root = t[i];
         if (root > 0.0f)

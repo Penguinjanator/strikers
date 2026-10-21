@@ -39,6 +39,20 @@ static const unsigned short g_aAdvantagePlayerFacingDirections[5] = {
     0,
 };
 
+// PORT: qsort orders equal keys differently per C library; this keeps ties in index order.
+static void SortFielders(cFielder** fielders, int (*compare)(const void*, const void*))
+{
+    for (int i = 1; i < 4; i++)
+    {
+        for (int j = i; j > 0 && compare(&fielders[j - 1], &fielders[j]) > 0; j--)
+        {
+            cFielder* t = fielders[j];
+            fielders[j] = fielders[j - 1];
+            fielders[j - 1] = t;
+        }
+    }
+}
+
 /**
  * Offset/Address/Size: 0x1CF0 | 0x8006609C | size: 0x138
  */
@@ -753,9 +767,7 @@ void cTeam::CalculateNewBallInterceptTimes()
 void cTeam::UpdateBallInterceptTime(float fDeltaT)
 {
     CalculateNewBallInterceptTimes();
-    // PORT: element size; the console's elements were pointer-sized.
-    qsort(m_pBallInterceptOrderedFielders, 4,
-          sizeof(m_pBallInterceptOrderedFielders[0]), BestAbleToInterceptBall);
+    SortFielders(m_pBallInterceptOrderedFielders, BestAbleToInterceptBall);
     mtBallInterceptTimer.SetSeconds(1.0f / 30.0f);
 }
 /**
@@ -865,8 +877,7 @@ void cTeam::UpdateTeamAI(float fDeltaT)
             m_pAIOrderedFielders[1] = (cFielder*)m_pPlayers[1];
             m_pAIOrderedFielders[2] = (cFielder*)m_pPlayers[2];
             m_pAIOrderedFielders[3] = (cFielder*)m_pPlayers[3];
-            qsort(m_pAIOrderedFielders, 4, sizeof(m_pAIOrderedFielders[0]),
-                  MostOffensiveThreat);
+            SortFielders(m_pAIOrderedFielders, MostOffensiveThreat);
             m_pAIOrderedFielders[0]->m_eRole = ROLE_STRIKER;
             m_pAIOrderedFielders[1]->m_eRole = ROLE_WINGER;
             m_pAIOrderedFielders[2]->m_eRole = ROLE_MIDFIELD;
@@ -878,8 +889,7 @@ void cTeam::UpdateTeamAI(float fDeltaT)
             m_pAIOrderedFielders[1] = (cFielder*)m_pPlayers[1];
             m_pAIOrderedFielders[2] = (cFielder*)m_pPlayers[2];
             m_pAIOrderedFielders[3] = (cFielder*)m_pPlayers[3];
-            qsort(m_pAIOrderedFielders, 4, sizeof(m_pAIOrderedFielders[0]),
-                  MostDefensivePlayer);
+            SortFielders(m_pAIOrderedFielders, MostDefensivePlayer);
             m_pAIOrderedFielders[0]->m_eRole = ROLE_STRIKER;
             m_pAIOrderedFielders[1]->m_eRole = ROLE_WINGER;
             m_pAIOrderedFielders[2]->m_eRole = ROLE_MIDFIELD;

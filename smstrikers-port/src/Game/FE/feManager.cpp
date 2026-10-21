@@ -17,6 +17,8 @@
 #include "Game/Sys/eventman.h"
 #include "NL/glx/glxSwap.h"
 #include "NL/nlTask.h"
+#include "port/lockstep.h"
+#include "port/online.h"
 
 extern float g_AllActorsHidden;
 extern bool g_e3_Build;
@@ -62,7 +64,21 @@ void FrontEnd::UpdateForGame(float fDeltaT)
     if (m_bGameOver)
         return;
 
-    if (!m_bInPauseMenuState && m_pauseDelay <= 0.0f)
+    // PORT: online, Start in the tick input froze every machine; whoever pressed it gets the menu.
+    if (PortSimOnline() && PortSimBarrier() == PORT_BARRIER_PAUSE && !m_bInPauseMenuState)
+    {
+        const int port = PortOnlineSlotLocalPort(PortSimPauseSlot());
+        if (port >= 0 && port < 4)
+        {
+            m_hitStartPad = (eFEINPUT_PAD)port;
+            EnterMenuState(MET_PAUSE);
+        }
+        else
+            PortSimBarrierDone(PORT_BARRIER_PAUSE);
+    }
+
+    // PORT: online, Start opens the online panel unless it paused through the tick input.
+    if (!m_bInPauseMenuState && m_pauseDelay <= 0.0f && !PortSimOnline())
     {
         nlTaskManager* taskManager = nlTaskManager::m_pInstance;
         if (taskManager->m_CurrState != 1 && taskManager->m_PendingState == taskManager->m_CurrState)
@@ -105,9 +121,12 @@ void FrontEnd::UpdateForGame(float fDeltaT)
         bool curConnected = g_pFEInput->IsConnected((eFEINPUT_PAD)i);
         if (m_ctrlConnectedState[i] == 1 && !curConnected)
         {
-            if (nlSingleton<GameInfoManager>::Instance()->GetPlayingSide((unsigned short)i) != -1)
+            // PORT: online, a lost pad only marks its slot unplugged in the tick input.
+            if (nlSingleton<GameInfoManager>::Instance()->GetPlayingSide((unsigned short)i) != -1
+                && !PortSimOnline())
             {
-                EnterMenuState(MET_CHOOSESIDES);
+                // PORT: in lockstep mode sides stay as the match began, so a lost pad only pauses.
+                EnterMenuState(g_simLockstep ? MET_PAUSE : MET_CHOOSESIDES);
             }
         }
         m_ctrlConnectedState[i] = curConnected;
@@ -251,6 +270,9 @@ void FrontEnd::ExitMenuState()
     g_pEventManager->CreateValidEvent(1, 0x14);
     g_pFEInput->EnableAnalogToDPadMapping(FE_ALL_PADS, false);
     m_pauseDelay = 0.25f;
+    // PORT: an online pause ends for every machine once the host hears this one is done.
+    if (PortSimBarrier() == PORT_BARRIER_PAUSE)
+        PortSimBarrierDone(PORT_BARRIER_PAUSE);
 }
 
 /**

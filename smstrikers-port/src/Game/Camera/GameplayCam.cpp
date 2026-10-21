@@ -1,5 +1,6 @@
 #include "Game/Camera/GameplayCam.h"
 #include "port/aspect.h"
+#include "port/simcamera.h"
 
 #include "Game/Ball.h"
 #include "Game/GameInfo.h"
@@ -110,7 +111,8 @@ void GameplayCamera::CalcDynamicZoom()
         for (int j = 0; j < 4; j++)
         {
             cFielder* fielder = g_pTeams[i]->GetFielder(j);
-            nlVector3 screenPosition = fielder->m_v3ScreenPosition;
+            // PORT: under lockstep the simulation camera zooms on its own projection and the stack's on the frame's.
+            nlVector3 screenPosition = PortCameraScreenPosition(this, fielder);
 
             screenPosition.x = fabsf(screenPosition.x);
             screenPosition.y = fabsf(screenPosition.y);
@@ -213,6 +215,15 @@ void GameplayCamera::Update(float deltaTime)
     // PORT: blended by display aspect rather than chosen by the game's widescreen option.
     m_nearZoom.m_CameraData = PortGameplayCameraData(0);
     m_farZoom.m_CameraData = PortGameplayCameraData(1);
+
+    // PORT: the lockstep simulation camera takes the session's zoom options and the console's 4:3 tables.
+    if (this == PortSimCamera())
+    {
+        m_bDynamicZoom = g_portSimCameraAutoZoom;
+        m_fDesiredZoom = 1.0f - g_portSimCameraZoomLevel;
+        m_nearZoom.m_CameraData = &gCameraData[0];
+        m_farZoom.m_CameraData = &gCameraData[1];
+    }
 
     m_nearZoom.Update(deltaTime, m_ForceNeutralAndNearZoom);
     m_farZoom.Update(deltaTime, m_ForceNeutralAndNearZoom);

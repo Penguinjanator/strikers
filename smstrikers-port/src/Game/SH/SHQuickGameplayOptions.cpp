@@ -8,6 +8,7 @@
 #include "Game/GameInfo.h"
 #include "Game/GameSceneManager.h"
 #include "NL/nlMemory.h"
+#include "port/online_game.h"
 
 extern FEInput* g_pFEInput;
 
@@ -73,6 +74,14 @@ void QuickGameplayOptionsScene::Update(float dt)
         {
             m_pOptionsMenu->Save();
 
+            // PORT: online options update the room without overwriting the card settings.
+            if (PortOnlineGameSelecting())
+            {
+                PortOnlineGameSaveOptions();
+                GameSceneManager::GetInstance()->Pop();
+                FEAudio::PlayAnimAudioEvent("sfx_screen_back", false);
+                return;
+            }
             GameInfoManager* pGameInfo = GameInfoManager::GetInstance();
             pGameInfo->mUserInfo.mGameplayOptions.SkillLevel = pGameInfo->mCurGameGameplayOptions.SkillLevel;
             pGameInfo->mUserInfo.mGameplayOptions.GameTime = pGameInfo->mCurGameGameplayOptions.GameTime;

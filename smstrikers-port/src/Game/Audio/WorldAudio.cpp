@@ -1,4 +1,5 @@
 #include "Game/Audio/WorldAudio.h"
+#include "port/lockstep.h"
 
 extern unsigned int nlDefaultSeed;
 
@@ -316,6 +317,8 @@ inline const eWorldSFX* GetRandomReactionSize(cWorldSFX::CrowdReactionType dType
  */
 unsigned long cWorldSFX::PlayRandomReaction(Audio::cWorldSFX::CrowdReactionType dType, float volume, float delayTime, int groupPriority, float fDefaultVolAdjustment)
 {
+    // PORT: whether this draws depends on audio running, so it takes the cosmetic stream.
+    PortRngCosmetic portRngCosmetic;
     const eWorldSFX* pSFXArray;
     unsigned int tableSize;
 

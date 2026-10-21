@@ -1,4 +1,5 @@
 #include "port/region.h"  // PORT: one binary, three discs
+#include "port/online_game.h"
 #include "Game/SH/SHLoading.h"
 #include "Game/Audio/AudioLoader.h"
 #include "Game/Audio/AudioStream.h"
@@ -145,7 +146,8 @@ void SuperLoadingScene::SceneCreated()
  */
 void SuperLoadingScene::Update(float fDeltaT)
 {
-    BaseSceneHandler::Update(fDeltaT);
+    // PORT: online, the VS screen stays up until every machine has loaded and the match begins.
+    BaseSceneHandler::Update(mType == TT_OUT && PortOnlineGameHoldLoading() ? 0.0f : fDeltaT);
 
     if (!mAlreadySwappedTextures)
     {

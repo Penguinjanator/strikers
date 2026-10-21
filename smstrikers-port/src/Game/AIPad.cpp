@@ -1,5 +1,6 @@
 #include "Game/AI/AIPad.h"
 #include "Game/Camera/CameraMan.h"
+#include "port/lockstep.h"
 
 static f32 g_fMovementDeadZone = 0.3f;
 static f32 g_fCStickDeadZone = 0.5f;
@@ -21,7 +22,8 @@ f32 cAIPad::GetMovementStickMagnitude()
  */
 u16 cAIPad::GetMovementStickDirection()
 {
-    return (u16)(cCameraManager::m_aJoystickRemap - 0x4000) + m_pGlobalPad->m_polarAnalogLeft.a;
+    // PORT: under lockstep the input arrives turned by its sender's camera, so the remap is the gameplay camera's.
+    return (u16)((g_simLockstep ? 0x4000 : cCameraManager::m_aJoystickRemap) - 0x4000) + m_pGlobalPad->m_polarAnalogLeft.a;
 }
 
 /**
@@ -39,7 +41,8 @@ f32 cAIPad::GetCStickMovementStickMagnitude()
  */
 u16 cAIPad::GetCStickMovementStickDirection()
 {
-    return (u16)(cCameraManager::m_aJoystickRemap - 0x4000) + m_pGlobalPad->m_polarAnalogRight.a;
+    // PORT: as for the main stick.
+    return (u16)((g_simLockstep ? 0x4000 : cCameraManager::m_aJoystickRemap) - 0x4000) + m_pGlobalPad->m_polarAnalogRight.a;
 }
 
 u16 cAIPad::GetMovementStickDirectionNoRemap()

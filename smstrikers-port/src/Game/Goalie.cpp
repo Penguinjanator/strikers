@@ -1337,7 +1337,8 @@ void Goalie::InitActionLooseBallPursueBouncing(const nlVector3& v3TargetPosition
     mfTargetTime = fTargetTime;
     mfTargetDist = 1.4f;
 
-    m_aDesiredFacingDirection = (s16)(nlATan2f(v3TargetPosition.y - m_v3Position.y, v3TargetPosition.x - m_v3Position.x) * 10430.378f);
+    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+    m_aDesiredFacingDirection = (s16)(s32)(nlATan2f(v3TargetPosition.y - m_v3Position.y, v3TargetPosition.x - m_v3Position.x) * 10430.378f);
 
     s16 nAngDiff = m_aDesiredFacingDirection - m_aActualFacingDirection;
     s32 nAnimID = ChooseRunAnim(nAngDiff, v3TargetPosition, 1.0f);
@@ -3749,7 +3750,8 @@ void Goalie::InitActionLooseBallPursueRolling()
 
     f32 fDy = mv3TargetPosition.y - m_v3Position.y;
     f32 fDx = mv3TargetPosition.x - m_v3Position.x;
-    m_aDesiredFacingDirection = (s16)(nlATan2f(fDy, fDx) * 10430.378f);
+    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+    m_aDesiredFacingDirection = (s16)(s32)(nlATan2f(fDy, fDx) * 10430.378f);
 
     mv3NavTarget = mv3TargetPosition;
     mUrgency = URGENCY_MED;
@@ -6069,7 +6071,8 @@ void Goalie::SetDesiredSaveFacing(const nlVector3& v3BallPosition)
         nlVec3WeightedSum(v3Facing, 0.5f, v3Facing, 0.5f, v3BallToGoal);
     }
 
-    m_aDesiredFacingDirection = (s16)(nlATan2f(v3Facing.y, v3Facing.x) * (32768.0f / 3.14159265f));
+    // PORT: via s32 as on the console; a float cast straight to 16 bits is undefined out of range.
+    m_aDesiredFacingDirection = (s16)(s32)(nlATan2f(v3Facing.y, v3Facing.x) * (32768.0f / 3.14159265f));
 }
 
 /**

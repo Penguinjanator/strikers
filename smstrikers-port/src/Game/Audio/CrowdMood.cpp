@@ -8,6 +8,7 @@
 #include "NL/nlFileGC.h"
 #include "NL/nlMath.h"
 #include "NL/nlString.h"
+#include "port/lockstep.h"
 
 #include "Game/Audio/AudioStreamVirtuals.h"
 
@@ -809,6 +810,8 @@ inline GCAudioStreaming::MonoAudioStream::MonoAudioStream(GCAudioStreaming::Audi
  */
 void CrowdMood::Init()
 {
+    // PORT: BeginGame reaches this only when audio runs, so it takes the cosmetic stream.
+    PortRngCosmetic portRngCosmetic;
     if (g_Initd)
         return;
 

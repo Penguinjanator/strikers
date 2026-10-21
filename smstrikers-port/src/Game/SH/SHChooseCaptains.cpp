@@ -7,6 +7,7 @@
 #include "Game/GameSceneManager.h"
 #include "Game/TrophyTextures.h"
 #include "Game/main.h"
+#include "port/online_game.h"
 #include "NL/nlConfig.h"
 #include "NL/nlLocalization.h"
 #include "NL/nlPrint.h"
@@ -67,6 +68,8 @@ void ChooseCaptainsSceneV2::SceneCreated()
     BindChooseSideInstances();
     CreateTicker();
     ChangeSceneType(mDesiredSceneType);
+    // PORT: online teams use room ownership and the shared selection state.
+    PortOnlineGameCaptainsCreated(this);
 }
 
 /**
@@ -152,6 +155,9 @@ void ChooseCaptainsSceneV2::Update(float fDeltaT)
     BaseSceneHandler::Update(fDeltaT);
     mButtons.CentreButtons();
     mChooseCaptain.UpdateSound(fDeltaT);
+    // PORT: the online session decides when both teams may advance.
+    if (PortOnlineGameCaptainsUpdate(this, fDeltaT))
+        return;
     FEPresentation* pPresentation = m_pFEScene->m_pFEPackage->GetPresentation();
     TLSlide* pCurrentSlide = pPresentation->m_currentSlide;
 

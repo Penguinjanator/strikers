@@ -16,6 +16,7 @@
 #include "NL/nlMemory.h"
 #include "NL/nlTask.h"
 #include "NL/nlString.h"
+#include "port/lockstep.h"
 #include "string.h"
 
 extern unsigned long cupTrophyHash;
@@ -740,6 +741,8 @@ void NisPlayer::Load(const char* nisType, NisTarget target, NisUseStadiumOffset 
         return;
     }
 
+    // PORT: which cutscene plays is presentation, and BeginGame reaches this, so it takes the cosmetic stream.
+    PortRngCosmetic portRngCosmetic;
     NisHeader& nisHeader = *availableNis[nlRandom(numAvailableNis, &nlDefaultSeed)];
 
     for (int i = 0; i < 4; i++)

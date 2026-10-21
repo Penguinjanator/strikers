@@ -465,7 +465,8 @@ EffectsTerrainSpec* parse_terrain_spec(SimpleParser* parser)
 
     pSpec->m_uNumTerrains = numTerrains;
     pSpec->m_pTerrainIDs = (unsigned long*)nlMalloc(numTerrains * sizeof(unsigned long), 8, false);
-    memcpy(pSpec->m_pTerrainIDs, terrainIDs, numTerrains << 2);
+    // PORT: copies whole elements on hosts where unsigned long is wider than four bytes.
+    memcpy(pSpec->m_pTerrainIDs, terrainIDs, numTerrains * sizeof(unsigned long));
 
     EffectsTerrainSpec* existingSpec = fxGetTerrainSpec(pSpec->GetHashID());
 

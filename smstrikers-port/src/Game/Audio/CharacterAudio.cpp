@@ -9,6 +9,7 @@
 
 #include "NL/nlMath.h"
 #include "NL/nlSingleton.h"
+#include "port/lockstep.h"
 
 extern cTeam* g_pTeams[2];
 
@@ -430,6 +431,8 @@ void cCharacterSFX::Stop(eCharSFX sfxType, cGameSFX::StopFlag flag)
 unsigned long cCharacterSFX::PlayRandomCharDialogue(CharDialogueType dType, PosUpdateMethod posUpdateMethod, float fVol, float fDelay, bool bAvoidCurrent)
 {
     Audio::SoundAttributes sfxAtr;
+    // PORT: whether this draws depends on audio running and voices still sounding, so it takes the cosmetic stream.
+    PortRngCosmetic portRngCosmetic;
 
     if (mbInited == 0)
     {
@@ -564,6 +567,8 @@ unsigned long cCharacterSFX::PlayRandomCharDialogue(CharDialogueType dType, PosU
  */
 uintptr_t cCharacterSFX::PlayRandomCharDialogue(CharDialogueType dType, Audio::SoundAttributes& sndAttributes, bool bAvoidCurrent, unsigned long* pOutSfx)
 {
+    // PORT: whether this draws depends on audio running and voices still sounding, so it takes the cosmetic stream.
+    PortRngCosmetic portRngCosmetic;
     if (mbInited == 0)
     {
         return -1;
@@ -730,6 +735,8 @@ void cCharacterSFX::StopPlayingAllRandomCharDialogue()
  */
 int cCharacterSFX::PlayRandomWalkFootstep(float fVol, bool bNoRepeat)
 {
+    // PORT: whether this draws depends on audio running, so it takes the cosmetic stream.
+    PortRngCosmetic portRngCosmetic;
     if (mbInited == 0)
     {
         return -1;

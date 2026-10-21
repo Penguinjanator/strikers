@@ -1,6 +1,7 @@
 #include "Game/DispatchEventsTask.h"
 
 #include "Game/Sys/eventman.h"
+#include "port/lockstep.h"
 
 extern EventManager* g_pEventManager;
 
@@ -9,5 +10,8 @@ extern EventManager* g_pEventManager;
  */
 void DispatchEventsTask::Run(float dt)
 {
+    // PORT: lockstep mode's simulation handlers run at tick ends, and here only while the task state runs no ticks.
+    if (g_simLockstep && nlTaskManager::m_pInstance->m_CurrState != 2)
+        PortSimDispatchEvents();
     g_pEventManager->DispatchEvents();
 }

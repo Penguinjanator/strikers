@@ -11,6 +11,8 @@
 #include "port/host.h"
 #include "port/input.h"
 #include "port/launch.h"
+#include "port/lockstep.h"
+#include "port/online_panel.h"
 #include "port/texture_packs.h"
 
 #include <cstdio>
@@ -622,7 +624,12 @@ int PortDebugPopCommand(PortDebugCommand* out)
 // a button.
 void PortOverlayHandleKey(int scancode, int down)
 {
+    if (PortOnlinePanelHandleKey(scancode, down))
+        return;
     if (!down)
+        return;
+    // A lockstep match's pace changes only inside its ticks.
+    if (g_simLockstep && (scancode == SDL_SCANCODE_F3 || scancode == SDL_SCANCODE_F4))
         return;
     switch (scancode)
     {
@@ -799,6 +806,8 @@ void draw_match_tab()
         // possession change, and goals slow it down, so the slider shows what is in force rather
         // than owning it.
         float* scale = PortSimTimeScalePtr();
+        // A lockstep match's pace changes only inside its ticks.
+        ImGui::BeginDisabled(g_simLockstep != 0);
         ImGui::SetNextItemWidth(150.0f);
         ImGui::SliderFloat("time scale", scale, 0.0f, 2.0f, "%.2fx");
         ImGui::SameLine();
@@ -810,6 +819,7 @@ void draw_match_tab()
         ImGui::SameLine();
         if (ImGui::SmallButton("1x"))
             *scale = 1.0f;
+        ImGui::EndDisabled();
         ImGui::TextDisabled("F3 freezes, F4 quarter speed.");
         if (s_simRateKnown)
         {
@@ -1581,6 +1591,7 @@ void draw_input_tab()
         { "F1", "this menu" },
         { "F2", "the compact overlay" },
         { "F3 / F4", "freeze / quarter speed" },
+        { "F5", "the online panel" },
         { "F11", "fullscreen" },
         { "F12 or P", "screenshot, to STRIKERS_SHOT_DIR" },
     };
@@ -1868,6 +1879,7 @@ void PortOverlayDraw(void)
     // STRIKERS_CONTROL, polled here because this runs every frame before the STRIKERS_OVERLAY test
     // and inside Aurora's frame, which is where shot has to ask for its readback.
     PortControlPoll();
+    PortOnlinePanelDraw();
     const bool menu = s_menuOpen;
     if (!menu && !s_enabled)
         return;

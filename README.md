@@ -31,6 +31,7 @@ Built on the community decompilation by the excellent [Yannick Suter](https://gi
 - US, European and Japanese game support in one executable, with region-aware saves and language handling. The Japanese disc supports Japanese, English, German, French, Spanish and Italian.
 - A dedicated settings app for configuring graphics, controls, audio and game-data location. Some basic localisation included to help.
 - Discord Rich Presence support, disabled by default.
+- [not released yet] Online play over a local network or by address, or over the internet through [Tailscale](https://tailscale.com) or [ZeroTier](https://www.zerotier.com). It has not yet been tested on separate machines. Traffic is encrypted against passive eavesdropping; peers are not authenticated.
 
 ## Installation
 
@@ -58,6 +59,7 @@ The [roadmap board](https://miro.com/app/board/uXjVEelphdQ=/?share_link_id=27505
 - [Steam Deck](https://github.com/new-coke/strikers/wiki/Development#linux-and-steam-deck)
 - [Nintendo Switch](https://github.com/new-coke/strikers/wiki/Development#nintendo-switch)
 
+
 ## Notes
 
 This has been a solo effort. I am releasing this on what is effectively a 'burner' GitHub account because I don't want it attached to my name for professional and legal reasons. I have not done this port for reasons of ego or notoriety. Mario Strikers is one of my favourite games and it's been a dream of mine to bring it to the PC platform without the pains of emulation. My goal is simply to have it running on Steam Deck or similar low-end hardware with as little power draw as possible and nice performance, as I play the original game on Steam Deck a lot and bring it to parties and such.
@@ -81,6 +83,8 @@ The main distinctions are:
 - ODE physics: upstream ODE portions use the historical BSD-style licence preserved in the repository. That licence does not, by itself, establish the licensing status of independently copyrightable game-specific modifications.
 - Button prompt artwork: [Input Prompts](https://kenney.nl/assets/input-prompts) by Kenney, under CC0 1.0. 
 - Discord Rich Presence: [borealis](https://github.com/encounter/borealis) by Luke Street and [nlohmann/json](https://github.com/nlohmann/json) by Niels Lohmann, both MIT.
+- Online play's encryption: [Monocypher](https://monocypher.org) by Loup Vaillant, Michael Savage and Fabio Scotoni, under CC0 1.0 or the 2-clause BSD licence.
+- Online panel font: Roboto Medium by Google, under the Apache 2.0 licence.
 - Switch build: NVK from [mesa-switch](https://github.com/danfromtico/mesa-switch) (MIT, see 'NOTICE-NVK.md'); [libnx](https://github.com/switchbrew/libnx) (ISC); devkitPro's SDL2 (zlib), Mesa EGL/OpenGL ES and libdrm_nouveau (MIT); [sdl3on2](https://github.com/new-coke/sdl3on2) (zlib); [dawn-switch](https://github.com/new-coke/dawn-switch) (BSD 3-Clause).
 - Settings app: [Qt 6](https://www.qt.io), under the LGPL 3.0.
 - Movies: [FFmpeg](https://ffmpeg.org)'s libavcodec, built with only the THP decoder and linked statically, under the LGPL 2.1.

@@ -230,6 +230,8 @@ if(MSVC)
         "/FI${CMAKE_CURRENT_SOURCE_DIR}/include/port/prelude.h"
         /clang:-fno-strict-aliasing
         /clang:-fsigned-char
+        # Compilers fuse different multiply-adds, so contracted float results differ by toolchain.
+        /clang:-ffp-contract=off
         -Wno-invalid-offsetof
         # A pointer truncated into a smaller integer is a build error here, as it already is
         # everywhere else.
@@ -244,6 +246,8 @@ else()
         -include "${CMAKE_CURRENT_SOURCE_DIR}/include/port/prelude.h"
         -fno-strict-aliasing
         -fsigned-char
+        # Compilers fuse different multiply-adds, so contracted float results differ by toolchain.
+        -ffp-contract=off
         -Wno-invalid-offsetof
         # GCC rejects a member named after its own type, which the decompiled structs use.
         $<$<AND:$<BOOL:${NX}>,$<COMPILE_LANGUAGE:CXX>>:-Wno-changes-meaning>
@@ -325,12 +329,13 @@ if(STRIKERS_AURORA AND NOT NX)
     target_link_libraries(strikers_discord PRIVATE borealis::discord)
 endif()
 
-# The debug overlay is ImGui, and ImGui arrives with Aurora and only with Aurora: with
-# STRIKERS_AURORA=OFF none of overlay.cpp's includes are on the path, so it leaves the source set
-# rather than becoming an empty translation unit.
+# The debug overlay and the online panel are ImGui, which arrives with Aurora and only with Aurora:
+# with STRIKERS_AURORA=OFF none of their includes are on the path, so they leave the source set
+# rather than becoming empty translation units.
 if(NOT STRIKERS_AURORA)
     list(REMOVE_ITEM PLATFORM_SOURCES
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/overlay.cpp")
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/overlay.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/online/panel.cpp")
 endif()
 
 if(NX)
@@ -422,11 +427,23 @@ target_compile_options(strikers_musyx PRIVATE
     # GCC 14 makes mismatched C pointer arguments an error; clang only warns, and -w hides that.
     $<$<BOOL:${NX}>:-Wno-error=incompatible-pointer-types>)
 
+# Monocypher, the online session's key exchange and encryption: one C file.
+include(FetchContent)
+FetchContent_Declare(monocypher
+    URL https://monocypher.org/download/monocypher-4.0.2.tar.gz
+    URL_HASH SHA256=38d07179738c0c90677dba3ceb7a7b8496bcfea758ba1a53e803fed30ae0879c
+    DOWNLOAD_EXTRACT_TIMESTAMP FALSE
+)
+FetchContent_MakeAvailable(monocypher)
+set(MONOCYPHER_SRC "${monocypher_SOURCE_DIR}/src")
+add_library(strikers_monocypher OBJECT "${MONOCYPHER_SRC}/monocypher.c")
+
 add_library(strikers_ode      OBJECT ${ODE_SOURCES})
 add_library(strikers_game     OBJECT ${GAME_SOURCES})
 add_library(strikers_platform OBJECT ${PLATFORM_SOURCES})
 # The crash log stamps the build into every file it writes.
 target_include_directories(strikers_platform PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/version")
+target_include_directories(strikers_platform PRIVATE "${MONOCYPHER_SRC}")
 
 foreach(_t strikers_ode strikers_game strikers_platform strikers_sdk
           strikers_operators)
@@ -437,7 +454,7 @@ endforeach()
 # linked.
 add_custom_target(strikers_scan
     DEPENDS strikers_ode strikers_game strikers_platform strikers_sdk
-            strikers_musyx strikers_operators)
+            strikers_musyx strikers_operators strikers_monocypher)
 if(TARGET strikers_discord)
     add_dependencies(strikers_scan strikers_discord)
 endif()
@@ -451,6 +468,7 @@ add_executable(strikers
     $<TARGET_OBJECTS:strikers_platform>
     $<TARGET_OBJECTS:strikers_operators>
     $<TARGET_OBJECTS:strikers_musyx>
+    $<TARGET_OBJECTS:strikers_monocypher>
 )
 target_link_libraries(strikers PRIVATE port_flags)
 if(TARGET strikers_discord)

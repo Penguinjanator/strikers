@@ -1,4 +1,5 @@
 #include "Game/OverlayHandlerHUD.h"
+#include "PowerPC_EABI_Support/Runtime/runtime.h"
 #include "Game/Audio/WorldAudio.h"
 #include "Game/DB/StatsTracker.h"
 #include "Game/EventDataTypes.h"
@@ -255,7 +256,8 @@ void HUDOverlay::Update(float fDeltaT)
 
     overtimeTime = (fTime > overtimeTime) ? overtimeTime : fTime;
 
-    time = (unsigned long)fRemainingTime;
+    // PORT: the console's saturating conversion; x86-64 wraps a negative or huge float into range.
+    time = __cvt_fp2unsigned(fRemainingTime);
     unsigned long remainingTime = (unsigned long)(isOvertime ? overtimeTime : (float)time);
     unsigned long newMinutes = remainingTime / 60;
     unsigned long newSeconds = remainingTime - (newMinutes * 60);

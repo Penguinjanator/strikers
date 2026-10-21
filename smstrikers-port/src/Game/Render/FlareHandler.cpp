@@ -7,6 +7,7 @@
 #include "NL/gl/glView.h"
 
 #include "Game/GL/gluMeshWriter.h"
+#include "port/fpconv.h"
 
 FlareHandler FlareHandler::instance;
 
@@ -116,7 +117,8 @@ void FlareHandler::AddFace(const FlareStruct* pFlare, GLMeshWriter* pMeshWriter)
     }
     else
     {
-        nlSinCos(&sn, &cs, (u16)((s32)(8192.0f * (viewPosition.x / viewPosition.y)) + 0x2000));
+        // PORT: fctiwz saturated; a flare near the eye plane puts the ratio past the s32 range.
+        nlSinCos(&sn, &cs, (u16)((u32)PortFloatToS32(8192.0f * (viewPosition.x / viewPosition.y)) + 0x2000));
         sn *= (pFlare->size * 0.5f);
         cs *= (pFlare->size * 0.5f);
     }

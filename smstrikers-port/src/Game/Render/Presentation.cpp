@@ -1,5 +1,7 @@
 #include "Game/Render/Presentation.h"
 #include "port/aspect.h"
+#include "port/lockstep.h"
+#include "port/online.h"
 #include "Game/BeginFrameTask.h"
 #include "Game/FixedUpdateTask.h"\n#include <stdlib.h>
 #include "Game/ParticleUpdateTask.h"
@@ -250,6 +252,9 @@ inline bool Presentation::DetectSkipPress() const
                 }
             }
 
+            // PORT: only this machine can request a shared cutscene skip.
+            if (PortSimOnline() && PortOnlineSlotLocalPort(i) < 0)
+                continue;
             cGlobalPad* pad = cPadManager::GetPad(i);
             if (pad != 0)
             {
@@ -296,7 +301,8 @@ void Presentation::Finish()
     {
         if (mCurrentFunction == strstr(mCurrentFunction, "Goal"))
         {
-            if (g_pGame->m_eGameState != GS_END_GAME)
+            // PORT: in lockstep mode the kickoff runs inside the tick the goal barrier resumes at.
+            if (g_pGame->m_eGameState != GS_END_GAME && !g_simLockstep)
             {
                 g_pGame->ChangeGameState(GS_KICKOFF);
             }
@@ -317,7 +323,15 @@ void Presentation::Finish()
             }
             else
             {
-                if (nlStrCmp<char>(mCurrentFunction, "GameBegin") == 0)
+                // PORT: in lockstep mode the barrier resumes play, with the kickoff inside that tick.
+                if (g_simLockstep)
+                {
+                    if (nlStrCmp<char>(mCurrentFunction, "GameBegin") == 0)
+                        PortSimBarrierDone(PORT_BARRIER_INTRO);
+                    else if (mCurrentFunction == strstr(mCurrentFunction, "Goal"))
+                        PortSimBarrierDone(PORT_BARRIER_GOAL);
+                }
+                else if (nlStrCmp<char>(mCurrentFunction, "GameBegin") == 0)
                 {
                     g_pGame->ChangeGameState(GS_KICKOFF);
                 }
@@ -437,11 +451,21 @@ void Presentation::EndByPass()
 void Presentation::PlayCharacterDirection()
 {
     mWaitingForCharacterDirectionSince = FixedUpdateTask::mSimulationTime;
-    NisPlayer::Instance()->PlayCharacterDirection();
+    // PORT: in lockstep mode the match issues event 7 itself, inside the tick after the goal.
+    if (!g_simLockstep)
+    {
+        NisPlayer::Instance()->PlayCharacterDirection();
+    }
 }
 
 void Presentation::PlayNis()
 {
+    // PORT: in lockstep mode a cutscene freezes the tick only once the match holds at a barrier.
+    if (g_simLockstep && PortSimBarrier() == PORT_BARRIER_NONE)
+    {
+        StopWithUndo();
+        return;
+    }
     if (NisPlayer::Instance()->Play())
     {
         if (nlTaskManager::m_pInstance->m_CurrState == 0x100)
@@ -538,6 +562,15 @@ void Presentation::WaitForAutoReplayCompletion(const char* wipe)
 
 void Presentation::WaitForCharacterDirection()
 {
+    // PORT: in lockstep mode the post-goal ticks end at the goal barrier's freeze tick, not after 1 s.
+    if (g_simLockstep)
+    {
+        if (PortSimBarrier() != PORT_BARRIER_GOAL)
+        {
+            StopWithUndo();
+        }
+        return;
+    }
     if (mWaitingForCharacterDirectionSince > 0.0f)
     {
         if (FixedUpdateTask::mSimulationTime - mWaitingForCharacterDirectionSince < 1.0f)
@@ -638,6 +671,9 @@ void Presentation::Update(float deltaT)
         if (!mSkipPressed)
         {
             mSkipPressed = DetectSkipPress();
+            // PORT: a skip bypasses presentation on every peer; simulation still waits at its barrier.
+            if (PortSimOnline())
+                mSkipPressed = PortOnlinePresentationSkip(PortSimPresentationId(), mSkipPressed) != 0;
         }
 
         if (mSkipPressed && mInsideByPass)
@@ -889,7 +925,15 @@ void Presentation::EventHandler(Event* event)
 
         if (noPresentation)
         {
-            g_pGame->ChangeGameState(GS_KICKOFF);
+            // PORT: in lockstep mode the goal barrier still kicks off at its freeze tick; only the cutscene goes.
+            if (g_simLockstep)
+            {
+                PortSimBarrierDone(PORT_BARRIER_GOAL);
+            }
+            else
+            {
+                g_pGame->ChangeGameState(GS_KICKOFF);
+            }
             return;
         }
 
@@ -1007,7 +1051,9 @@ void Presentation::EventHandler(Event* event)
                 }
             }
 
-            FixedUpdateTask::mTimeScale = 1.0f;
+            // PORT: in lockstep mode CheckForGoal has already ended slow motion from the next tick.
+            if (!g_simLockstep)
+                FixedUpdateTask::mTimeScale = 1.0f;
             ParticleUpdateTask::SetTimeScale(1.0f);
 
             if (nlStrCmp<char>(idleFun, mCurrentFunction) != 0 && nlStrCmp<char>(idleFun, script) != 0)

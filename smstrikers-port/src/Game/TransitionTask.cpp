@@ -28,6 +28,7 @@
 #include "Game/BeginFrameTask.h"
 #include "Game/WorldManager.h"
 #include "Game/ObjectBlur.h"
+#include "port/lockstep.h"
 #include "Game/Camera/CameraMan.h"
 #include "Game/CameraLoader.h"
 #include "Game/Effects/EmissionManager.h"
@@ -451,6 +452,9 @@ void TransitionTask::StateTransition(unsigned int from, unsigned int to)
         if (from != 1)
         {
             ReplayManager::Instance()->PrepareForRecording();
+            // PORT: lockstep holds the kickoff that removes this camera, which cannot update without a render camera.
+            if (g_simLockstep)
+                cCameraManager::Remove(eCameraType_MatrixEffect, true);
         }
 
         if (!g_JaapAndJacksNastyHackBecauseWeDoNotKnowDifferenceBetweenPausePauseAndPostGamePause)

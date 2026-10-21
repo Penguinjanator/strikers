@@ -20,6 +20,7 @@
 #include "Game/Net.h"
 #include "Game/WorldManager.h"
 #include "Game/AI/AiUtil.h"
+#include "port/simcamera.h"
 
 #include "math.h"
 
@@ -57,6 +58,8 @@ void FireCameraRumbleFilter(float fRumbleX, float fRumbleY)
     {
         nlDLRingGetStart<cBaseCamera>(cCameraManager::m_cameraStack)->m_pFilter->Rumble(fRumbleX, fRumbleY);
     }
+    // PORT: the lockstep simulation camera shakes as the one on screen does.
+    PortSimCameraRumble(fRumbleX, fRumbleY);
 }
 
 /**

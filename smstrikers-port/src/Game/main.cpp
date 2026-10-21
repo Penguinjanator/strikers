@@ -27,6 +27,8 @@ extern "C" void PortDebugFrame(void);   // PORT: defined in Game.cpp
 #include <stdio.h>   // PORT: snprintf
 #endif
 #include "port/benchmark.h"
+#include "port/lockstep.h"
+#include "port/online_game.h"
 #include "port/audio.h"
 #include "port/determinism.h"
 #include "port/config.h"
@@ -130,7 +132,9 @@ public:
      */
     virtual void Run(float dt)
     {
-        ClockManager::Update(dt);
+        // PORT: in lockstep mode the tick steps the clocks by its own 0.02 s, not by render dt.
+        if (!g_simLockstep)
+            ClockManager::Update(dt);
     }
 };
 
@@ -220,6 +224,10 @@ static void Initialize()
 
     // PORT: After the ini files so it wins.
     PortBenchInit();
+    // PORT: STRIKERS_LOCKSTEP=1 runs matches through the lockstep tick loop.
+    PortLockstepInit();
+    // PORT: after the config and the disc, which set this machine's online identity.
+    PortOnlineGameInit();
     if (PortBenchWantsDemo())
     {
         Config::Global().Set("dosoak", true);
@@ -894,6 +902,9 @@ int main(int argc, char* argv[])
         // Sample the pad before the tasks that read it. main() registers VBlankPadUpdate through PADSetSamplingCallback.
         PortInvokePadSamplingCallback();
 
+        // PORT: the online session hears the local pads and moves the room and match on.
+        PortOnlineGameFrame();
+
         nlTaskManager::RunAllTasks();
         UpdateProfile();
         PortBenchAfterTasks();
@@ -942,6 +953,8 @@ int main(int argc, char* argv[])
         }
     }
     PortDiscordShutdown();
+    // PORT: peers hear that this machine left.
+    PortOnlineGameShutdown();
     PortBenchReport();
     aurora_shutdown();
     return 0;

@@ -1,6 +1,8 @@
 #include "NL/nlLexicalCast.h"
 #include "Game/GameInfo.h"
 #include "port/overlay.h"
+#include "port/lockstep.h"
+#include "port/online_game.h"
 #include <stdlib.h>
 #include "NL/nlString.h"
 #include "NL/nlDebug.h"
@@ -2318,7 +2320,17 @@ const GameplaySettings& GameInfoManager::GetGameplayOptions() const
 const PowerupSettings& GameInfoManager::GetPowerupOptions() const
 {
     FORCE_DONT_INLINE;
+    // PORT: a lockstep match reads the current-game copy, which its settings are applied to.
+    if (g_simLockstep && mUseCurGameSettings)
+    {
+        return mCurGamePowerupOptions;
+    }
     return mUserInfo.mPowerupOptions;
+}
+
+const CheatSettings& GameInfoManager::GetCheatOptions() const
+{
+    return (g_simLockstep && mUseCurGameSettings) ? mCurGameCheatOptions : mUserInfo.mCheatOptions;
 }
 
 /**
@@ -2327,10 +2339,19 @@ const PowerupSettings& GameInfoManager::GetPowerupOptions() const
 void GameInfoManager::OnPreGameState()
 {
     mCurGameGameplayOptions = GetGameplayOptions();
+    // PORT: the rest of the match settings get a current-game copy too.
+    mCurGamePowerupOptions = mUserInfo.mPowerupOptions;
+    mCurGameCheatOptions = mUserInfo.mCheatOptions;
 
     mUseCurGameSettings = true;
 
-    if (Config::Global().Exists("team1"))
+    // PORT: an online match's settings go on these current-game copies, never on the card's.
+    PortOnlineGameApplySettings(this);
+
+    // PORT: in lockstep mode the ini files, the environment and the overlay do not change the match.
+    const bool configOverrides = !g_simLockstep;
+
+    if (configOverrides && Config::Global().Exists("team1"))
     {
         BasicString<char, Detail::TempStringAllocator> teamString = Config::Global().Get<BasicString<char, Detail::TempStringAllocator> >(
             "team1", BasicString<char, Detail::TempStringAllocator>("mario"));
@@ -2338,7 +2359,7 @@ void GameInfoManager::OnPreGameState()
         mGameInfo[mCurrentMode]->mTeamIndex[0] = ConvertToTeamID(teamString.c_str());
     }
 
-    if (Config::Global().Exists("team2"))
+    if (configOverrides && Config::Global().Exists("team2"))
     {
         BasicString<char, Detail::TempStringAllocator> teamString = Config::Global().Get<BasicString<char, Detail::TempStringAllocator> >(
             "team2", BasicString<char, Detail::TempStringAllocator>("luigi"));
@@ -2346,12 +2367,12 @@ void GameInfoManager::OnPreGameState()
         mGameInfo[mCurrentMode]->mTeamIndex[1] = ConvertToTeamID(teamString.c_str());
     }
 
-    if (Config::Global().Exists("soak_diff"))
+    if (configOverrides && Config::Global().Exists("soak_diff"))
     {
         mCurGameGameplayOptions.SkillLevel = (GameplaySettings::eSkillLevel)GetConfigInt(Config::Global(), "soak_diff", 2);
     }
 
-    if (Config::Global().Exists("sidekick1"))
+    if (configOverrides && Config::Global().Exists("sidekick1"))
     {
         BasicString<char, Detail::TempStringAllocator> sidekickString
             = Config::Global().Get<BasicString<char, Detail::TempStringAllocator> >(
@@ -2360,7 +2381,7 @@ void GameInfoManager::OnPreGameState()
         mGameInfo[mCurrentMode]->mSidekickIndex[0] = ConvertToSidekickID(sidekickString.c_str());
     }
 
-    if (Config::Global().Exists("sidekick2"))
+    if (configOverrides && Config::Global().Exists("sidekick2"))
     {
         BasicString<char, Detail::TempStringAllocator> sidekickString
             = Config::Global().Get<BasicString<char, Detail::TempStringAllocator> >(
@@ -2397,7 +2418,7 @@ void GameInfoManager::OnPreGameState()
 
     ApplyDifficultySettings();
 
-    if (Config::Global().Exists("stadium"))
+    if (configOverrides && Config::Global().Exists("stadium"))
     {
         BasicString<char, Detail::TempStringAllocator> stadium;
         stadium = Config::Global().Get<BasicString<char, Detail::TempStringAllocator> >(
@@ -3759,7 +3780,7 @@ bool GameInfoManager::IsStunnedGoaliesOn() const
         }
         if (useCheatSettings)
         {
-            return mUserInfo.mCheatOptions.mStunnedGoalies;
+            return GetCheatOptions().mStunnedGoalies;   // PORT: the current-game copy in a lockstep match
         }
         return false;
     }
@@ -3788,7 +3809,7 @@ bool GameInfoManager::IsInfinitePowerupsOn() const
         }
         if (useCheatSettings)
         {
-            return mUserInfo.mCheatOptions.mInfinitePowerups;
+            return GetCheatOptions().mInfinitePowerups;   // PORT: the current-game copy in a lockstep match
         }
         return false;
     }
@@ -3817,7 +3838,7 @@ bool GameInfoManager::IsTiltingFieldOn() const
         }
         if (useCheatSettings)
         {
-            return mUserInfo.mCheatOptions.mCheatTBD1Enabled;
+            return GetCheatOptions().mCheatTBD1Enabled;   // PORT: the current-game copy in a lockstep match
         }
         return false;
     }
@@ -3846,7 +3867,7 @@ bool GameInfoManager::IsPerfectStrikesOn() const
         }
         if (useCheatSettings)
         {
-            return mUserInfo.mCheatOptions.mCheatTBD2Enabled;
+            return GetCheatOptions().mCheatTBD2Enabled;   // PORT: the current-game copy in a lockstep match
         }
         return false;
     }
@@ -3961,7 +3982,7 @@ CustomPowerups GameInfoManager::GetCustomPowerups() const
         }
         if (useCheatSettings)
         {
-            return mUserInfo.mCheatOptions.mCustomPowerups;
+            return GetCheatOptions().mCustomPowerups;   // PORT: the current-game copy in a lockstep match
         }
         return CheatSettings::CP_OFF;
     }

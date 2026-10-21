@@ -155,6 +155,7 @@ if(Qt6LinguistTools_FOUND)
   qt_add_translations(strikers-settings
     TS_FILES ${STRIKERS_SETTINGS_TS}
     SOURCE_TARGETS strikers-settings strikers-settings-core
+    SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../src/platform/online/panel_text.cpp"
     QM_FILES_OUTPUT_VARIABLE STRIKERS_SETTINGS_QM_BUILT
     ${STRIKERS_MERGE_ARG})
   set(STRIKERS_SETTINGS_QM_EMBED ${STRIKERS_SETTINGS_QM_BUILT})

@@ -277,6 +277,7 @@ void FEResourceManager::TextureResourceLoadComplete(void* buffer, unsigned long 
     FEResourceHandle* pHandle = (FEResourceHandle*)uParam;
 
     glTextureAdd(pHandle->m_hashID, s_pResourceLoadBuffer, uReadSize);
+    PortPromptsLegendReloaded(pHandle->m_hashID);   // PORT: repaint a replaced button legend
 
     delete[] s_pResourceLoadBuffer;
     s_pResourceLoadBuffer = NULL;

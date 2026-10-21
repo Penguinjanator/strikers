@@ -156,6 +156,20 @@
 # Every stadium, team and cup mode available.
 # unlock_all = 1
 
+[online]
+# Online play. The game writes these when you change them in the online panel (hold L+R+Z).
+# The name other players see, up to 16 characters.
+# online_nickname = "Player"
+
+# Input delay in steps of 20 ms, 1 to 8, or 0 to pick it from the connection.
+# online_delay = 0
+
+# 1 shows the connection line during online matches.
+# online_stats = 0
+
+# The UDP port a room you host listens on, 1025 to 49151. Guests joining by address need it open.
+# online_port = 41210
+
 [debug]
 # Force a stadium instead of letting the demo pick at random: mario_stadium, peach_toad, dk_daisy,
 # wario_stadium, yoshi_stadium, super_stadium or forbidden_dome, or 0 to 6.

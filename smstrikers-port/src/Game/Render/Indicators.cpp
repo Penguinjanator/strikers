@@ -17,6 +17,8 @@
 #include "NL/nlColour.h"
 #include "NL/nlMath.h"
 #include "types.h"
+#include "port/lockstep.h"
+#include "port/simcamera.h"
 
 static float s_fOverheadSize = 35.0f;
 static float s_fAdditiveBlendingIntensity = 0.55f;
@@ -148,14 +150,19 @@ static void UpdateAndRenderOffScreenIndicators(float dt)
         }
 
         glViewProjectPoint((eGLView)7, worldPos, projectedPos);
-        ((cPlayer*)g_pCharacters[i])->m_v3ScreenPosition = projectedPos;
+        // PORT: under lockstep the AI's screen positions come from the simulation camera; the frame's stay here.
+        if (g_simLockstep)
+            PortRenderScreenPosition(i) = projectedPos;
+        else
+            ((cPlayer*)g_pCharacters[i])->m_v3ScreenPosition = projectedPos;
 
         if (((cPlayer*)g_pCharacters[i])->GetGlobalPad() != 0)
         {
             u8 onScreenFlags[2];
             float fOne;
 
-            const nlVector3& screenPos = ((cPlayer*)g_pCharacters[i])->m_v3ScreenPosition;
+            // PORT: the frame's own projection, which is m_v3ScreenPosition only outside lockstep.
+            const nlVector3& screenPos = projectedPos;
             onScreenFlags[1] = 0;
             fOne = 1.0f;
             onScreenFlags[0] = onScreenFlags[1];

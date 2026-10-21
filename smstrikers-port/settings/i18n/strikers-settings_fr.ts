@@ -1378,4 +1378,787 @@ Le jeu utilise désormais ce dossier ; l&apos;image peut donc être déplacée o
         <translation>Droite</translation>
     </message>
 </context>
+<context>
+    <name>Online</name>
+    <message>
+        <source>Change team</source>
+        <extracomment>T_CHANGE_TEAM; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Changer d'équipe</translation>
+    </message>
+    <message>
+        <source>CPU</source>
+        <extracomment>T_CPU; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Ordinateur</translation>
+    </message>
+    <message>
+        <source>CPU (host chooses)</source>
+        <extracomment>T_CPU_HOST; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Ordinateur (choix de l'hôte)</translation>
+    </message>
+    <message>
+        <source>Enter</source>
+        <extracomment>T_ENTER_KEY; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Entrée</translation>
+    </message>
+    <message>
+        <source>Esc</source>
+        <extracomment>T_ESCAPE_KEY; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Échap</translation>
+    </message>
+    <message>
+        <source>Waiting for %s to choose teams</source>
+        <extracomment>T_CHOOSE_TEAMS_WAIT; printf arguments: s. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>En attente du choix des équipes par %s</translation>
+    </message>
+    <message>
+        <source>Connection details</source>
+        <extracomment>T_CONNECTION_DETAILS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Détails de connexion</translation>
+    </message>
+    <message>
+        <source>Invite player</source>
+        <extracomment>T_INVITE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Inviter un joueur</translation>
+    </message>
+    <message>
+        <source>Connected</source>
+        <extracomment>T_CONNECTED; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Connecté</translation>
+    </message>
+    <message>
+        <source>Choosing captain</source>
+        <extracomment>T_CHOOSING_CAPTAIN; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Choix du capitaine</translation>
+    </message>
+    <message>
+        <source>Choosing sidekick</source>
+        <extracomment>T_CHOOSING_SIDEKICK; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Choix des équipiers</translation>
+    </message>
+    <message>
+        <source>The host hasn't unlocked this stadium. Choose another.</source>
+        <extracomment>T_STADIUM_LOCKED; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>L'hôte n'a pas débloqué ce stade. Choisissez-en un autre.</translation>
+    </message>
+    <message>
+        <source>The host chooses the stadium</source>
+        <extracomment>T_STAGE_STADIUM; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>L'hôte choisit le stade</translation>
+    </message>
+    <message>
+        <source>Back returns everyone to team selection</source>
+        <extracomment>T_SHARED_BACK; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Retour ramène tous les joueurs au choix des équipes</translation>
+    </message>
+    <message>
+        <source>Advanced connection settings</source>
+        <extracomment>T_ADVANCED; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Paramètres de connexion avancés</translation>
+    </message>
+    <message>
+        <source>Other network addresses</source>
+        <extracomment>T_OTHER_NETWORKS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Autres adresses réseau</translation>
+    </message>
+    <message>
+        <source>Copy address</source>
+        <extracomment>T_COPY_ADDRESS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Copier l'adresse</translation>
+    </message>
+    <message>
+        <source>Address copied</source>
+        <extracomment>T_COPIED; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Adresse copiée</translation>
+    </message>
+    <message>
+        <source>Enter the host's address. Include the port if supplied.</source>
+        <extracomment>T_JOIN_HELP; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Saisissez l'adresse de l'hôte. Ajoutez le port s'il est indiqué.</translation>
+    </message>
+    <message>
+        <source>Editing match rules</source>
+        <extracomment>T_RULES; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Modification des règles du match</translation>
+    </message>
+    <message>
+        <source>Rumble only affects this device</source>
+        <extracomment>T_LOCAL_RUMBLE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Les vibrations ne concernent que cet appareil</translation>
+    </message>
+    <message>
+        <source>Online</source>
+        <extracomment>T_ONLINE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>En ligne</translation>
+    </message>
+    <message>
+        <source>Create room</source>
+        <extracomment>T_CREATE_ROOM; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Créer un salon</translation>
+    </message>
+    <message>
+        <source>Invite players by address or on this network</source>
+        <extracomment>T_CREATE_ROOM_SUB; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Inviter des joueurs par adresse ou sur ce réseau</translation>
+    </message>
+    <message>
+        <source>Nearby rooms</source>
+        <extracomment>T_NEARBY; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Salons à proximité</translation>
+    </message>
+    <message>
+        <source>Rooms on this network</source>
+        <extracomment>T_NEARBY_SUB; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Salons sur ce réseau</translation>
+    </message>
+    <message>
+        <source>Join by address</source>
+        <extracomment>T_JOIN_ADDRESS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Rejoindre par adresse</translation>
+    </message>
+    <message>
+        <source>The host's IP address or Tailscale device name</source>
+        <extracomment>T_JOIN_ADDRESS_SUB; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Adresse IP ou nom d'appareil Tailscale de l'hôte</translation>
+    </message>
+    <message>
+        <source>Recent</source>
+        <extracomment>T_RECENT; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Récents</translation>
+    </message>
+    <message>
+        <source>Online settings</source>
+        <extracomment>T_SETTINGS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Paramètres en ligne</translation>
+    </message>
+    <message>
+        <source>Nickname, input delay, connection stats</source>
+        <extracomment>T_SETTINGS_SUB; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Pseudo, délai des commandes, statistiques de connexion</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <extracomment>T_CLOSE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Fermer</translation>
+    </message>
+    <message>
+        <source>USA/Europe data</source>
+        <extracomment>T_DATA_USA_EUROPE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Données USA/Europe</translation>
+    </message>
+    <message>
+        <source>Japanese data</source>
+        <extracomment>T_DATA_JAPAN; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Données japonaises</translation>
+    </message>
+    <message>
+        <source>%s  |  version %s</source>
+        <extracomment>T_BUILD_LINE; printf arguments: ss. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%s  |  version %s</translation>
+    </message>
+    <message>
+        <source>Select</source>
+        <extracomment>T_HINT_SELECT; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Sélectionner</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <extracomment>T_HINT_BACK; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Retour</translation>
+    </message>
+    <message>
+        <source>Change</source>
+        <extracomment>T_HINT_CHANGE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Modifier</translation>
+    </message>
+    <message>
+        <source>Move</source>
+        <extracomment>T_HINT_MOVE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Déplacer</translation>
+    </message>
+    <message>
+        <source>Join</source>
+        <extracomment>T_HINT_JOIN; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Rejoindre</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <extracomment>T_HINT_DELETE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Supprimer</translation>
+    </message>
+    <message>
+        <source>Keyboard</source>
+        <extracomment>T_HINT_KEYBOARD; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Clavier</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <extracomment>T_HINT_REFRESH; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Actualiser</translation>
+    </message>
+    <message>
+        <source>Add player</source>
+        <extracomment>T_ADD_PLAYER; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Ajouter un joueur</translation>
+    </message>
+    <message>
+        <source>Leave</source>
+        <extracomment>T_HINT_LEAVE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Quitter</translation>
+    </message>
+    <message>
+        <source>Up and down change a character, left and right move.</source>
+        <extracomment>T_WHEEL_HELP; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Haut et bas changent le caractère, gauche et droite déplacent le curseur.</translation>
+    </message>
+    <message>
+        <source>Type or paste the address</source>
+        <extracomment>T_JOIN_TYPE_HINT; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Saisissez ou collez l'adresse</translation>
+    </message>
+    <message>
+        <source>Type</source>
+        <extracomment>T_TYPE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Saisir</translation>
+    </message>
+    <message>
+        <source>Paste</source>
+        <extracomment>T_PASTE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Coller</translation>
+    </message>
+    <message>
+        <source>Looking for rooms on this network...</source>
+        <extracomment>T_SEARCHING; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Recherche de salons sur ce réseau...</translation>
+    </message>
+    <message>
+        <source>No rooms found on this network.</source>
+        <extracomment>T_NONE_FOUND; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Aucun salon trouvé sur ce réseau.</translation>
+    </message>
+    <message>
+        <source>%s's room</source>
+        <extracomment>T_ROOM_OF; printf arguments: s. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Salon de %s</translation>
+    </message>
+    <message>
+        <source>1 player</source>
+        <extracomment>T_ONE_PLAYER; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>1 joueur</translation>
+    </message>
+    <message>
+        <source>%d players</source>
+        <extracomment>T_PLAYERS; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%d joueurs</translation>
+    </message>
+    <message>
+        <source>Playing</source>
+        <extracomment>T_PLAYING; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>En jeu</translation>
+    </message>
+    <message>
+        <source>Different version</source>
+        <extracomment>T_INCOMPATIBLE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Version différente</translation>
+    </message>
+    <message>
+        <source>Joining</source>
+        <extracomment>T_JOINING; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Connexion</translation>
+    </message>
+    <message>
+        <source>Finding %s...</source>
+        <extracomment>T_STAGE_RESOLVING; printf arguments: s. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Recherche de %s...</translation>
+    </message>
+    <message>
+        <source>Contacting the room...</source>
+        <extracomment>T_STAGE_CONTACTING; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Connexion au salon...</translation>
+    </message>
+    <message>
+        <source>Checking versions...</source>
+        <extracomment>T_STAGE_HANDSHAKE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Vérification des versions...</translation>
+    </message>
+    <message>
+        <source>Joining the room...</source>
+        <extracomment>T_STAGE_ADMITTED; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Entrée dans le salon...</translation>
+    </message>
+    <message>
+        <source>%d s</source>
+        <extracomment>T_SECONDS; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%d s</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <extracomment>T_CANCEL; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Annuler</translation>
+    </message>
+    <message>
+        <source>Room</source>
+        <extracomment>T_ROOM; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Salon</translation>
+    </message>
+    <message>
+        <source>Waiting for players to join</source>
+        <extracomment>T_WAITING_FOR_PLAYERS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>En attente de joueurs</translation>
+    </message>
+    <message>
+        <source>(you)</source>
+        <extracomment>T_YOU; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>(vous)</translation>
+    </message>
+    <message>
+        <source>Host</source>
+        <extracomment>T_HOST; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Hôte</translation>
+    </message>
+    <message>
+        <source>direct</source>
+        <extracomment>T_DIRECT; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Directe</translation>
+    </message>
+    <message>
+        <source>unstable</source>
+        <extracomment>T_UNSTABLE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Instable</translation>
+    </message>
+    <message>
+        <source>%d%% loss</source>
+        <extracomment>T_LOSS; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%d%% de perte</translation>
+    </message>
+    <message>
+        <source>Ready</source>
+        <extracomment>T_READY; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Prêt</translation>
+    </message>
+    <message>
+        <source>Not ready</source>
+        <extracomment>T_NOT_READY; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Pas prêt</translation>
+    </message>
+    <message>
+        <source>Home</source>
+        <extracomment>T_HOME; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Domicile</translation>
+    </message>
+    <message>
+        <source>Away</source>
+        <extracomment>T_AWAY; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Extérieur</translation>
+    </message>
+    <message>
+        <source>No side</source>
+        <extracomment>T_NO_SIDE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Sans équipe</translation>
+    </message>
+    <message>
+        <source>P%d</source>
+        <extracomment>T_SLOT; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>J%d</translation>
+    </message>
+    <message>
+        <source>Input delay %d ms</source>
+        <extracomment>T_INPUT_DELAY; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Délai des commandes : %d ms</translation>
+    </message>
+    <message>
+        <source>Input delay %d ms (auto)</source>
+        <extracomment>T_INPUT_DELAY_AUTO; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Délai des commandes : %d ms (auto)</translation>
+    </message>
+    <message>
+        <source>Start match</source>
+        <extracomment>T_START_MATCH; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Commencer le match</translation>
+    </message>
+    <message>
+        <source>Choose teams</source>
+        <extracomment>T_SELECT_TEAMS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Choisir les équipes</translation>
+    </message>
+    <message>
+        <source>%s is choosing the stadium</source>
+        <extracomment>T_SELECTING_STADIUM; printf arguments: s. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%s choisit le stade</translation>
+    </message>
+    <message>
+        <source>Confirm on the other controller to join.</source>
+        <extracomment>T_ADD_PLAYER_WAIT; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Confirmez avec l'autre manette pour rejoindre.</translation>
+    </message>
+    <message>
+        <source>Connect another controller, then confirm to join.</source>
+        <extracomment>T_ADD_PLAYER_NO_PAD; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Branchez une autre manette, puis confirmez pour rejoindre.</translation>
+    </message>
+    <message>
+        <source>Leave the room?</source>
+        <extracomment>T_LEAVE_ROOM_Q; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Quitter le salon ?</translation>
+    </message>
+    <message>
+        <source>Close the room? Everyone will be disconnected.</source>
+        <extracomment>T_CLOSE_ROOM_Q; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Fermer le salon ? Tous les joueurs seront déconnectés.</translation>
+    </message>
+    <message>
+        <source>Leave the match? You can't rejoin it.</source>
+        <extracomment>T_LEAVE_MATCH_Q; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Quitter le match ? Vous ne pourrez pas le rejoindre.</translation>
+    </message>
+    <message>
+        <source>Stay</source>
+        <extracomment>T_STAY; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Rester</translation>
+    </message>
+    <message>
+        <source>For players on this network. For remote play, share a reachable VPN address or forward the port and share your public address.</source>
+        <extracomment>T_ADDRESS_BIG_HINT; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Pour les joueurs de ce réseau. À distance, partagez une adresse VPN accessible ou redirigez le port et partagez votre adresse publique.</translation>
+    </message>
+    <message>
+        <source>%d min</source>
+        <extracomment>T_MINUTES; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%d min</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <extracomment>T_ON; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Activé</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <extracomment>T_OFF; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Désactivé</translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <extracomment>T_DONE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Terminé</translation>
+    </message>
+    <message>
+        <source>%s vs %s</source>
+        <extracomment>T_VERSUS; printf arguments: ss. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%s contre %s</translation>
+    </message>
+    <message>
+        <source>%s + %s</source>
+        <extracomment>T_TEAM_WITH; printf arguments: ss. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%s + %s</translation>
+    </message>
+    <message>
+        <source>%s  |  %s  |  %s</source>
+        <extracomment>T_SUMMARY; printf arguments: sss. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%s  |  %s  |  %s</translation>
+    </message>
+    <message>
+        <source>Getting ready</source>
+        <extracomment>T_GETTING_READY; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Préparation</translation>
+    </message>
+    <message>
+        <source>Waiting</source>
+        <extracomment>T_LOAD_WAITING; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>En attente</translation>
+    </message>
+    <message>
+        <source>Loading %d%%</source>
+        <extracomment>T_LOAD_LOADING; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Chargement : %d%%</translation>
+    </message>
+    <message>
+        <source>Preparing graphics %d%%</source>
+        <extracomment>T_LOAD_PIPELINES; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Préparation des graphismes : %d%%</translation>
+    </message>
+    <message>
+        <source>Checking the match setup...</source>
+        <extracomment>T_CHECKING_SETUP; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Vérification des paramètres du match...</translation>
+    </message>
+    <message>
+        <source>%s is still loading (%d s).</source>
+        <extracomment>T_STILL_LOADING; printf arguments: sd. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%s est encore en cours de chargement (%d s).</translation>
+    </message>
+    <message>
+        <source>Keep waiting</source>
+        <extracomment>T_KEEP_WAITING; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Continuer à attendre</translation>
+    </message>
+    <message>
+        <source>In a match</source>
+        <extracomment>T_IN_MATCH; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Match en cours</translation>
+    </message>
+    <message>
+        <source>Back to the game</source>
+        <extracomment>T_BACK_TO_GAME; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Reprendre le jeu</translation>
+    </message>
+    <message>
+        <source>Leave match</source>
+        <extracomment>T_LEAVE_MATCH; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Quitter le match</translation>
+    </message>
+    <message>
+        <source>Full time</source>
+        <extracomment>T_FULL_TIME; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Fin du match</translation>
+    </message>
+    <message>
+        <source>Rematch</source>
+        <extracomment>T_REMATCH; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Revanche</translation>
+    </message>
+    <message>
+        <source>Back to room</source>
+        <extracomment>T_BACK_TO_ROOM; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Retour au salon</translation>
+    </message>
+    <message>
+        <source>%d s to vote</source>
+        <extracomment>T_VOTE_SECONDS; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%d s pour voter</translation>
+    </message>
+    <message>
+        <source>voted</source>
+        <extracomment>T_VOTED; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>A voté</translation>
+    </message>
+    <message>
+        <source>Your opponents left</source>
+        <extracomment>T_OPPONENTS_LEFT; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Vos adversaires sont partis</translation>
+    </message>
+    <message>
+        <source>Continue against CPU</source>
+        <extracomment>T_CONTINUE_CPU; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Continuer contre l'ordinateur</translation>
+    </message>
+    <message>
+        <source>End match</source>
+        <extracomment>T_END_MATCH; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Terminer le match</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <extracomment>T_OK; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Online play failed.</source>
+        <extracomment>T_ERR_UNKNOWN; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Échec du jeu en ligne.</translation>
+    </message>
+    <message>
+        <source>Online play isn't in this build.</source>
+        <extracomment>T_ERR_UNAVAILABLE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Le jeu en ligne n'est pas disponible dans cette version.</translation>
+    </message>
+    <message>
+        <source>No network connection.</source>
+        <extracomment>T_ERR_NETWORK; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Aucune connexion réseau.</translation>
+    </message>
+    <message>
+        <source>Enter a valid address.</source>
+        <extracomment>T_ERR_BAD_ADDRESS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Saisissez une adresse valide.</translation>
+    </message>
+    <message>
+        <source>Port %u is in use by another program.</source>
+        <extracomment>T_ERR_PORT_IN_USE; printf arguments: u. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Le port %u est utilisé par un autre programme.</translation>
+    </message>
+    <message>
+        <source>This system can join rooms but not host them.</source>
+        <extracomment>T_ERR_CANT_HOST; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Ce système peut rejoindre des salons, mais pas en héberger.</translation>
+    </message>
+    <message>
+        <source>Couldn't reach the room. Check the address and ask the host if the room is open.</source>
+        <extracomment>T_ERR_UNREACHABLE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Impossible de joindre le salon. Vérifiez l'adresse et demandez à l'hôte si le salon est ouvert.</translation>
+    </message>
+    <message>
+        <source>That room is full.</source>
+        <extracomment>T_ERR_ROOM_FULL; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Ce salon est complet.</translation>
+    </message>
+    <message>
+        <source>A match is already in progress.</source>
+        <extracomment>T_ERR_IN_MATCH; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Un match est déjà en cours.</translation>
+    </message>
+    <message>
+        <source>That room runs a different version.</source>
+        <extracomment>T_ERR_VERSION; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Ce salon utilise une autre version.</translation>
+    </message>
+    <message>
+        <source>That room uses different game data.</source>
+        <extracomment>T_ERR_DATA_FAMILY; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Ce salon utilise des données de jeu différentes.</translation>
+    </message>
+    <message>
+        <source>The host closed the room.</source>
+        <extracomment>T_ERR_HOST_LEFT; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>L'hôte a fermé le salon.</translation>
+    </message>
+    <message>
+        <source>The connection was lost.</source>
+        <extracomment>T_ERR_CONNECTION_LOST; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>La connexion a été perdue.</translation>
+    </message>
+    <message>
+        <source>The room sent data this version can't read.</source>
+        <extracomment>T_ERR_PROTOCOL; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Le salon a envoyé des données que cette version ne peut pas lire.</translation>
+    </message>
+    <message>
+        <source>The players' match settings don't match.</source>
+        <extracomment>T_ERR_SETUP_MISMATCH; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Les paramètres du match diffèrent entre les joueurs.</translation>
+    </message>
+    <message>
+        <source>Waiting for %s... %d</source>
+        <extracomment>T_PROBLEM_WAITING; printf arguments: sd. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>En attente de %s... %d</translation>
+    </message>
+    <message>
+        <source>%s's device is running slowly</source>
+        <extracomment>T_PROBLEM_SLOW_DEVICE; printf arguments: s. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>L'appareil de %s est lent</translation>
+    </message>
+    <message>
+        <source>High latency</source>
+        <extracomment>T_PROBLEM_HIGH_LATENCY; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Latence élevée</translation>
+    </message>
+    <message>
+        <source>Unstable connection</source>
+        <extracomment>T_PROBLEM_UNSTABLE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Connexion instable</translation>
+    </message>
+    <message>
+        <source>Packet loss</source>
+        <extracomment>T_PROBLEM_PACKET_LOSS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Perte de paquets</translation>
+    </message>
+    <message>
+        <source>Ping %d ms   Delay %d ms   Stalls %d/min   %+.1f ticks</source>
+        <extracomment>T_STATS; printf arguments: dddf. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Ping %d ms   Délai %d ms   Blocages %d/min   %+.1f ticks</translation>
+    </message>
+    <message>
+        <source>   Input %d ms</source>
+        <extracomment>T_STATS_INPUT; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>   Commandes %d ms</translation>
+    </message>
+    <message>
+        <source>%s joined</source>
+        <extracomment>T_NOTICE_JOINED; printf arguments: s. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%s a rejoint le salon</translation>
+    </message>
+    <message>
+        <source>%s left</source>
+        <extracomment>T_NOTICE_LEFT; printf arguments: s. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%s a quitté le salon</translation>
+    </message>
+    <message>
+        <source>%s left. CPU took over.</source>
+        <extracomment>T_NOTICE_DROPPED; printf arguments: s. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%s a quitté le match. Le CPU prend le relais.</translation>
+    </message>
+    <message>
+        <source>Match settings differ. Returning to the room.</source>
+        <extracomment>T_NOTICE_SETUP_MISMATCH; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Les paramètres du match diffèrent. Retour au salon.</translation>
+    </message>
+    <message>
+        <source>Rematch!</source>
+        <extracomment>T_NOTICE_REMATCH; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Revanche !</translation>
+    </message>
+    <message>
+        <source>The match ended because the games went out of sync.</source>
+        <extracomment>T_DESYNC_ENDED; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Le match est terminé car les jeux ne sont plus synchronisés.</translation>
+    </message>
+    <message>
+        <source>Report saved to %s</source>
+        <extracomment>T_DESYNC_REPORT; printf arguments: s. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Rapport enregistré dans %s</translation>
+    </message>
+    <message>
+        <source>Nickname</source>
+        <extracomment>T_NICKNAME; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Pseudo</translation>
+    </message>
+    <message>
+        <source>Room port</source>
+        <extracomment>T_ROOM_PORT; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Port du salon</translation>
+    </message>
+    <message>
+        <source>Connection stats in matches</source>
+        <extracomment>T_SHOW_STATS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Statistiques de connexion en match</translation>
+    </message>
+    <message>
+        <source>Input delay</source>
+        <extracomment>T_DELAY_LABEL; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Délai des commandes</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <extracomment>T_AUTO; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Automatique</translation>
+    </message>
+    <message>
+        <source>%d ms</source>
+        <extracomment>T_MILLISECONDS; printf arguments: d. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%d ms</translation>
+    </message>
+    <message>
+        <source>Use a port from 1025 to 49151.</source>
+        <extracomment>T_PORT_RANGE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Utilisez un port compris entre 1025 et 49151.</translation>
+    </message>
+    <message>
+        <source>%s paused the match</source>
+        <extracomment>T_PAUSED_BY; printf arguments: s. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>%s a mis le match en pause</translation>
+    </message>
+    <message>
+        <source>Allow pausing (3 per side)</source>
+        <extracomment>T_PAUSE_ALLOWED; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Autoriser les pauses (3 par équipe)</translation>
+    </message>
+    <message>
+        <source>Share an address the other players can reach:</source>
+        <extracomment>T_OTHER_ADDRESSES; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Partagez une adresse accessible aux autres joueurs :</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <extracomment>T_HINT_SAVE; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Enregistrer</translation>
+    </message>
+    <message>
+        <source>Change teams</source>
+        <extracomment>T_CHANGE_TEAMS; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Changer les équipes</translation>
+    </message>
+    <message>
+        <source>Choosing...</source>
+        <extracomment>T_NOT_VOTED; printf arguments: none. Keep their order. Native game names come from the disc.</extracomment>
+        <translation>Choix en cours...</translation>
+    </message>
+</context>
 </TS>

@@ -20,6 +20,7 @@
 
 #include "NL/nlMemory.h"
 #include "port/host.h"
+#include "port/online_panel.h"
 #include "port/shaders.h"
 #include "port/switch/clocks.h"
 #include "port/switch/memory.h"
@@ -305,6 +306,7 @@ void PortOverlayDraw(void)
         s_overlayVisible = !s_overlayVisible;
     if (s_overlayVisible)
         draw_overlay();
+    PortOnlinePanelDraw();
     PortControlPoll();
 }
 

@@ -8,6 +8,7 @@
 
 #include "Game/SH/SHSaveLoad.h"
 #include "Game/DB/SaveLoad.h"
+#include "port/lockstep.h"
 
 s32 ResetTask::s_ResetMode = 0;
 RESET_STATE ResetTask::s_ResetState = RS_RUNNING;
@@ -101,7 +102,8 @@ void HandleSoftReset()
 
     LastTime = OSGetTime();
 
-    if (g_bEnableGamecubePadMonkey)
+    // PORT: off in lockstep mode, where the pads are match input and a reset ends the match on a frame.
+    if (g_bEnableGamecubePadMonkey || g_simLockstep)
     {
         return;
     }
