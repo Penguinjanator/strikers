@@ -19,6 +19,7 @@ void PortOnlineGameShutdown(void);
 // Non-zero while the VS screen waits for every machine to load.
 int PortOnlineGameHoldLoading(void);
 int PortOnlineGameSelecting(void);
+int PortOnlineGameAtMainMenu(void);
 int PortOnlineGameSelectionSide(int port);
 int PortOnlineGameSelectStadium(int stadium);
 int PortOnlineGameSelectionBack(void);

@@ -10,6 +10,8 @@ extern "C" const unsigned char* PortPromptsMenuImage(unsigned, unsigned*, unsign
 {
     return nullptr;
 }
+extern "C" const unsigned char* PortPromptsBackImage(unsigned*, unsigned*) { return nullptr; }
+extern "C" int PortPromptsKeyboardActive(void) { return 0; }
 extern "C" void PortPromptsLegendsLoaded() {}
 extern "C" void PortPromptsLegendReloaded(unsigned long) {}
 extern "C" void PortPromptsLegendsUnloading() {}
@@ -671,6 +673,30 @@ extern "C" const unsigned char* PortPromptsMenuImage(unsigned button, unsigned* 
     *height = art->height;
     return art->rgba.data();
 }
+
+extern "C" const unsigned char* PortPromptsBackImage(unsigned* width, unsigned* height)
+{
+    const Family family = s_icons[A].family;
+    if (family == Keyboard || family == Gamecube || s_activePort < 0)
+        return nullptr;
+    // A Back bound to a game button does not open the online panel.
+    u32 count = 0;
+    const auto* mappings = PADGetButtonMappings(s_activePort, &count);
+    for (u32 i = 0; mappings && i < count; ++i)
+        if (mappings[i].nativeButton == (u32)SDL_GAMEPAD_BUTTON_BACK)
+            return nullptr;
+    Icon icon = {};
+    icon.family = family;
+    snprintf(icon.token, sizeof icon.token, "back");
+    const Image* art = compose(icon, Menu);
+    if (!art)
+        return nullptr;
+    *width = art->width;
+    *height = art->height;
+    return art->rgba.data();
+}
+
+extern "C" int PortPromptsKeyboardActive(void) { return s_icons[A].family == Keyboard; }
 
 extern "C" void PortPromptsFrame()
 {

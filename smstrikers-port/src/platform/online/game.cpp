@@ -438,10 +438,20 @@ extern "C" void PortOnlineGameInit(void)
     PortOnlineInit();
 }
 
+extern "C" int PortOnlineGameAtMainMenu(void) { return resting_on(SCENE_MAIN_MENU); }
+
 extern "C" void PortOnlineGameFrame(void)
 {
     if (s_stage == STAGE_NONE && !s_selectOpen && PortOnlinePanelIdle())
+    {
+        // The menu's online prompt; the session stays closed.
+        if (resting_on(SCENE_MAIN_MENU))
+        {
+            refresh_language();
+            PortOnlinePanelPrepare();
+        }
         return;
+    }
     refresh_language();
     PortOnlinePanelPrepare();
     sample_pads();

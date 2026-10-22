@@ -80,7 +80,7 @@ ImGuiStyle make_style(float px)
     const float u = px / 20.0f;
     st.WindowPadding = ImVec2(24.0f * u, 18.0f * u);
     st.FramePadding = ImVec2(14.0f * u, 9.0f * u);
-    st.ItemSpacing = ImVec2(12.0f * u, 10.0f * u);
+    st.ItemSpacing = ImVec2(14.0f * u, 14.0f * u);
     st.ItemInnerSpacing = ImVec2(8.0f * u, 6.0f * u);
     st.WindowRounding = 0.0f;
     st.ChildRounding = 0.0f;
@@ -885,8 +885,8 @@ void begin_screen(const char* id, const char* title, const char* context, bool b
     const ImGuiIO& io = ImGui::GetIO();
     const float p = px();
     const float margin = p;
-    const ImVec2 size(ImMin(io.DisplaySize.x - 2.0f * margin, p * 40.0f),
-                      ImMin(io.DisplaySize.y - 2.0f * margin, p * rows));
+    const ImVec2 size(ImMin(io.DisplaySize.x - 2.0f * margin, p * 48.0f),
+                      ImMin(io.DisplaySize.y - 2.0f * margin, p * rows * 1.12f));
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
                             ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
@@ -2224,6 +2224,43 @@ void draw_toasts()
     }
 }
 
+// Bottom left of the main menu: the key or button that opens the panel.
+void draw_menu_prompt()
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    ImGui::PushFont(s_fonts->body);
+    const float p = px();
+    if (begin_overlay("##online.menu", ImVec2(p, io.DisplaySize.y - p), ImVec2(0.0f, 1.0f)))
+    {
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const ImVec2 a = ImGui::GetCursorScreenPos();
+        const float h = p * 1.35f;
+        float x = a.x;
+        unsigned w = 0, ht = 0;
+        const unsigned char* back = PortPromptsBackImage(&w, &ht);
+        const auto glyph = s_promptTextures.find(back);
+        if (PortPromptsKeyboardActive())
+            x += key_glyph(dl, ImVec2(x, a.y), h, "F5");
+        else if (back != nullptr && glyph != s_promptTextures.end())
+        {
+            const float gw = h * (float)w / (float)ht;
+            dl->AddImage(glyph->second, ImVec2(x, a.y), ImVec2(x + gw, a.y + h));
+            x += gw;
+        }
+        else
+            for (unsigned bit :
+                 { (unsigned)PAD_TRIGGER_L, (unsigned)PAD_TRIGGER_R, (unsigned)PAD_TRIGGER_Z })
+                x += button_glyph(dl, ImVec2(x, a.y), h, bit) + p * 0.15f;
+        x += p * 0.4f;
+        const char* label = text(T_ONLINE);
+        const ImVec2 ts = text_size(s_fonts->body, label);
+        text_at(dl, s_fonts->body, ImVec2(x, a.y + (h - ts.y) * 0.5f), kText, label);
+        ImGui::Dummy(ImVec2(x + ts.x - a.x, h));
+    }
+    ImGui::End();
+    ImGui::PopFont();
+}
+
 void notice_toast(const OnlineState& st)
 {
     if (st.noticeSerial == s_lastNotice)
@@ -2528,19 +2565,25 @@ extern "C" void PortOnlinePanelPrepare(void)
 {
     if (ImGui::GetCurrentContext() == nullptr)
         return;
-    const unsigned buttons[] = { PAD_BUTTON_A,  PAD_BUTTON_B,  PAD_BUTTON_X,  PAD_BUTTON_Y,
-                                 PAD_TRIGGER_L, PAD_TRIGGER_R, PAD_TRIGGER_Z, PAD_BUTTON_START };
-    for (unsigned button : buttons)
-    {
-        unsigned w = 0, h = 0;
-        const unsigned char* pixels = PortPromptsMenuImage(button, &w, &h);
+    const auto upload = [](const unsigned char* pixels, unsigned w, unsigned h) {
         if (pixels && w && h && s_promptTextures.find(pixels) == s_promptTextures.end())
         {
             // Metal staging-buffer creation must wait for the render worker's encoding.
             aurora::gfx::synchronize();
             s_promptTextures.emplace(pixels, aurora_imgui_add_texture(w, h, pixels));
         }
+    };
+    const unsigned buttons[] = { PAD_BUTTON_A,  PAD_BUTTON_B,  PAD_BUTTON_X,  PAD_BUTTON_Y,
+                                 PAD_TRIGGER_L, PAD_TRIGGER_R, PAD_TRIGGER_Z, PAD_BUTTON_START };
+    for (unsigned button : buttons)
+    {
+        unsigned w = 0, h = 0;
+        const unsigned char* pixels = PortPromptsMenuImage(button, &w, &h);
+        upload(pixels, w, h);
     }
+    unsigned w = 0, h = 0;
+    const unsigned char* pixels = PortPromptsBackImage(&w, &h);
+    upload(pixels, w, h);
 }
 
 extern "C" void PortOnlinePanelDraw(void)
@@ -2551,6 +2594,17 @@ extern "C" void PortOnlinePanelDraw(void)
     if (PortOnlinePanelIdle())
     {
         s_startPressed = false;
+        if (PortOnlineGameAtMainMenu())
+        {
+            update_fonts();
+            if (s_fonts != nullptr)
+            {
+                ImGuiStyle saved = ImGui::GetStyle();
+                ImGui::GetStyle() = s_style;
+                draw_menu_prompt();
+                ImGui::GetStyle() = saved;
+            }
+        }
         return;
     }
     update_fonts();

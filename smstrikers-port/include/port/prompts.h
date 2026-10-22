@@ -16,6 +16,9 @@ void PortPromptsEvent(const SDL_Event* event);
 
 // RGBA menu art from the same resolved binding as the retail prompts; stable until exit.
 const unsigned char* PortPromptsMenuImage(unsigned button, unsigned* width, unsigned* height);
+// The active pad's Back button, or null when Back cannot open the online panel.
+const unsigned char* PortPromptsBackImage(unsigned* width, unsigned* height);
+int PortPromptsKeyboardActive(void);
 
 void PortPromptsFrame(void);
 
