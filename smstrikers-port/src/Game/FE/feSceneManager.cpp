@@ -329,6 +329,7 @@ void FESceneManager::ProcessPushPopQueue()
             pPackagePushPopMessage->m_pSceneHandler->m_pFEScene->UnloadPackage();
 
             FEScene* pFEScene = pPackagePushPopMessage->m_pSceneHandler->m_pFEScene;
+            PortFESceneForget(pFEScene);   // PORT: a later scene may reuse the address
 
             delete pPackagePushPopMessage->m_pSceneHandler;
             delete pFEScene;

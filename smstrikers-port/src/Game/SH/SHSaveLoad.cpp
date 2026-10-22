@@ -21,6 +21,7 @@
 #include "types.h"
 #if defined(PORT_USE_AURORA)
 #include "port/shaders.h"   // PORT: the shader stage
+#include "Game/FE/feRender.h"
 #include "Game/FE/feFontResource.h"
 #include "NL/nlAlgorithm.h"
 #include "NL/nlLocalization.h"
@@ -680,6 +681,11 @@ void SaveLoadScene::SceneCreated()
 {
     FEPresentation* pres = m_pFEScene->m_pFEPackage->GetPresentation();
     pres->SetActiveSlide("Slide1");
+#if defined(PORT_USE_AURORA)
+    // PORT: black until a slow load fades it in.
+    if (mSaveLoadMode == SLM_AT_BOOT && !mIsAutoSaving)
+        PortFESceneSetOpacity(m_pFEScene, 0.0f);
+#endif
 
     m_displayText = FEFinder<TLTextInstance, 3>::Find<FEPresentation>(
         pres,
@@ -967,7 +973,23 @@ void SaveLoadScene::Update(float fDeltaT)
 
 #if defined(PORT_USE_AURORA)
     // PORT: wait for the shader compile before leaving the boot screen.
-    if (gSaveLoadFinished && port_HoldForShaders(this))
+    const bool portHolding = gSaveLoadFinished && port_HoldForShaders(this);
+
+    // PORT: past half a second of loading the boot screen fades in; it fades out on leaving.
+    if (mSaveLoadMode == SLM_AT_BOOT && !mIsAutoSaving)
+    {
+        static float s_opacity;
+        const bool leaving = gSaveLoadFinished && !portHolding && port_WouldLeaveBootScene(this);
+        if (leaving)
+            s_opacity -= fDeltaT / 0.25f;
+        else if (gSceneTime > 0.5f)
+            s_opacity += fDeltaT / 0.25f;
+        s_opacity = s_opacity < 0.0f ? 0.0f : (s_opacity > 1.0f ? 1.0f : s_opacity);
+        PortFESceneSetOpacity(m_pFEScene, s_opacity);
+        if (leaving && s_opacity > 0.0f)
+            return;
+    }
+    if (portHolding)
         return;
 #endif
 

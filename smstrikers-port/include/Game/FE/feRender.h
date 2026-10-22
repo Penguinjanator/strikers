@@ -34,4 +34,8 @@ public:
     static FEScene* m_pRenderScene;
 };
 
+// PORT: a whole scene's opacity, 0 to 1, multiplied into everything it draws.
+void PortFESceneSetOpacity(const FEScene* scene, float opacity);
+void PortFESceneForget(const FEScene* scene);
+
 #endif // _FERENDER_H_

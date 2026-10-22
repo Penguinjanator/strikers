@@ -13,11 +13,151 @@
 #include "Game/BaseGameSceneManager.h"
 #include "Game/FE/FEAudio.h"
 #include "Game/FE/feFinder.h"
+#include "Game/FE/feInput.h"
 #include "Game/FE/fePresentation.h"
+#include "Game/FE/feRender.h"
 #include "Game/FE/feResourceManager.h"
 #include "Game/FE/feSceneManager.h"
+#include "Game/FE/tlTextInstance.h"
 #include "Game/GameInfo.h"
 #include "Game/GameSceneManager.h"
+#include "Game/Sys/audio.h"
+#include "Game/main.h"
+
+// PORT: A or Start skips the logos; the loads their steps would start still run.
+static bool s_portSkipped;
+static float s_portSkipAlpha;             // the white plate's alpha at the skip
+static unsigned s_portStepsRun;           // a bit for each logo whose FS_WAIT step has run
+static long s_portVoices[2] = { -1, -1 }; // Nintendo and NLG voice lines, faded on a skip
+static BaseSceneHandler* s_portLoading;
+static float s_portOpacity;               // the whole logo screen, faded up from black
+static float s_portLoadingOpacity;
+const float kPortFadeSeconds = 0.4f;
+
+// PORT: LOADING, for a skip that finishes before the sample file is in memory.
+class PortLogoLoadingScene : public BaseSceneHandler
+{
+public:
+    void SceneCreated()
+    {
+        PortFESceneSetOpacity(m_pFEScene, 0.0f);
+        m_pFEPresentation->SetActiveSlide("Slide1");
+        TLTextInstance* text = FEFinder<TLTextInstance, 3>::Find<FEPresentation>(
+            m_pFEPresentation,
+            InlineHasher(nlStringLowerHash("Slide1")),
+            InlineHasher(nlStringLowerHash("Layer")),
+            InlineHasher(nlStringLowerHash("Text")));
+        if (text != NULL)
+        {
+            text->m_LocStrId = 0x9750565D;   // LOC_LOADING
+            text->m_OverloadFlags |= 0x8;
+            text->m_bVisible = true;
+        }
+    }
+};
+
+static void port_StartSkippedLoads()
+{
+    if ((s_portStepsRun & 1) == 0)
+    {
+        AudioLoader::LoadNintendoDialogueGroup(true);
+        AudioLoader::LoadNLGDialogueGroup(true);
+        AudioLoader::ReadEntireSampleFileIntoMem(false);
+    }
+    if ((s_portStepsRun & 4) == 0)
+        nlSingleton<GameInfoManager>::Instance()->mUserInfo.mAudioOptions.ForceApplySettings(true);
+    s_portStepsRun = 7;
+}
+
+static bool port_SkippedLoadsDone()
+{
+    if (!PlatAudio::IsEntireSampleFileInMem())
+        return false;
+    AudioLoader::LoadFEAudioData(false);
+    AudioLoader::LoadPermanentSoundGroups(false);
+    return true;
+}
+
+static void port_FadeVoices(float level)
+{
+    for (int i = 0; i < 2; i++)
+    {
+        const unsigned long voice = (unsigned long)s_portVoices[i];
+        if (!Audio::IsSFXPlaying(voice))
+            continue;
+        if (level > 0.0f)
+        {
+            Audio::SetSFXVolume(voice, level);
+        }
+        else
+        {
+            Audio::StopSFX(voice);
+            s_portVoices[i] = -1;
+        }
+    }
+}
+
+void CrossFaderScene::port_UpdateSkip(float fDeltaT)
+{
+    const float step = fDeltaT / kPortFadeSeconds;
+    FESceneManager* fe = nlSingleton<FESceneManager>::Instance();
+
+    // Fade to the white plate, as without a skip.
+    if (mAlpha < 255.0f || s_portOpacity < 1.0f)
+    {
+        mAlpha += 255.0f * step;
+        if (mAlpha > 255.0f)
+            mAlpha = 255.0f;
+        nlColour col = { 0xFF, 0xFF, 0xFF, (u8)(int)mAlpha };
+        mCurrentImageInstance->SetAssetColour(col);
+        s_portOpacity += step;
+        if (s_portOpacity > 1.0f)
+            s_portOpacity = 1.0f;
+        PortFESceneSetOpacity(m_pFEScene, s_portOpacity);
+        port_FadeVoices(s_portSkipAlpha < 255.0f ? (255.0f - mAlpha) / (255.0f - s_portSkipAlpha)
+                                                 : 0.0f);
+        return;
+    }
+    port_FadeVoices(0.0f);
+
+    const bool loaded = port_SkippedLoadsDone();
+
+    // LOADING cross-fades in over the plate until the sample file is in.
+    if (!loaded && s_portLoading == NULL)
+    {
+        s_portLoading =
+            new (nlMalloc(sizeof(PortLogoLoadingScene), 8, false)) PortLogoLoadingScene();
+        fe->QueueScenePush(s_portLoading, g_Language == nlLocalization::LangJapanese
+                                              ? "art/fe/saving_loading_jp.fen"
+                                              : "art/fe/saving_loading.fen");
+        s_portLoadingOpacity = 0.0f;
+        return;
+    }
+    if (s_portLoading != NULL)
+    {
+        if (s_portLoading->m_pFEScene == NULL || !s_portLoading->m_pFEScene->m_bValid)
+            return;
+        s_portLoadingOpacity += loaded ? -step : step;
+        if (s_portLoadingOpacity < 0.0f)
+            s_portLoadingOpacity = 0.0f;
+        if (s_portLoadingOpacity > 1.0f)
+            s_portLoadingOpacity = 1.0f;
+        PortFESceneSetOpacity(s_portLoading->m_pFEScene, s_portLoadingOpacity);
+        PortFESceneSetOpacity(m_pFEScene, 1.0f - s_portLoadingOpacity);
+        if (!loaded || s_portLoadingOpacity > 0.0f)
+            return;
+        fe->QueueScenePop();
+        s_portLoading = NULL;
+    }
+
+    // Pause before the intro, as without a skip.
+    mFadeToBlackTimer += fDeltaT;
+    if (mFadeToBlackTimer < 0.2f)
+        return;
+    nlSingleton<GameSceneManager>::Instance()->PopEntireStack();
+    nlSingleton<GameSceneManager>::Instance()->Push(SCENE_INTRO_MOVIE, SCREEN_NOTHING, false);
+    mFadeToBlackTimer = 0.0f;
+}
 
 /**
  * Offset/Address/Size: 0x93C | 0x800BC840 | size: 0x5C
@@ -230,6 +370,30 @@ void CrossFaderScene::Update(float fDeltaT)
 
     BaseSceneHandler::Update(fDeltaT);
 
+    // PORT: fades up from the boot screen's black; the console cut to the white plate.
+    if (!s_portSkipped && mFadeState != FS_INVALID)
+    {
+        s_portOpacity += fDeltaT / kPortFadeSeconds;
+        if (s_portOpacity > 1.0f)
+            s_portOpacity = 1.0f;
+        PortFESceneSetOpacity(m_pFEScene, s_portOpacity);
+    }
+
+    // PORT: a skip fades to the white plate the intro opens on.
+    if (!s_portSkipped && mFadeState >= FS_FADE_IN && mFadeState <= FS_CROSS_FADE &&
+        (g_pFEInput->JustPressed(FE_ALL_PADS, 0x24, true, NULL) ||
+         g_pFEInput->JustPressed(FE_ALL_PADS, 0x100, false, NULL)))
+    {
+        s_portSkipped = true;
+        s_portSkipAlpha = mAlpha;
+        port_StartSkippedLoads();
+    }
+    if (s_portSkipped)
+    {
+        port_UpdateSkip(fDeltaT);
+        return;
+    }
+
     switch (mFadeState)
     {
     case FS_FADE_IN_INIT:
@@ -286,7 +450,7 @@ void CrossFaderScene::Update(float fDeltaT)
                 {
                     sound = nintendoSounds[nlRandom(13, &nlDefaultSeed)];
                 } while (sound == NULL);
-                FEAudio::PlayAnimAudioEvent(sound, false);
+                s_portVoices[0] = FEAudio::PlayAnimAudioEvent(sound, false);
                 AudioLoader::LoadNLGDialogueGroup(true);
                 AudioLoader::ReadEntireSampleFileIntoMem(false);
                 break;
@@ -301,10 +465,11 @@ void CrossFaderScene::Update(float fDeltaT)
                 {
                     sound = nlgSounds[nlRandom(13, &nlDefaultSeed)];
                 } while (sound == NULL);
-                FEAudio::PlayAnimAudioEvent(sound, false);
+                s_portVoices[1] = FEAudio::PlayAnimAudioEvent(sound, false);
                 break;
             }
             }
+            s_portStepsRun |= 1u << mCurrentImage;   // PORT
             triggeraudioload = false;
         }
         mTimer += fDeltaT;

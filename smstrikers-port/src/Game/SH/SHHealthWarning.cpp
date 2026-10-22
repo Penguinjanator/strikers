@@ -5,6 +5,7 @@
 #include "Game/FE/FEAudio.h"
 #include "Game/FE/feFinder.h"
 #include "Game/FE/feInput.h"
+#include "Game/FE/feRender.h"
 #include "Game/FE/tlComponentInstance.h"
 #include "NL/nlMemory.h"
 #include "NL/nlString.h"
@@ -58,6 +59,8 @@ void HealthWarningSceneV2::SceneCreated()
         m_pFEPresentation->m_currentSlide,
         InlineHasher(nlStringLowerHash("Layer")),
         InlineHasher(nlStringLowerHash("health_and_safety_EU_english")));
+    // PORT: until it loads, the notice's texture is the A legend the port repaints.
+    mMessageImage->mImageInstance->m_bVisible = false;
 
     pImage = NULL;
 
@@ -123,7 +126,8 @@ void HealthWarningSceneV2::Update(float fDeltaT)
     TLImageInstance* pImage;
 
     BaseSceneHandler::Update(fDeltaT);
-    mMessageImage->Update(true);
+    if (mMessageImage->Update(true))
+        mMessageImage->mImageInstance->m_bVisible = true;
     mPressButtonImage->Update(true);
 
     f32 newTime = mElapsedTime + fDeltaT;
@@ -167,6 +171,26 @@ void HealthWarningSceneV2::Update(float fDeltaT)
     if (PortBenchWantsDemo())
     {
         proceed = true;
+    }
+
+    // PORT: fades out on the press; the console cut to black.
+    static float s_portFadeOut = -1.0f;
+    if (proceed && s_portFadeOut < 0.0f && !PortBenchWantsDemo())
+    {
+        FEAudio::PlayAnimAudioEvent("sfx_screen_forward", false);
+        s_portFadeOut = 0.0f;
+    }
+    if (s_portFadeOut >= 0.0f)
+    {
+        s_portFadeOut += fDeltaT;
+        const float kFadeSeconds = 0.3f;
+        const float left = 1.0f - s_portFadeOut / kFadeSeconds;
+        PortFESceneSetOpacity(m_pFEScene, left > 0.0f ? left : 0.0f);
+        proceed = s_portFadeOut >= kFadeSeconds + 0.05f;
+        if (!proceed)
+            return;
+        nlTaskManager::SetNextState(0x80000);
+        return;
     }
 
     if (proceed)

@@ -28,6 +28,53 @@ GLMatrixStack* FERender::m_pMatrixStack = nullptr;
 static const unsigned long grabTex = nlStringLowerHash("target/grab_texture");
 static const unsigned long portMovieTex = nlStringLowerHash("movie");
 
+// PORT: scenes mid-fade; any other scene draws opaque.
+static struct
+{
+    const FEScene* scene;
+    float opacity;
+} s_portSceneOpacity[4];
+static const int kPortSceneOpacitySlots = sizeof s_portSceneOpacity / sizeof s_portSceneOpacity[0];
+
+void PortFESceneSetOpacity(const FEScene* scene, float opacity)
+{
+    int freeSlot = -1;
+    for (int i = 0; i < kPortSceneOpacitySlots; i++)
+    {
+        if (s_portSceneOpacity[i].scene == scene)
+        {
+            s_portSceneOpacity[i].opacity = opacity;
+            return;
+        }
+        if (s_portSceneOpacity[i].scene == nullptr && freeSlot < 0)
+            freeSlot = i;
+    }
+    if (freeSlot >= 0)
+    {
+        s_portSceneOpacity[freeSlot].scene = scene;
+        s_portSceneOpacity[freeSlot].opacity = opacity;
+    }
+}
+
+void PortFESceneForget(const FEScene* scene)
+{
+    for (int i = 0; i < kPortSceneOpacitySlots; i++)
+    {
+        if (s_portSceneOpacity[i].scene == scene)
+            s_portSceneOpacity[i].scene = nullptr;
+    }
+}
+
+static float port_SceneOpacity(const FEScene* scene)
+{
+    for (int i = 0; i < kPortSceneOpacitySlots; i++)
+    {
+        if (s_portSceneOpacity[i].scene == scene)
+            return s_portSceneOpacity[i].opacity;
+    }
+    return 1.0f;
+}
+
 /**
  * Offset/Address/Size: 0x16D8 | 0x8020B960 | size: 0xB4
  */
@@ -251,7 +298,7 @@ void FERender::RenderScene(FEScene* scene)
     s_currentAssetColour.c[0] = 1.0f;
     s_currentAssetColour.c[1] = 1.0f;
     s_currentAssetColour.c[2] = 1.0f;
-    s_currentAssetColour.c[3] = 1.0f;
+    s_currentAssetColour.c[3] = port_SceneOpacity(scene);   // PORT: scene fades
 
     FEPresentation* presentation = scene->m_pFEPackage->GetPresentation();
     RenderPresentation(presentation);

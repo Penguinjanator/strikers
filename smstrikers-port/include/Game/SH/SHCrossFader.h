@@ -23,6 +23,7 @@ public:
     ~CrossFaderScene();
     void SceneCreated();
     void Update(float fDeltaT);
+    void port_UpdateSkip(float fDeltaT);   // PORT
 
     /* 0x1C */ int mNumImages;
     /* 0x20 */ int mCurrentImage;

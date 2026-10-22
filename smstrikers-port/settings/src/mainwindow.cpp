@@ -485,7 +485,10 @@ QWidget* MainWindow::buildDisplayTab()
         spin->setRange(0.0, 1000.0);
         spin->setDecimals(2);
         spin->setSingleStep(1.0);
-        spin->setValue(60.0);
+        // The game opens on the primary display.
+        const QScreen* primary = QGuiApplication::primaryScreen();
+        spin->setValue(primary != nullptr && primary->refreshRate() >= 20.0 ? primary->refreshRate()
+                                                                            : 60.0);
         spin->setSuffix(tr(" Hz"));
         spin->setSpecialValueText(tr("No limit"));
         connect(monitorBox, &QCheckBox::toggled, spin, &QWidget::setDisabled);
