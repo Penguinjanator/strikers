@@ -51,7 +51,6 @@ void request_frame_buffer_resize();
 // smstrikers-port: the work request_frame_buffer_resize defers to the next event pump, done now; a wrapper because resize_swapchain has internal linkage.
 void resize_frame_buffer_now();
 void set_frame_buffer_scale(float scale);
-float get_frame_buffer_scale();  // smstrikers-port
 void set_frame_buffer_aspect_fit(bool fit);
 void set_background_input(bool value);
 }; // namespace aurora::window

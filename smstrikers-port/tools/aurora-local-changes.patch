@@ -1,8 +1,58 @@
+diff --git a/cmake/AuroraDearImguiProvider.cmake b/cmake/AuroraDearImguiProvider.cmake
+index 994196d..8798dfb 100644
+--- a/cmake/AuroraDearImguiProvider.cmake
++++ b/cmake/AuroraDearImguiProvider.cmake
+@@ -21,11 +21,15 @@ if (NOT TARGET imgui)
+                 ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
+         )
+ 
+-        add_library(imgui_backends STATIC
+-                ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+-                ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
+-                ${imgui_SOURCE_DIR}/backends/imgui_impl_wgpu.cpp
+-        )
++        set(AURORA_IMGUI_BACKEND_SOURCES ${imgui_SOURCE_DIR}/backends/imgui_impl_wgpu.cpp)
++        if (NOT NX)
++            # sdl3on2 lacks parts of the SDL3 API these backends call.
++            list(APPEND AURORA_IMGUI_BACKEND_SOURCES
++                    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
++                    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
++            )
++        endif ()
++        add_library(imgui_backends STATIC ${AURORA_IMGUI_BACKEND_SOURCES})
+         target_compile_definitions(imgui_backends PRIVATE IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
+         target_link_libraries(imgui_backends PRIVATE imgui ${AURORA_SDL3_TARGET} dawn::webgpu_dawn)
+         target_link_libraries(imgui PUBLIC imgui_backends imgui_headers)
+diff --git a/extern/CMakeLists.txt b/extern/CMakeLists.txt
+index e9094f4..53ac0b9 100644
+--- a/extern/CMakeLists.txt
++++ b/extern/CMakeLists.txt
+@@ -194,6 +194,7 @@ if (AURORA_ENABLE_GX)
+     message(STATUS "aurora: Using existing libpng")
+   endif ()
+ 
++  if (NOT NX)
+   aurora_find_package_global(Freetype QUIET)
+   if (NOT TARGET Freetype::Freetype)
+     find_package(PkgConfig)
+@@ -220,6 +221,7 @@ if (AURORA_ENABLE_GX)
+   else ()
+     message(STATUS "aurora: Using existing Freetype")
+   endif ()
++  endif ()
+ 
+   set(AURORA_IMGUI_IMPLEMENTATION ON)
+   include(../cmake/AuroraDearImguiProvider.cmake)
 diff --git a/include/aurora/aurora.h b/include/aurora/aurora.h
-index 56c7aae..45aef10 100644
+index 92b734f..01349e2 100644
 --- a/include/aurora/aurora.h
 +++ b/include/aurora/aurora.h
-@@ -89,6 +89,8 @@ typedef struct {
+@@ -86,9 +86,13 @@ typedef struct {
+   const char* resourcesPath;
+   AuroraBackend desiredBackend;
+   uint32_t msaa;
++  /* smstrikers-port: pipeline compilation threads; 0 sizes it to the core count. */
++  uint32_t pipelineJobs;
    uint16_t maxTextureAnisotropy;
    bool vsync;
    bool startFullscreen;
@@ -11,7 +61,7 @@ index 56c7aae..45aef10 100644
    bool allowJoystickBackgroundEvents;
    bool pauseOnFocusLost;
    bool allowTextureDumps;
-@@ -128,6 +130,18 @@ typedef struct {
+@@ -128,6 +132,18 @@ typedef struct {
  
  AuroraInfo aurora_initialize(int argc, char* argv[], const AuroraConfig* config);
  void aurora_shutdown();
@@ -30,6 +80,123 @@ index 56c7aae..45aef10 100644
  const AuroraEvent* aurora_update();
  bool aurora_begin_frame();
  void aurora_end_frame();
+diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
+index 94504b1..4072626 100644
+--- a/include/aurora/gfx.h
++++ b/include/aurora/gfx.h
+@@ -29,9 +29,13 @@ typedef struct {
+ } AuroraStats;
+ 
+ const AuroraStats* aurora_get_stats();
++/* smstrikers-port: the pipeline counters from AuroraStats, read atomically; the struct's own fields race the compile threads. */
++void aurora_get_pipeline_counts(uint32_t* queued, uint32_t* created);
+ float aurora_get_fps();
+ 
+ void aurora_enable_vsync(bool enabled);
++/* smstrikers-port: whether the selected present mode waits for the vblank; vsync off still gets Fifo on a surface without Mailbox or Immediate. */
++bool aurora_present_waits_for_vblank();
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/include/aurora/imgui_config.h b/include/aurora/imgui_config.h
+index 3e62e59..2293416 100644
+--- a/include/aurora/imgui_config.h
++++ b/include/aurora/imgui_config.h
+@@ -2,8 +2,18 @@
+ 
+ #define IMGUI_DISABLE_DEFAULT_FILE_FUNCTIONS 1
+ 
++#ifdef __SWITCH__
++// smstrikers-port: the default URL opener needs fork and execvp, which Horizon lacks.
++#define IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS 1
++#endif
++
++#ifdef __SWITCH__
++// smstrikers-port: sdl3on2 defines SDL_IOStream as a macro for its own stream type.
++typedef struct S3_IOStream* ImFileHandle;
++#else
+ typedef struct SDL_IOStream SDL_IOStream;
+ typedef SDL_IOStream* ImFileHandle;
++#endif
+ typedef unsigned long long ImU64;
+ 
+ ImFileHandle ImFileOpen(const char* filename, const char* mode);
+diff --git a/include/aurora/replacement.h b/include/aurora/replacement.h
+new file mode 100644
+index 0000000..c8cc0e7
+--- /dev/null
++++ b/include/aurora/replacement.h
+@@ -0,0 +1,33 @@
++#ifndef AURORA_REPLACEMENT_H
++#define AURORA_REPLACEMENT_H
++
++/* smstrikers-port: the replacement folders and texture dumps of <aurora/texture.hpp>, for C callers. */
++
++#include <dolphin/gx/GXStruct.h>
++
++#ifdef __cplusplus
++#include <cstdint>
++
++extern "C" {
++#else
++#include <stdint.h>
++#endif
++
++/* Registers every replacement file under `root`, an existing UTF-8 path, one pack if `one_pack`; returns how many. */
++uint32_t aurora_replacement_load(const char* root, int32_t priority, int one_pack);
++void aurora_replacement_clear(void);
++void aurora_replacement_set_cache_budget(uint64_t bytes);
++/* aurora::texture::dump_texture: 1 written, 0 already there, -1 failed. */
++int aurora_replacement_dump(const GXTexObj* obj, const GXTlutObj* tlut, const char* dir);
++/* Starts loading the replacement for a texture the game has just made; `tlut` may be NULL unless it has a palette. */
++void aurora_replacement_prefetch(const GXTexObj* obj, const GXTlutObj* tlut);
++/* 1: a replacement still loading at its texture's first draw is waited for, not drawn as the original. */
++void aurora_replacement_set_wait(int wait);
++/* aurora::texture::set_replacement_strict_budget; call before aurora_replacement_load. */
++void aurora_replacement_set_strict_budget(int strict);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff --git a/include/aurora/texture.hpp b/include/aurora/texture.hpp
+index 6c68778..8d88f72 100644
+--- a/include/aurora/texture.hpp
++++ b/include/aurora/texture.hpp
+@@ -45,6 +45,8 @@ struct RawTextureReplacement {
+ 
+ struct ReplacementOptions {
+   int32_t priority = 0;
++  // smstrikers-port: the strict budget counts `root` as one pack, not each folder in it.
++  bool onePack = false;
+ };
+ 
+ struct ReplacementRegistration {
+@@ -97,6 +99,23 @@ void reload_replacement_directory(const std::filesystem::path& root, Replacement
+ 
+ bool has_replacement(const GXTexObj* obj, const GXTlutObj* tlut = nullptr);
+ 
++/// smstrikers-port: bytes of loaded replacements kept before LRU eviction; 4 GB by default.
++void set_replacement_cache_budget(uint64_t bytes);
++
++/// smstrikers-port: starts loading the replacement for a texture the game has just made.
++void prefetch_replacement(const GXTexObj* obj, const GXTlutObj* tlut = nullptr);
++
++/// smstrikers-port: true makes a texture's first draw wait for a replacement still loading, not draw its original.
++void set_replacement_wait(bool wait);
++
++/// smstrikers-port: true holds replacements to the cache budget, skipping any pack folder bigger than it.
++void set_replacement_strict_budget(bool strict);
++
++enum class DumpResult { Written, Exists, Failed };
++
++/// smstrikers-port: writes `obj`'s base level to `dir` as a PNG under Dolphin's dump name, unless it exists.
++DumpResult dump_texture(const GXTexObj* obj, const GXTlutObj* tlut, const std::filesystem::path& dir);
++
+ } // namespace aurora::texture
+ 
+ #endif
 diff --git a/include/dolphin/ai.h b/include/dolphin/ai.h
 index 52975e7..0a4b6dc 100644
 --- a/include/dolphin/ai.h
@@ -46,8 +213,22 @@ index 52975e7..0a4b6dc 100644
  u32 AIGetDMALength(void);
  BOOL AICheckInit(void);
  AISCallback AIRegisterStreamCallback(AISCallback callback);
+diff --git a/include/dolphin/gx/GXCpu2Efb.h b/include/dolphin/gx/GXCpu2Efb.h
+index 11fa99a..1ddafb0 100644
+--- a/include/dolphin/gx/GXCpu2Efb.h
++++ b/include/dolphin/gx/GXCpu2Efb.h
+@@ -12,7 +12,8 @@ void GXPokeDstAlpha(GXBool enable, u8 alpha);
+ void GXPokeDither(GXBool dither);
+ void GXPokeZMode(GXBool compare_enable, GXCompare func, GXBool update_enable);
+ // Use AuroraReadbackCapturePeeks (GXAurora.h)
+-// void GXPeekARGB(u16 x, u16 y, u32* color);
++// smstrikers-port: declared for the game's debug screenshot and crash dump, which link it to a no-op.
++void GXPeekARGB(u16 x, u16 y, u32* color);
+ void GXPokeARGB(u16 x, u16 y, u32 color);
+ // Use AuroraReadbackCapturePeeks (GXAurora.h)
+ // void GXPeekZ(u16 x, u16 y, u32* z);
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842..c750c10 100644
+index 3df2b4a..cb0c394 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
 @@ -1,4 +1,8 @@
@@ -59,7 +240,15 @@ index 9430842..c750c10 100644
  #include <aurora/time.hpp>
  
  #ifdef AURORA_ENABLE_GX
-@@ -233,6 +237,134 @@ const AuroraEvent* update() noexcept {
+@@ -6,6 +10,7 @@
+ #include "gfx/frame.hpp"
+ #include "gfx/recording.hpp"
+ #include "gfx/render_worker.hpp"
++#include "gfx/texture.hpp"
+ #include "gx/command_processor.hpp"
+ #include "gx/fifo.hpp"
+ #include "gx/gx.hpp"
+@@ -233,6 +238,134 @@ const AuroraEvent* update() noexcept {
    return window::poll_events();
  }
  
@@ -194,7 +383,30 @@ index 9430842..c750c10 100644
  bool begin_frame() noexcept {
    ZoneScoped;
  #ifdef AURORA_ENABLE_GX
-@@ -366,6 +498,7 @@ void end_frame() noexcept {
+@@ -264,7 +397,12 @@ bool begin_frame() noexcept {
+ void end_frame() noexcept {
+   ZoneScoped;
+ #ifdef AURORA_ENABLE_GX
++  // smstrikers-port: how long this thread waits for the FIFO worker, for AURORA_TEX_LOG.
++  const uint64_t drainStart = gfx::tex_log_enabled() ? gfx::tex_log_now_ns() : 0;
+   gx::fifo::drain();
++  if (drainStart != 0) {
++    gx::texture::note_drain_wait(gfx::tex_log_now_ns() - drainStart);
++  }
+   gx::fifo::end_frame();
+   gx::texture::end_frame();
+   gfx::finish();
+@@ -343,7 +481,8 @@ void end_frame() noexcept {
+         }
+         pass.End();
+       }
+-      {
++      // smstrikers-port: an empty ImGui pass still opens a Load/Store render pass on the swapchain image.
++      if (!imguiDrawData.empty()) {
+         const std::array attachments{
+             wgpu::RenderPassColorAttachment{
+                 .view = currentView,
+@@ -366,6 +505,7 @@ void end_frame() noexcept {
      } else {
        Log.info("Skipping present; window not presentable");
      }
@@ -202,7 +414,7 @@ index 9430842..c750c10 100644
      webgpu::gpu_prof::frame_end(encoder);
      const wgpu::CommandBufferDescriptor cmdBufDescriptor{.label = "Redraw command buffer"};
      const auto buffer = encoder.Finish(&cmdBufDescriptor);
-@@ -373,6 +506,18 @@ void end_frame() noexcept {
+@@ -373,6 +513,18 @@ void end_frame() noexcept {
        ZoneScopedN("Queue Submit");
        g_queue.Submit(1, &buffer);
      }
@@ -221,7 +433,7 @@ index 9430842..c750c10 100644
      webgpu::gpu_prof::after_submit();
      if (canPresent && g_surface) {
        ZoneScopedN("Present");
-@@ -441,6 +586,10 @@ void end_frame() noexcept {
+@@ -440,6 +592,10 @@ void end_frame() noexcept {
      TracyPlot("aurora: lastTextureUploadSize", static_cast<int64_t>(stats.lastTextureUploadSize));
    });
  
@@ -232,7 +444,7 @@ index 9430842..c750c10 100644
  #endif
  }
  } // namespace
-@@ -451,6 +600,36 @@ AuroraInfo aurora_initialize(int argc, char* argv[], const AuroraConfig* config)
+@@ -450,6 +606,36 @@ AuroraInfo aurora_initialize(int argc, char* argv[], const AuroraConfig* config)
    return aurora::initialize(argc, argv, *config);
  }
  void aurora_shutdown() { aurora::shutdown(); }
@@ -269,77 +481,39 @@ index 9430842..c750c10 100644
  const AuroraEvent* aurora_update() { return aurora::update(); }
  bool aurora_begin_frame() { return aurora::begin_frame(); }
  void aurora_end_frame() { aurora::end_frame(); }
-diff --git a/lib/card/CardGciFolder.cpp b/lib/card/CardGciFolder.cpp
-index e845254..e110866 100644
---- a/lib/card/CardGciFolder.cpp
-+++ b/lib/card/CardGciFolder.cpp
-@@ -82,7 +82,8 @@ ECardResult CardGciFolder::openFile(const char* filename, FileHandle& handleOut)
-     idx++;
-   }
+diff --git a/lib/dawn/BackendBinding.cpp b/lib/dawn/BackendBinding.cpp
+index 447ead8..5f5b2c3 100644
+--- a/lib/dawn/BackendBinding.cpp
++++ b/lib/dawn/BackendBinding.cpp
+@@ -4,7 +4,9 @@
  
--  return ECardResult::NOCARD;
-+  /* smstrikers-port: NOFILE, not NOCARD. The card is mounted and readable; the one thing that is missing is this file, which is what CARD_RESULT_NOFILE means and what CardRawFile::openFile already returns for it. */
-+  return ECardResult::NOFILE;
- }
+ #include <memory>
  
- ECardResult CardGciFolder::openFile(uint32_t fileno, FileHandle& handleOut) {
-@@ -96,7 +97,8 @@ ECardResult CardGciFolder::openFile(uint32_t fileno, FileHandle& handleOut) {
-     return ECardResult::READY;
-   }
+-#if !defined(SDL_PLATFORM_MACOS) && !defined(SDL_PLATFORM_IOS) && !defined(SDL_PLATFORM_TVOS)
++#if defined(__SWITCH__)
++#include <switch.h>
++#elif !defined(SDL_PLATFORM_MACOS) && !defined(SDL_PLATFORM_IOS) && !defined(SDL_PLATFORM_TVOS)
+ #include <SDL3/SDL_video.h>
+ #endif
  
--  return ECardResult::NOCARD;
-+  /* smstrikers-port: NOFILE, as above; an index past the end is a file that is not there, not an absent card. */
-+  return ECardResult::NOFILE;
- }
- 
- ECardResult CardGciFolder::createFile(const char* filename, size_t size, FileHandle& handleOut) {
-@@ -151,9 +153,39 @@ void CardGciFolder::deleteFile(const FileHandle& fh) {
-     fileIO.deleteFile();
- }
- 
--ECardResult CardGciFolder::deleteFile(const char* filename) { return ECardResult::NOCARD; }
-+/* smstrikers-port: delete the file, instead of reporting a card that is not there. Both overloads were stubs returning NOCARD, so no save could be deleted at all on the folder-of-.gci backend a desktop build uses; neither name nor index matching is NOFILE, and an open file is BUSY, which is what the SDK's own CARDDeleteAsync answers for it. */
-+ECardResult CardGciFolder::deleteFile(const char* filename) {
-+  uint32_t fileno = 0;
-+  for (const auto& gciFile : m_files) {
-+    if (strcmp(filename, gciFile.file.m_filename) == 0) {
-+      return deleteFile(fileno);
-+    }
-+    fileno++;
-+  }
-+
-+  return ECardResult::NOFILE;
-+}
- 
--ECardResult CardGciFolder::deleteFile(uint32_t fileno) { return ECardResult::NOCARD; }
-+ECardResult CardGciFolder::deleteFile(uint32_t fileno) {
-+  auto* gciFile = get_file(fileno);
-+  if (gciFile == nullptr) {
-+    return ECardResult::NOFILE;
-+  }
-+  if (gciFile->opened) {
-+    return ECardResult::BUSY;
-+  }
-+
-+  const auto path = m_folderPath / gciFile->filename;
-+  FileIO fileIO(path, true);
-+  if (!fileIO || !fileIO.deleteFile()) {
-+    Log.error("Failed to delete GCI file '{}'", io::fs_path_to_string(path));
-+    return ECardResult::IOERROR;
-+  }
-+
-+  /* m_files *is* this card's listing, and the index into it is the file number: an entry left behind is a file getStatus still describes with nothing on disk behind it. */
-+  m_files.erase(m_files.begin() + static_cast<std::ptrdiff_t>(fileno));
-+  return ECardResult::READY;
-+}
- 
- ECardResult CardGciFolder::renameFile(const char* oldName, const char* newName) {
-   for (auto& gciFile : m_files) {
+@@ -16,6 +18,12 @@ std::shared_ptr<wgpu::ChainedStruct> SetupWindowAndGetSurfaceDescriptorCocoa(SDL
+ std::shared_ptr<wgpu::ChainedStruct> SetupWindowAndGetSurfaceDescriptor(SDL_Window* window) {
+ #if defined(SDL_PLATFORM_MACOS) || defined(SDL_PLATFORM_IOS) || defined(SDL_PLATFORM_TVOS)
+   return SetupWindowAndGetSurfaceDescriptorCocoa(window);
++#elif defined(__SWITCH__)
++  // smstrikers-port: render to the default NWindow; SDL2's Switch window exposes no native handle.
++  (void)window;
++  std::shared_ptr<wgpu::SurfaceSourceSwitchNWindow> desc = std::make_shared<wgpu::SurfaceSourceSwitchNWindow>();
++  desc->window = nwindowGetDefault();
++  return std::move(desc);
+ #else
+   const auto props = SDL_GetWindowProperties(window);
+ #if defined(SDL_PLATFORM_ANDROID)
 diff --git a/lib/dolphin/card.cpp b/lib/dolphin/card.cpp
-index 25f74df..c4aff02 100644
+index 24b537e..e71c7c0 100644
 --- a/lib/dolphin/card.cpp
 +++ b/lib/dolphin/card.cpp
-@@ -39,6 +39,45 @@ bool Initialized = false;
+@@ -44,6 +44,45 @@ bool Initialized = false;
  CARDFileType SelectedFileType = CARD_GCIFOLDER;
  bool UseFastMode = false;
  
@@ -385,119 +559,125 @@ index 25f74df..c4aff02 100644
  void CopyKabuFileHandleToDolphin(const s32 chan, const aurora::card::FileHandle& handle, CARDFileInfo* fileInfo) {
    fileInfo->chan = chan;
    fileInfo->fileNo = handle.getFileNo();
-@@ -247,7 +286,7 @@ s32 CARDCheckAsync(const s32 chan, const CARDCallback callback) {
+@@ -386,9 +425,7 @@ s32 CARDCheckAsync(const s32 chan, const CARDCallback callback) {
  
    const auto& card = GET_CARD(chan);
    const auto res = static_cast<s32>(card->getError());
--  callback(chan, res);
+-  if (callback) {
+-    callback(chan, res);
+-  }
 +  FinishAsync(callback, chan, res);
    return static_cast<s32>(card->getError());
  }
  
-@@ -269,7 +308,7 @@ s32 CARDCheckExAsync(const s32 chan, s32* xferBytes [[maybe_unused]], const CARD
+@@ -410,9 +447,7 @@ s32 CARDCheckExAsync(const s32 chan, s32* xferBytes [[maybe_unused]], const CARD
    }
    const auto& card = GET_CARD(chan);
    const auto res = static_cast<s32>(card->getError());
--  callback(chan, res);
+-  if (callback) {
+-    callback(chan, res);
+-  }
 +  FinishAsync(callback, chan, res);
    return static_cast<s32>(card->getError());
  }
  
-@@ -298,8 +337,7 @@ s32 CARDCreateAsync(const s32 chan, const char* fileName, const u32 size, CARDFi
+@@ -441,9 +476,7 @@ s32 CARDCreateAsync(const s32 chan, const char* fileName, const u32 size, CARDFi
      return CARD_RESULT_FATAL_ERROR;
    }
    const auto res = CARDCreate(chan, fileName, size, fileInfo);
--  callback(chan, res);
--  return res;
-+  return FinishAsync(callback, chan, res);
+-  if (callback) {
+-    callback(chan, res);
+-  }
++  FinishAsync(callback, chan, res);
+   return res;
  }
  
- s32 CARDDelete(const s32 chan, const char* fileName) {
-@@ -326,8 +364,7 @@ s32 CARDDeleteAsync(const s32 chan, const char* fileName, const CARDCallback cal
+@@ -471,9 +504,7 @@ s32 CARDDeleteAsync(const s32 chan, const char* fileName, const CARDCallback cal
      return CARD_RESULT_FATAL_ERROR;
    }
    const auto res = CARDDelete(chan, fileName);
--  callback(chan, res);
--  return res;
-+  return FinishAsync(callback, chan, res);
+-  if (callback) {
+-    callback(chan, res);
+-  }
++  FinishAsync(callback, chan, res);
+   return res;
  }
  
- s32 CARDFastDelete(const s32 chan, const s32 fileNo) {
-@@ -353,8 +390,7 @@ s32 CARDFastDeleteAsync(const s32 chan, const s32 fileNo, const CARDCallback cal
+@@ -500,9 +531,7 @@ s32 CARDFastDeleteAsync(const s32 chan, const s32 fileNo, const CARDCallback cal
      return CARD_RESULT_FATAL_ERROR;
    }
    const auto res = CARDFastDelete(chan, fileNo);
--  callback(chan, res);
--  return res;
-+  return FinishAsync(callback, chan, res);
+-  if (callback) {
+-    callback(chan, res);
+-  }
++  FinishAsync(callback, chan, res);
+   return res;
  }
  
- s32 CARDFastOpen(const s32 chan, const s32 fileNo, CARDFileInfo* fileInfo) {
-@@ -394,8 +430,7 @@ s32 CARDFormatAsync(const s32 chan, const CARDCallback callback) {
+@@ -541,9 +570,7 @@ s32 CARDFormatAsync(const s32 chan, const CARDCallback callback) {
      return CARD_RESULT_FATAL_ERROR;
    }
    const auto res = CARDFormat(chan);
--  callback(chan, res);
--  return res;
-+  return FinishAsync(callback, chan, res);
+-  if (callback) {
+-    callback(chan, res);
+-  }
++  FinishAsync(callback, chan, res);
+   return res;
  }
  
- s32 CARDFreeBlocks(const s32 chan, s32* byteNotUsed, s32* filesNotUsed) {
-@@ -520,10 +555,16 @@ s32 CARDMount(const s32 chan, void* workArea [[maybe_unused]], CARDCallback deta
-   return CARD_RESULT_READY;
- }
- s32 CARDMountAsync(const s32 chan, void* workArea [[maybe_unused]], const CARDCallback detachCallback [[maybe_unused]],
--                   const CARDCallback attachCallback [[maybe_unused]]) {
-+                   const CARDCallback attachCallback) {
-+  // smstrikers-port: invoke the attach callback, as every other CARD*Async here does.
-   if (chan < 0 || chan >= 2) {
+@@ -674,8 +701,8 @@ s32 CARDMountAsync(const s32 chan, void* workArea [[maybe_unused]], const CARDCa
      return CARD_RESULT_FATAL_ERROR;
    }
-+  if (!CARD_READY(chan)) {
-+    FinishAsync(attachCallback, chan, CARD_RESULT_NOCARD);
-+    return CARD_RESULT_NOCARD;
-+  }
-+  FinishAsync(attachCallback, chan, CARD_RESULT_READY);
+   const auto& card = GET_CARD(chan);
+-  if (card && attachCallback) {
+-    attachCallback(chan, static_cast<s32>(card->getError()));
++  if (card) {
++    FinishAsync(attachCallback, chan, static_cast<s32>(card->getError()));
+   }
    return CARD_RESULT_READY;
  }
- 
-@@ -585,8 +626,7 @@ s32 CARDRenameAsync(const s32 chan, const char* oldName, const char* newName, co
+@@ -743,9 +770,7 @@ s32 CARDRenameAsync(const s32 chan, const char* oldName, const char* newName, co
      return CARD_RESULT_FATAL_ERROR;
    }
    const auto res = CARDRename(chan, oldName, newName);
--  callback(chan, res);
--  return res;
-+  return FinishAsync(callback, chan, res);
+-  if (callback) {
+-    callback(chan, res);
+-  }
++  FinishAsync(callback, chan, res);
+   return res;
  }
  
- s32 CARDSetAttributesAsync(const s32 chan, s32 fileNo [[maybe_unused]], u8 attr [[maybe_unused]],
-@@ -642,8 +682,7 @@ s32 CARDSetStatusAsync(const s32 chan, const s32 fileNo, const CARDStat* stat, c
+@@ -802,9 +827,7 @@ s32 CARDSetStatusAsync(const s32 chan, const s32 fileNo, const CARDStat* stat, c
      return CARD_RESULT_FATAL_ERROR;
    }
    const auto res = CARDSetStatus(chan, fileNo, stat);
--  callback(chan, res);
--  return res;
-+  return FinishAsync(callback, chan, res);
+-  if (callback) {
+-    callback(chan, res);
+-  }
++  FinishAsync(callback, chan, res);
+   return res;
  }
  
- s32 CARDUnmount(const s32 chan) {
-@@ -706,8 +745,7 @@ s32 CARDRead(const CARDFileInfo* fileInfo, void* addr, s32 length, const s32 off
+@@ -868,9 +891,7 @@ s32 CARDRead(const CARDFileInfo* fileInfo, void* addr, s32 length, const s32 off
  s32 CARDReadAsync(const CARDFileInfo* fileInfo, void* addr, const s32 length, const s32 offset,
                    const CARDCallback callback) {
    const auto res = CARDRead(fileInfo, addr, length, offset);
--  callback(fileInfo->chan, res);
--  return res;
-+  return FinishAsync(callback, fileInfo->chan, res);
+-  if (callback) {
+-    callback(fileInfo->chan, res);
+-  }
++  FinishAsync(callback, fileInfo->chan, res);
+   return res;
  }
  
- s32 CARDWrite(const CARDFileInfo* fileInfo, const void* addr, const s32 length, const s32 offset) {
-@@ -735,7 +773,6 @@ s32 CARDWrite(const CARDFileInfo* fileInfo, const void* addr, const s32 length,
+@@ -899,9 +920,7 @@ s32 CARDWrite(const CARDFileInfo* fileInfo, const void* addr, const s32 length,
  s32 CARDWriteAsync(const CARDFileInfo* fileInfo, const void* addr, const s32 length, const s32 offset,
                     const CARDCallback callback) {
    const auto res = CARDWrite(fileInfo, addr, length, offset);
--  callback(fileInfo->chan, res);
--  return res;
-+  return FinishAsync(callback, fileInfo->chan, res);
+-  if (callback) {
+-    callback(fileInfo->chan, res);
+-  }
++  FinishAsync(callback, fileInfo->chan, res);
+   return res;
  }
  }
 diff --git a/lib/dolphin/gx/GXDispList.cpp b/lib/dolphin/gx/GXDispList.cpp
@@ -515,38 +695,52 @@ index 5bf9460..7ddb476 100644
    aurora::gx::fifo::publish();
  }
 diff --git a/lib/dolphin/gx/GXFrameBuffer.cpp b/lib/dolphin/gx/GXFrameBuffer.cpp
-index 470f038..7f010e2 100644
+index 3460090..b5179a3 100644
 --- a/lib/dolphin/gx/GXFrameBuffer.cpp
 +++ b/lib/dolphin/gx/GXFrameBuffer.cpp
-@@ -149,6 +149,26 @@ GXRenderModeObj GXMpal480IntDf = {
+@@ -118,25 +118,22 @@ GXRenderModeObj GXMpal480IntDf = {
+ };
  
  void GXAdjustForOverscan(GXRenderModeObj* rmin, GXRenderModeObj* rmout, u16 hor, u16 ver) {
-   *rmout = *rmin;
-+  // smstrikers-port: the window is the wrong EFB size once the render target is
-+  // pinned to the VI mode, because this answer feeds VIConfigure and becomes the
-+  // logical framebuffer. Do the SDK's own arithmetic in that case.
-+  if (aurora::window::get_frame_buffer_scale() > 0.f) {
-+    const u16 hor2 = static_cast<u16>(hor * 2);
-+    const u16 ver2 = static_cast<u16>(ver * 2);
-+    const u32 mode = rmin->viTVmode & 3;
-+    rmout->fbWidth = static_cast<u16>(rmin->fbWidth - hor2);
-+    if (rmin->xfbHeight != 0) {
-+      const u32 verf = (static_cast<u32>(ver2) * rmin->efbHeight) / rmin->xfbHeight;
-+      rmout->efbHeight = static_cast<u16>(rmin->efbHeight - verf);
-+    }
-+    rmout->xfbHeight = static_cast<u16>(rmin->xfbHeight -
-+                                        ((rmin->xFBmode == VI_XFBMODE_SF && mode == 0) ? ver2 / 2 : ver2));
-+    rmout->viWidth = static_cast<u16>(rmin->viWidth - hor2);
-+    rmout->viHeight = static_cast<u16>(rmin->viHeight - (mode == 1 ? ver2 * 2 : ver2));
-+    rmout->viXOrigin = static_cast<u16>(rmin->viXOrigin + hor);
-+    rmout->viYOrigin = static_cast<u16>(rmin->viYOrigin + ver);
-+    return;
-+  }
-   const auto size = aurora::window::get_window_size();
-   rmout->fbWidth = size.fb_width;
-   rmout->efbHeight = size.fb_height;
+-  const GXRenderModeObj in = *rmin;
+-  const u16 hor2 = hor * 2;
+-  const u16 ver2 = ver * 2;
+-  const u32 efbHeight = in.efbHeight;
+-
+-  *rmout = in;
+-  rmout->fbWidth = in.fbWidth - hor2;
+-  rmout->efbHeight = efbHeight - (ver2 * efbHeight) / in.xfbHeight;
+-
+-  if (in.xFBmode == VI_XFBMODE_SF && (in.viTVmode & 2) != 2) {
+-    rmout->xfbHeight = in.xfbHeight - ver;
+-  } else {
+-    rmout->xfbHeight = in.xfbHeight - ver2;
++  *rmout = *rmin;
++  // smstrikers-port: the SDK's arithmetic: mode 1 trims VI height twice, only mode 0 halves a single-strike XFB.
++  const u16 hor2 = static_cast<u16>(hor * 2);
++  const u16 ver2 = static_cast<u16>(ver * 2);
++  const u32 mode = rmin->viTVmode & 3;
++  rmout->fbWidth = static_cast<u16>(rmin->fbWidth - hor2);
++  if (rmin->xfbHeight != 0) {
++    const u32 verf = (static_cast<u32>(ver2) * rmin->efbHeight) / rmin->xfbHeight;
++    rmout->efbHeight = static_cast<u16>(rmin->efbHeight - verf);
+   }
+-
+-  rmout->viWidth = in.viWidth - hor2;
+-  rmout->viHeight = in.viHeight - ver2;
+-  rmout->viXOrigin = in.viXOrigin + hor;
+-  rmout->viYOrigin = in.viYOrigin + ver;
++  rmout->xfbHeight =
++      static_cast<u16>(rmin->xfbHeight - ((rmin->xFBmode == VI_XFBMODE_SF && mode == 0) ? ver2 / 2 : ver2));
++  rmout->viWidth = static_cast<u16>(rmin->viWidth - hor2);
++  rmout->viHeight = static_cast<u16>(rmin->viHeight - (mode == 1 ? ver2 * 2 : ver2));
++  rmout->viXOrigin = static_cast<u16>(rmin->viXOrigin + hor);
++  rmout->viYOrigin = static_cast<u16>(rmin->viYOrigin + ver);
+ }
+ 
+ void GXSetDispCopySrc(u16 left, u16 top, u16 wd, u16 ht) {}
 diff --git a/lib/dolphin/gx/GXManage.cpp b/lib/dolphin/gx/GXManage.cpp
-index 7e62821..f98e4a6 100644
+index 0bb5465..a0a8538 100644
 --- a/lib/dolphin/gx/GXManage.cpp
 +++ b/lib/dolphin/gx/GXManage.cpp
 @@ -16,7 +16,9 @@ extern "C" {
@@ -560,8 +754,29 @@ index 7e62821..f98e4a6 100644
    GXColor black = {0, 0, 0, 0};
    GXColor white = {255, 255, 255, 255};
    u32 i;
+diff --git a/lib/dolphin/gx/GXTexture.cpp b/lib/dolphin/gx/GXTexture.cpp
+index 7e31004..888fa5c 100644
+--- a/lib/dolphin/gx/GXTexture.cpp
++++ b/lib/dolphin/gx/GXTexture.cpp
+@@ -2,6 +2,7 @@
+ #include "__gx.h"
+ 
+ #include "../../gfx/texture.hpp"
++#include "../../gx/texture.hpp"
+ #include "dolphin/gx/GXAurora.h"
+ 
+ #include <algorithm>
+@@ -135,6 +136,8 @@ void GXInitTexObjLOD(GXTexObj* obj_, GXTexFilter minFilt, GXTexFilter magFilt, f
+   const auto clampedMax = std::clamp(maxLod, 0.0f, 10.0f);
+   SET_REG_FIELD(0, obj->mode1, 8, 0, static_cast<u8>(16.0f * clampedMin));
+   SET_REG_FIELD(0, obj->mode1, 8, 8, static_cast<u8>(16.0f * clampedMax));
++  // smstrikers-port: the object is complete once its LOD range is set, so conversion can start here.
++  aurora::gx::texture::preconvert_texture(*obj);
+ }
+ 
+ void GXInitTexObjData(GXTexObj* obj_, const void* data) {
 diff --git a/lib/dolphin/gx/GXTransform.cpp b/lib/dolphin/gx/GXTransform.cpp
-index f443204..066e004 100644
+index 7c1c80c..53e7925 100644
 --- a/lib/dolphin/gx/GXTransform.cpp
 +++ b/lib/dolphin/gx/GXTransform.cpp
 @@ -54,7 +54,9 @@ void GXSetProjectionv(const f32* ptr) {
@@ -585,6 +800,74 @@ index f443204..066e004 100644
    const auto* mtx = reinterpret_cast<const f32*>(mtx_);
  
    GX_WRITE_U8(0x10);
+diff --git a/lib/dolphin/pad/adapter.cpp b/lib/dolphin/pad/adapter.cpp
+index 011f593..b51f206 100644
+--- a/lib/dolphin/pad/adapter.cpp
++++ b/lib/dolphin/pad/adapter.cpp
+@@ -251,6 +251,20 @@ private:
+       leftTriggerSet = leftTriggerSet || mapping.padButton == PAD_TRIGGER_L;
+       rightTriggerSet = rightTriggerSet || mapping.padButton == PAD_TRIGGER_R;
+     }
++#if defined(__SWITCH__)
++    // smstrikers-port: L also presses GameCube L, as in the Switch 2 release, unless L is remapped.
++    if (std::ranges::none_of(buttons,
++                             [](const auto& m) { return m.nativeButton == SDL_GAMEPAD_BUTTON_LEFT_SHOULDER; })) {
++      out.push_back({
++          .input =
++              {
++                  .source = controller,
++                  .control = PhysicalInput::GamepadButton{SDL_GAMEPAD_BUTTON_LEFT_SHOULDER},
++              },
++          .target = c.l,
++      });
++    }
++#endif
+ 
+     const float stickDeadZone = deadZones.useDeadzones ? deadZones.stickDeadZone / 32767.f : 0.f;
+     const float substickDeadZone = deadZones.useDeadzones ? deadZones.substickDeadZone / 32767.f : 0.f;
+diff --git a/lib/dolphin/pad/pad.cpp b/lib/dolphin/pad/pad.cpp
+index 89b597f..3a3395d 100644
+--- a/lib/dolphin/pad/pad.cpp
++++ b/lib/dolphin/pad/pad.cpp
+@@ -154,30 +154,32 @@ std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsProCon{{
+     {SDL_GAMEPAD_BUTTON_DPAD_RIGHT, PAD_BUTTON_RIGHT},
+ }};
+ 
++// smstrikers-port: a lone Joy-Con has no triggers, so SL and SR are L and R and the stick click is Z.
+ std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsJoyConRight{{
+     {SDL_GAMEPAD_BUTTON_SOUTH, PAD_BUTTON_A},
+     {SDL_GAMEPAD_BUTTON_EAST, PAD_BUTTON_B},
+     {SDL_GAMEPAD_BUTTON_WEST, PAD_BUTTON_X},
+     {SDL_GAMEPAD_BUTTON_NORTH, PAD_BUTTON_Y},
+     {SDL_GAMEPAD_BUTTON_START, PAD_BUTTON_START},
+-    {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, PAD_TRIGGER_Z},
+-    {PAD_NATIVE_BUTTON_INVALID, PAD_TRIGGER_L},
+-    {PAD_NATIVE_BUTTON_INVALID, PAD_TRIGGER_R},
++    {SDL_GAMEPAD_BUTTON_LEFT_STICK, PAD_TRIGGER_Z},
++    {SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, PAD_TRIGGER_L},
++    {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, PAD_TRIGGER_R},
+     {SDL_GAMEPAD_BUTTON_DPAD_UP, PAD_BUTTON_UP},
+     {SDL_GAMEPAD_BUTTON_DPAD_DOWN, PAD_BUTTON_DOWN},
+     {SDL_GAMEPAD_BUTTON_DPAD_LEFT, PAD_BUTTON_LEFT},
+     {SDL_GAMEPAD_BUTTON_DPAD_RIGHT, PAD_BUTTON_RIGHT},
+ }};
+ 
++// smstrikers-port: as the right Joy-Con.
+ std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsJoyConLeft{{
+     {SDL_GAMEPAD_BUTTON_SOUTH, PAD_BUTTON_A},
+     {SDL_GAMEPAD_BUTTON_EAST, PAD_BUTTON_B},
+     {SDL_GAMEPAD_BUTTON_WEST, PAD_BUTTON_X},
+     {SDL_GAMEPAD_BUTTON_NORTH, PAD_BUTTON_Y},
+     {SDL_GAMEPAD_BUTTON_START, PAD_BUTTON_START},
+-    {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, PAD_TRIGGER_Z},
+-    {PAD_NATIVE_BUTTON_INVALID, PAD_TRIGGER_L},
+-    {PAD_NATIVE_BUTTON_INVALID, PAD_TRIGGER_R},
++    {SDL_GAMEPAD_BUTTON_LEFT_STICK, PAD_TRIGGER_Z},
++    {SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, PAD_TRIGGER_L},
++    {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, PAD_TRIGGER_R},
+     {SDL_GAMEPAD_BUTTON_DPAD_UP, PAD_BUTTON_UP},
+     {SDL_GAMEPAD_BUTTON_DPAD_DOWN, PAD_BUTTON_DOWN},
+     {SDL_GAMEPAD_BUTTON_DPAD_LEFT, PAD_BUTTON_LEFT},
 diff --git a/lib/dolphin/vi/vi.cpp b/lib/dolphin/vi/vi.cpp
 index 4c8dddc..b5de94d 100644
 --- a/lib/dolphin/vi/vi.cpp
@@ -633,7 +916,7 @@ index a711c3f..e2403e1 100644
 +float locked_aspect() noexcept;
  } // namespace aurora::vi
 diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
-index b3054be..c4f4a36 100644
+index ad53429..24bd1a5 100644
 --- a/lib/gfx/encoding.cpp
 +++ b/lib/gfx/encoding.cpp
 @@ -1,3 +1,7 @@
@@ -644,10 +927,16 @@ index b3054be..c4f4a36 100644
  #include "encoding.hpp"
  
  #include "frame.hpp"
-@@ -324,6 +328,88 @@ constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBu
+@@ -336,15 +340,102 @@ constexpr uint64_t IndexStagingOffset = UniformStagingOffset + UniformBufferSize
+ constexpr uint64_t StorageStagingOffset = IndexStagingOffset + IndexBufferSize;
+ constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBufferSize;
  
- constexpr uint32_t align_down_copy_offset(uint32_t value) noexcept { return value & ~3u; }
- 
+-constexpr uint32_t align_down_copy_offset(uint32_t value) noexcept { return value & ~3u; }
++// smstrikers-port: staging copies on 64 KiB boundaries (hasvk runs vkCmdCopyBuffer as a blorp blit; off-page copies corrupt vertex data and the extent search burns CPU).
++constexpr uint32_t StagingCopyAlign = 64 * 1024;
++
++constexpr uint32_t align_down_copy_offset(uint32_t value) noexcept { return value & ~(StagingCopyAlign - 1); }
++
 +// smstrikers-port: STRIKERS_LOG_GPUMEM prints each fixed pool's per-frame peak
 +// against what resources.hpp reserved for it, which nothing else reports.
 +namespace {
@@ -729,11 +1018,22 @@ index b3054be..c4f4a36 100644
 +    if (reservedBytes != nullptr) reservedBytes[i] = reserved[i];
 +  }
 +}
-+
+ 
  void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& frame, uint32_t& copied,
-                                uint32_t highWater, uint64_t stagingOffset, const wgpu::Buffer& dst) {
+-                               uint32_t highWater, uint64_t stagingOffset, const wgpu::Buffer& dst) {
++                               uint32_t highWater, uint64_t stagingOffset, uint64_t poolSize,
++                               const wgpu::Buffer& dst) {
    if (highWater <= copied) {
-@@ -338,6 +424,7 @@ void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& fra
+     return;
+   }
+   const uint32_t copyStart = align_down_copy_offset(copied);
+-  const uint32_t copyEnd = AURORA_ALIGN(highWater, 4);
++  const uint32_t copyEnd =
++      static_cast<uint32_t>(std::min<uint64_t>(AURORA_ALIGN(uint64_t{highWater}, StagingCopyAlign), poolSize));
+   cmd.CopyBufferToBuffer(staging_buffer(frame.stagingBuffer), stagingOffset + copyStart, dst, copyStart,
+                          copyEnd - copyStart);
+   copied = highWater;
+@@ -352,6 +443,7 @@ void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& fra
  
  bool needs_staging_copy(const FramePacket& frame, const FrameOp& op) {
    const auto& highWater = op.highWater;
@@ -741,6 +1041,394 @@ index b3054be..c4f4a36 100644
    if (highWater.verts > frame.copied.verts || highWater.uniforms > frame.copied.uniforms ||
        highWater.indices > frame.copied.indices || highWater.storage > frame.copied.storage) {
      return true;
+@@ -369,12 +461,14 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+   const webgpu::gpu_prof::Zone zone{cmd, "Staging copies"};
+   const auto& highWater = op.highWater;
+   auto& res = resources();
+-  copy_staging_buffer_range(cmd, frame, frame.copied.verts, highWater.verts, VertexStagingOffset, res.vertexBuffer);
++  copy_staging_buffer_range(cmd, frame, frame.copied.verts, highWater.verts, VertexStagingOffset, VertexBufferSize,
++                            res.vertexBuffer);
+   copy_staging_buffer_range(cmd, frame, frame.copied.uniforms, highWater.uniforms, UniformStagingOffset,
+-                            res.uniformBuffer);
+-  copy_staging_buffer_range(cmd, frame, frame.copied.indices, highWater.indices, IndexStagingOffset, res.indexBuffer);
++                            UniformBufferSize, res.uniformBuffer);
++  copy_staging_buffer_range(cmd, frame, frame.copied.indices, highWater.indices, IndexStagingOffset, IndexBufferSize,
++                            res.indexBuffer);
+   copy_staging_buffer_range(cmd, frame, frame.copied.storage, highWater.storage, StorageStagingOffset,
+-                            res.storageBuffer);
++                            StorageBufferSize, res.storageBuffer);
+ 
+   if constexpr (UseTextureBuffer) {
+     for (size_t i = frame.copied.textureUploadCount; i < op.textureUploads.size(); ++i) {
+diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
+index 2d6d5e2..31a2dd7 100644
+--- a/lib/gfx/frame.cpp
++++ b/lib/gfx/frame.cpp
+@@ -595,28 +595,27 @@ bool wait_for_staging_buffer(size_t slot) {
+ size_t acquire_frame_slot() {
+   ZoneScopedN("Acquire frame slot");
+   const auto waitStart = PresentClock::now();
+-  while (true) {
+-    if (const auto slot = g_frameSlots.try_acquire()) {
+-      const auto waitDuration = PresentClock::now() - waitStart;
+-      const double waitMs = std::chrono::duration<double, std::milli>{waitDuration}.count();
+-      TracyPlot("aurora: frameSlotWaitMs", waitMs);
+-      return *slot;
+-    }
+-    wait_for_gpu_progress(std::chrono::microseconds{100});
+-  }
++  // smstrikers-port: blocks, since the render worker releases slots itself and never from a Dawn callback.
++  const size_t slot = g_frameSlots.acquire();
++  const auto waitDuration = PresentClock::now() - waitStart;
++  const double waitMs = std::chrono::duration<double, std::milli>{waitDuration}.count();
++  TracyPlot("aurora: frameSlotWaitMs", waitMs);
++  return slot;
+ }
+ 
+ std::optional<size_t> acquire_mapped_staging_buffer() {
+   ZoneScopedN("Acquire mapped staging buffer");
+   while (true) {
+-    if (auto slot = g_stagingSlots.try_acquire()) {
++    if (auto slot = g_stagingSlots.acquire_for(std::chrono::milliseconds{1})) {
+       if (wait_for_staging_buffer(*slot)) {
+         return *slot;
+       }
+       g_stagingSlots.release(*slot);
+       return std::nullopt;
+     }
+-    wait_for_gpu_progress(std::chrono::microseconds{100});
++    if (render_worker::is_idle()) {
++      enqueue_process_events();
++    }
+   }
+ }
+ 
+@@ -741,4 +740,15 @@ float calculate_fps() noexcept {
+ } // namespace aurora::gfx
+ 
+ const AuroraStats* aurora_get_stats() { return &aurora::gfx::detail::resources().stats; }
++void aurora_get_pipeline_counts(uint32_t* queued, uint32_t* created) {
++  uint32_t q = 0;
++  uint32_t c = 0;
++  aurora::gfx::get_pipeline_counts(q, c);
++  if (queued != nullptr) {
++    *queued = q;
++  }
++  if (created != nullptr) {
++    *created = c;
++  }
++}
+ float aurora_get_fps() { return aurora::gfx::calculate_fps(); }
+diff --git a/lib/gfx/frame.hpp b/lib/gfx/frame.hpp
+index 9e1152c..19b47c4 100644
+--- a/lib/gfx/frame.hpp
++++ b/lib/gfx/frame.hpp
+@@ -7,7 +7,12 @@
+ 
+ namespace aurora::gfx::detail {
+ 
++#ifdef __SWITCH__
++// smstrikers-port: a third slot lets the game thread record while the GPU finishes two frames.
++inline constexpr size_t FrameSlotCount = 3;
++#else
+ inline constexpr size_t FrameSlotCount = 2;
++#endif
+ inline constexpr size_t StagingBufferCount = FrameSlotCount + 3;
+ inline constexpr uint64_t StagingBufferSize = UniformBufferSize + VertexBufferSize + IndexBufferSize +
+                                               StorageBufferSize + (UseTextureBuffer ? TextureUploadSize : 0);
+diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
+index 46a9903..8fdb022 100644
+--- a/lib/gfx/pipeline_cache.cpp
++++ b/lib/gfx/pipeline_cache.cpp
+@@ -24,6 +24,7 @@
+ #include <ranges>
+ #include <variant>
+ #include <thread>
++#include <vector>
+ 
+ #include <SDL3/SDL_iostream.h>
+ #include <absl/container/flat_hash_map.h>
+@@ -80,7 +81,7 @@ constexpr size_t BuildPipelinesPerFrame = 5;
+ #else
+ constexpr size_t BuildPipelinesPerFrame = 1;
+ #endif
+-static std::thread g_pipelineThread;
++static std::vector<std::thread> g_pipelineThreads;
+ static std::atomic_bool g_pipelineThreadEnd = false;
+ static std::condition_variable g_pipelineQueueCv;
+ static std::condition_variable g_pipelineReadyCv;
+@@ -345,6 +346,7 @@ struct AtomicStatRef {
+     __atomic_store_n(&ref, val, __ATOMIC_RELAXED);
+     return val;
+   }
++  uint32_t load() const { return __atomic_load_n(&ref, __ATOMIC_RELAXED); }
+ };
+ static AtomicStatRef queuedPipelines{detail::resources().stats.queuedPipelines};
+ static AtomicStatRef createdPipelines{detail::resources().stats.createdPipelines};
+@@ -960,17 +962,15 @@ static void pipeline_worker() {
+   tracy::SetThreadName("Pipeline compilation thread");
+ #endif
+ 
+-  bool hasMore = false;
+   while (g_hasPipelineThread || g_pipelinesPerFrame < BuildPipelinesPerFrame) {
+     PendingPipeline pending;
+     {
+       std::unique_lock lock{g_pipelineMutex};
+       if (g_hasPipelineThread) {
+-        if (!hasMore) {
+-          g_pipelineQueueCv.wait(lock, [] {
+-            return !g_pipelineQueue.empty() || !g_backgroundPipelineQueue.empty() || g_pipelineThreadEnd;
+-          });
+-        }
++        // smstrikers-port: every pass, under the lock; another worker may have taken the item this one last saw queued.
++        g_pipelineQueueCv.wait(lock, [] {
++          return !g_pipelineQueue.empty() || !g_backgroundPipelineQueue.empty() || g_pipelineThreadEnd;
++        });
+       } else if (g_pipelineQueue.empty() && g_backgroundPipelineQueue.empty()) {
+         return;
+       }
+@@ -987,7 +987,6 @@ static void pipeline_worker() {
+       std::lock_guard lock{g_pipelineMutex};
+       g_pipelines.try_emplace(pending.hash, std::move(result));
+       g_pendingPipelines.erase(pending.hash);
+-      hasMore = !g_pipelineQueue.empty() || !g_backgroundPipelineQueue.empty();
+     }
+     if (!g_hasPipelineThread) {
+       g_pipelinesPerFrame += std::max(1u, pipelineCount);
+@@ -1146,7 +1145,21 @@ void initialize_pipeline_cache() {
+     g_hasPipelineThread = false;
+   } else {
+     g_hasPipelineThread = true;
+-    g_pipelineThread = std::thread(pipeline_worker);
++    // smstrikers-port: automatic leaves the main and render threads two cores.
++    constexpr uint32_t MaxPipelineJobs = 16;
++    const uint32_t cores = std::max(std::thread::hardware_concurrency(), 1u);
++    const uint32_t limit = std::min(cores, MaxPipelineJobs);
++    uint32_t jobs = g_config.pipelineJobs;
++    if (jobs == 0) {
++      jobs = cores > 4 ? std::min(cores - 2, 8u) : 2u;
++    } else if (jobs > limit) {
++      Log.warn("Pipeline compilation: {} threads asked for, capped at {}", jobs, limit);
++      jobs = limit;
++    }
++    Log.info("Pipeline compilation: {} at a time", jobs);
++    for (uint32_t i = 0; i < jobs; ++i) {
++      g_pipelineThreads.emplace_back(pipeline_worker);
++    }
+   }
+ 
+   const size_t loadedCount = load_pipeline_cache();
+@@ -1165,7 +1178,10 @@ void shutdown_pipeline_cache() {
+     g_pipelineThreadEnd = true;
+     g_pipelineQueueCv.notify_all();
+     g_pipelineReadyCv.notify_all();
+-    g_pipelineThread.join();
++    for (auto& thread : g_pipelineThreads) {
++      thread.join();
++    }
++    g_pipelineThreads.clear();
+   }
+   g_hasPipelineThread = false;
+ 
+@@ -1200,6 +1216,11 @@ void end_pipeline_frame() {
+   }
+ }
+ 
++void get_pipeline_counts(uint32_t& queued, uint32_t& created) {
++  queued = queuedPipelines.load();
++  created = createdPipelines.load();
++}
++
+ bool get_pipeline(PipelineRef ref, CompiledPipeline& pipeline) {
+   std::lock_guard guard{g_pipelineMutex};
+   const auto it = g_pipelines.find(ref);
+diff --git a/lib/gfx/pipeline_cache.hpp b/lib/gfx/pipeline_cache.hpp
+index 6f2afb5..4d52ebc 100644
+--- a/lib/gfx/pipeline_cache.hpp
++++ b/lib/gfx/pipeline_cache.hpp
+@@ -43,4 +43,6 @@ PipelineRef find_pipeline(const rmlui::PipelineConfig& config);
+ 
+ bool get_pipeline(PipelineRef ref, CompiledPipeline& pipeline);
+ 
++void get_pipeline_counts(uint32_t& queued, uint32_t& created);
++
+ } // namespace aurora::gfx
+diff --git a/lib/gfx/png_io.cpp b/lib/gfx/png_io.cpp
+index 9fb1379..1f6df39 100644
+--- a/lib/gfx/png_io.cpp
++++ b/lib/gfx/png_io.cpp
+@@ -4,6 +4,7 @@
+ #include "png.h"
+ 
+ #include <cstring>
++#include <vector>
+ 
+ static aurora::Module Log("aurora::gfx::png");
+ 
+@@ -80,6 +81,11 @@ std::optional<ConvertedTexture> parse_png_bytes(ArrayRef<uint8_t> bytes) noexcep
+   rowPointers.resize(height);
+ 
+   imageData.append_zeroes(rowBytes * height);
++  // smstrikers-port: the allocation can fail on the Switch, where a large texture pack fills the heap.
++  if (imageData.data() == nullptr) {
++    Log.error("out of memory for a {}x{} PNG", width, height);
++    return std::nullopt;
++  }
+ 
+   for (i = 0; i < height; i++) {
+     rowPointers[i] = imageData.data() + i * rowBytes;
+@@ -97,6 +103,44 @@ std::optional<ConvertedTexture> parse_png_bytes(ArrayRef<uint8_t> bytes) noexcep
+   };
+ }
+ 
++static void writePngData(png_structp png, png_bytep data, const size_t length) {
++  auto* out = static_cast<std::vector<uint8_t>*>(png_get_io_ptr(png));
++  out->insert(out->end(), data, data + length);
++}
++
++static void flushPngData(png_structp) {}
++
++bool write_rgba8_png(const std::filesystem::path& path, uint32_t width, uint32_t height,
++                     ArrayRef<uint8_t> pixels) noexcept {
++  if (width == 0 || height == 0 || pixels.size() != static_cast<size_t>(width) * height * 4) {
++    return false;
++  }
++  png_structp pStruct = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
++  png_infop pInfo = pStruct != nullptr ? png_create_info_struct(pStruct) : nullptr;
++  if (pInfo == nullptr) {
++    png_destroy_write_struct(&pStruct, nullptr);
++    return false;
++  }
++
++  std::vector<uint8_t> encoded;
++  std::vector<png_bytep> rows(height);
++  for (uint32_t y = 0; y < height; ++y) {
++    rows[y] = const_cast<png_bytep>(pixels.data()) + static_cast<size_t>(y) * width * 4;
++  }
++  if (setjmp(png_jmpbuf(pStruct))) {
++    png_destroy_write_struct(&pStruct, &pInfo);
++    return false;
++  }
++  png_set_write_fn(pStruct, &encoded, writePngData, flushPngData);
++  png_set_IHDR(pStruct, pInfo, width, height, 8, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
++               PNG_FILTER_TYPE_DEFAULT);
++  png_write_info(pStruct, pInfo);
++  png_write_image(pStruct, rows.data());
++  png_write_end(pStruct, nullptr);
++  png_destroy_write_struct(&pStruct, &pInfo);
++  return io::write_file(path, {encoded.data(), encoded.size()});
++}
++
+ std::optional<ConvertedTexture>
+ load_png_file(const std::filesystem::path& path) noexcept {
+   const auto bytes = io::read_file(path);
+diff --git a/lib/gfx/png_io.hpp b/lib/gfx/png_io.hpp
+index 3e15fbf..fc3aa92 100644
+--- a/lib/gfx/png_io.hpp
++++ b/lib/gfx/png_io.hpp
+@@ -8,4 +8,7 @@
+ namespace aurora::gfx::png {
+ std::optional<ConvertedTexture> parse_png_bytes(ArrayRef<uint8_t> bytes) noexcept;
+ std::optional<ConvertedTexture> load_png_file(const std::filesystem::path& path) noexcept;
++// smstrikers-port: for texture dumps.
++bool write_rgba8_png(const std::filesystem::path& path, uint32_t width, uint32_t height,
++                     ArrayRef<uint8_t> pixels) noexcept;
+ } // namespace aurora::gfx::png
+diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
+index 190a1f5..4bb238f 100644
+--- a/lib/gfx/recording.cpp
++++ b/lib/gfx/recording.cpp
+@@ -689,7 +689,7 @@ void queue_texture_upload(TextureUpload upload) {
+   current_frame_packet().textureUploads.emplace_back(std::move(upload));
+ }
+ 
+-void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32_t rowsPerImage,
++bool queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32_t rowsPerImage,
+                                wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size) {
+   const auto copyBytesPerRow = AURORA_ALIGN(bytesPerRow, 256);
+   auto& frame = current_frame_packet();
+@@ -701,7 +701,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+         .rowsPerImage = rowsPerImage,
+     };
+     queue_texture_upload(TextureUpload{layout, std::move(tex), size});
+-    return;
++    return true;
+   }
+ 
+   const uint64_t uploadSize = copyBytesPerRow * rowsPerImage;
+@@ -711,8 +711,18 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+       .size = uploadSize,
+       .mappedAtCreation = true,
+   };
++#if defined(__SWITCH__)
++  // smstrikers-port: out of memory skips the upload instead of ending the game.
++  webgpu::g_device.PushErrorScope(wgpu::ErrorFilter::OutOfMemory);
++#endif
+   auto buffer = webgpu::g_device.CreateBuffer(&descriptor);
+   auto* dst = static_cast<uint8_t*>(buffer.GetMappedRange(0, uploadSize));
++#if defined(__SWITCH__)
++  if (webgpu::pop_out_of_memory_scope() || dst == nullptr) {
++    Log.warn("no memory for a {} MiB texture upload", uploadSize >> 20);
++    return false;
++  }
++#endif
+   for (uint32_t row = 0; row < rowsPerImage; ++row) {
+     memcpy(dst, data, bytesPerRow);
+     data += bytesPerRow;
+@@ -726,6 +736,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+       .rowsPerImage = rowsPerImage,
+   };
+   queue_texture_upload(TextureUpload{layout, std::move(tex), size, std::move(buffer)});
++  return true;
+ }
+ 
+ void queue_texture_copy(wgpu::TexelCopyTextureInfo src, wgpu::TexelCopyTextureInfo dst, wgpu::Extent3D size) {
+diff --git a/lib/gfx/render_worker.cpp b/lib/gfx/render_worker.cpp
+index 85783b6..68cbda8 100644
+--- a/lib/gfx/render_worker.cpp
++++ b/lib/gfx/render_worker.cpp
+@@ -156,6 +156,28 @@ size_t FrameSlotPool::acquire() {
+   return 0;
+ }
+ 
++std::optional<size_t> FrameSlotPool::acquire_for(std::chrono::nanoseconds timeout) {
++  std::unique_lock lock{m_mutex};
++  const bool ready = m_cv.wait_for(lock, timeout, [&] {
++    for (const bool free : m_freeSlots) {
++      if (free) {
++        return true;
++      }
++    }
++    return false;
++  });
++  if (!ready) {
++    return std::nullopt;
++  }
++  for (size_t i = 0; i < m_freeSlots.size(); ++i) {
++    if (m_freeSlots[i]) {
++      m_freeSlots[i] = false;
++      return i;
++    }
++  }
++  return std::nullopt;
++}
++
+ std::optional<size_t> FrameSlotPool::try_acquire() {
+   std::lock_guard lock{m_mutex};
+   for (size_t i = 0; i < m_freeSlots.size(); ++i) {
+diff --git a/lib/gfx/render_worker.hpp b/lib/gfx/render_worker.hpp
+index 7d652ca..4d8a2c9 100644
+--- a/lib/gfx/render_worker.hpp
++++ b/lib/gfx/render_worker.hpp
+@@ -63,6 +63,8 @@ public:
+ 
+   size_t acquire();
+   std::optional<size_t> try_acquire();
++  // smstrikers-port: blocks until a slot is free or `timeout` passes.
++  std::optional<size_t> acquire_for(std::chrono::nanoseconds timeout);
+   void release(size_t slot);
+   void reset();
+   [[nodiscard]] size_t free_count() const;
 diff --git a/lib/gfx/resources.hpp b/lib/gfx/resources.hpp
 index 3fdc0ee..ce4716e 100644
 --- a/lib/gfx/resources.hpp
@@ -766,8 +1454,231 @@ index 3fdc0ee..ce4716e 100644
  
  namespace detail {
  struct Resources {
+diff --git a/lib/gfx/texture.cpp b/lib/gfx/texture.cpp
+index 029a3d0..116497d 100644
+--- a/lib/gfx/texture.cpp
++++ b/lib/gfx/texture.cpp
+@@ -1,3 +1,6 @@
++#include <cstring>
++#include <cstdlib>
++#include <chrono>
+ #include "resources.hpp"
+ #include "recording.hpp"
+ 
+@@ -97,28 +100,28 @@ u16 wgpu_aniso(GXAnisotropy aniso) {
+ }
+ } // namespace
+ 
+-TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 format, ArrayRef<uint8_t> data,
+-                                    bool tlut, const char* label) noexcept {
+-  ZoneScoped;
++TexLoadTiming g_texLoadTiming;
+ 
+-  auto handle = new_dynamic_texture_2d(width, height, mips, format, label);
+-  auto& ref = *handle;
++bool tex_log_enabled() noexcept {
++  static const bool s_enabled = [] {
++    const char* e = std::getenv("AURORA_TEX_LOG");
++    return e != nullptr && *e != '\0' && std::strcmp(e, "0") != 0;
++  }();
++  return s_enabled;
++}
+ 
+-  ConvertedTexture converted;
+-  if (ref.gxFormat != InvalidTextureFormat) {
+-    if (tlut) {
+-      CHECK(ref.size.height == 1, "new_static_texture_2d[{}]: expected tlut height 1, got {}", label, ref.size.height);
+-      CHECK(ref.mipCount == 1, "new_static_texture_2d[{}]: expected tlut mipCount 1, got {}", label, ref.mipCount);
+-      converted = convert_tlut(ref.gxFormat, ref.size.width, data);
+-    } else {
+-      converted = convert_texture(ref.gxFormat, ref.size.width, ref.size.height, ref.mipCount, data);
+-    }
+-    if (!converted.data.empty()) {
+-      data = converted.data;
+-      ref.hasArbitraryMips = converted.hasArbitraryMips;
+-    }
+-  }
++uint64_t tex_log_now_ns() noexcept {
++  return static_cast<uint64_t>(
++      std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
++          .count());
++}
+ 
++static TextureHandle create_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
++                                       wgpu::TextureFormat wgpuFormat, const char* label) noexcept;
++
++// smstrikers-port: the upload half of new_static_texture_2d, shared with new_static_texture_2d_converted.
++static void queue_static_texture_upload(TextureRef& ref, uint32_t mips, ArrayRef<uint8_t> data, const char* label,
++                                        bool timing, uint64_t t0) noexcept {
+   uint32_t offset = 0;
+   for (uint32_t mip = 0; mip < mips; ++mip) {
+     const wgpu::Extent3D mipSize{
+@@ -152,13 +155,80 @@ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mi
+   if (data.size() != UINT32_MAX && offset < data.size()) {
+     Log.warn("new_static_texture_2d[{}]: texture used {} bytes, but given {} bytes", label, offset, data.size());
+   }
++  if (timing) {
++    g_texLoadTiming.queueNs += tex_log_now_ns() - t0;
++    ++g_texLoadTiming.textures;
++    g_texLoadTiming.bytes += offset;
++  }
++}
++
++TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 format, ArrayRef<uint8_t> data,
++                                    bool tlut, const char* label) noexcept {
++  ZoneScoped;
++
++  const bool timing = tex_log_enabled();
++  uint64_t t0 = timing ? tex_log_now_ns() : 0;
++  ConvertedTexture converted{};
++  if (format != InvalidTextureFormat) {
++    if (tlut) {
++      CHECK(height == 1, "new_static_texture_2d[{}]: expected tlut height 1, got {}", label, height);
++      CHECK(mips == 1, "new_static_texture_2d[{}]: expected tlut mipCount 1, got {}", label, mips);
++      converted = convert_tlut(format, width, data);
++    } else {
++      converted = convert_texture(format, width, height, mips, data);
++    }
++    if (!converted.data.empty()) {
++      data = converted.data;
++    }
++  }
++  if (timing) {
++    const uint64_t t = tex_log_now_ns();
++    g_texLoadTiming.convertNs += t - t0;
++    t0 = t;
++  }
++
++  const auto wgpuFormat = converted.format != wgpu::TextureFormat::Undefined ? converted.format : to_wgpu(format);
++  auto handle = create_texture_2d(width, height, mips, format, wgpuFormat, label);
++  auto& ref = *handle;
++  ref.hasArbitraryMips = converted.hasArbitraryMips;
++  if (timing) {
++    const uint64_t t = tex_log_now_ns();
++    g_texLoadTiming.createNs += t - t0;
++    t0 = t;
++  }
++
++  queue_static_texture_upload(ref, mips, data, label, timing, t0);
++  return handle;
++}
++
++TextureHandle new_static_texture_2d_converted(uint32_t width, uint32_t height, uint32_t mips, u32 format,
++                                              wgpu::TextureFormat wgpuFormat, ArrayRef<uint8_t> converted,
++                                              bool hasArbitraryMips, const char* label) noexcept {
++  ZoneScoped;
++  const bool timing = tex_log_enabled();
++  uint64_t t0 = timing ? tex_log_now_ns() : 0;
++  auto handle = create_texture_2d(width, height, mips, format, wgpuFormat, label);
++  auto& ref = *handle;
++  ref.hasArbitraryMips = hasArbitraryMips;
++  if (timing) {
++    const uint64_t t = tex_log_now_ns();
++    g_texLoadTiming.createNs += t - t0;
++    t0 = t;
++    ++g_texLoadTiming.preconverted;
++  }
++  queue_static_texture_upload(ref, mips, converted, label, timing, t0);
+   return handle;
+ }
+ 
+ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
+                                      const char* label) noexcept {
+   ZoneScopedS(3);
+-  const auto wgpuFormat = to_wgpu(gxFormat);
++  return create_texture_2d(width, height, mips, gxFormat, to_wgpu(gxFormat), label);
++}
++
++// smstrikers-port: takes the GPU format, since CMPR content decides between BC1 and RGBA8.
++static TextureHandle create_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
++                                       wgpu::TextureFormat wgpuFormat, const char* label) noexcept {
+   const wgpu::Extent3D size{
+       .width = width,
+       .height = height,
+@@ -256,10 +326,10 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
+                                       std::move(attachmentTextureView), size, wgpuFormat, 1, gxFormat);
+ }
+ 
+-void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept {
++bool write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept {
+   ZoneScoped;
+ 
+-  ConvertedTexture converted;
++  ConvertedTexture converted{};
+   if (ref.gxFormat != InvalidTextureFormat) {
+     converted = convert_texture(ref.gxFormat, ref.size.width, ref.size.height, ref.mipCount, data);
+     ref.hasArbitraryMips = converted.hasArbitraryMips;
+@@ -288,7 +358,10 @@ void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept {
+         .mipLevel = mip,
+     };
+     if constexpr (UseTextureBuffer) {
+-      queue_texture_upload_data(data.data() + offset, bytesPerRow, heightBlocks, std::move(dstView), physicalSize);
++      if (!queue_texture_upload_data(data.data() + offset, bytesPerRow, heightBlocks, std::move(dstView),
++                                     physicalSize)) {
++        return false;
++      }
+     } else {
+       const wgpu::TexelCopyBufferLayout dataLayout{
+           .bytesPerRow = bytesPerRow,
+@@ -301,6 +374,7 @@ void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept {
+   if (data.size() != UINT32_MAX && offset < data.size()) {
+     Log.warn("write_texture: texture used {} bytes, but given {} bytes", offset, data.size());
+   }
++  return true;
+ }
+ 
+ wgpu::SamplerDescriptor TextureBind::get_descriptor() const noexcept {
+diff --git a/lib/gfx/texture.hpp b/lib/gfx/texture.hpp
+index 7485f82..12fafba 100644
+--- a/lib/gfx/texture.hpp
++++ b/lib/gfx/texture.hpp
+@@ -18,8 +18,24 @@ struct TextureUpload {
+                 wgpu::Buffer buffer) noexcept
+   : layout(layout), tex(std::move(tex)), size(size), buffer(std::move(buffer)) {}
+ };
++// smstrikers-port: per-frame texture load timing, filled only when AURORA_TEX_LOG is set.
++struct TexLoadTiming {
++  uint64_t convertNs = 0;
++  uint64_t createNs = 0;
++  uint64_t queueNs = 0;
++  uint64_t hashNs = 0;
++  uint64_t paletteNs = 0;
++  uint64_t textures = 0;
++  uint64_t bytes = 0;
++  uint64_t preconverted = 0;   // converted ahead on the pre-conversion thread
++};
++extern TexLoadTiming g_texLoadTiming;
++bool tex_log_enabled() noexcept;
++uint64_t tex_log_now_ns() noexcept;
++
+ void queue_texture_upload(TextureUpload upload);
+-void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32_t rowsPerImage,
++// smstrikers-port: false when there was no memory to stage it; nothing is queued then.
++bool queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32_t rowsPerImage,
+                                wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size);
+ 
+ struct TextureFormatInfo {
+@@ -57,11 +73,17 @@ struct TextureRef {
+ 
+ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
+                                     ArrayRef<uint8_t> data, bool tlut, const char* label) noexcept;
++// smstrikers-port: new_static_texture_2d for data convert_texture already produced from this exact texture.
++TextureHandle new_static_texture_2d_converted(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
++                                              wgpu::TextureFormat wgpuFormat, ArrayRef<uint8_t> converted,
++                                              bool hasArbitraryMips,
++                                              const char* label) noexcept;
+ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
+                                      const char* label) noexcept;
+ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept;
+ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept;
+-void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept;
++// smstrikers-port: false when a level could not be staged for upload.
++bool write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept;
+ }; // namespace aurora::gfx
+ 
+ struct GXTexObj_ {
 diff --git a/lib/gfx/texture_convert.cpp b/lib/gfx/texture_convert.cpp
-index b2f791b..915b382 100644
+index b2f791b..0f095b9 100644
 --- a/lib/gfx/texture_convert.cpp
 +++ b/lib/gfx/texture_convert.cpp
 @@ -1,5 +1,7 @@
@@ -802,7 +1713,104 @@ index b2f791b..915b382 100644
  bool arb_mip_check(uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data) {
    if (mips < 2) {
      return false;
-@@ -572,6 +568,34 @@ static ByteBuffer BuildRGBA8FromBC1(uint32_t width, uint32_t height, uint32_t mi
+@@ -498,6 +494,96 @@ static ByteBuffer BuildRGBA8FromCMPR(uint32_t width, uint32_t height, uint32_t m
+   return buf;
+ }
+ 
++// smstrikers-port: re-tile CMPR's big-endian blocks as little-endian BC1 and reverse each row's indices.
++static ByteBuffer BuildBC1FromCMPR(uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data) {
++  size_t total = 0;
++  for (uint32_t mip = 0, w = width, h = height; mip < mips; ++mip) {
++    total += static_cast<size_t>((w + 3) / 4) * ((h + 3) / 4) * 8;
++    if (w > 1) {
++      w /= 2;
++    }
++    if (h > 1) {
++      h /= 2;
++    }
++  }
++  ByteBuffer buf{total};
++
++  uint8_t* dst = buf.data();
++  const uint8_t* src = data.data();
++  uint32_t w = width;
++  uint32_t h = height;
++  for (uint32_t mip = 0; mip < mips; ++mip) {
++    // Source tiles are always whole, so mips under 8 texels carry blocks BC1 skips.
++    const uint32_t tilesW = (w + 7) / 8;
++    const uint32_t tilesH = (h + 7) / 8;
++    const uint32_t blocksW = (w + 3) / 4;
++    const uint32_t blocksH = (h + 3) / 4;
++    CHECK(static_cast<size_t>(src - data.data()) + static_cast<size_t>(tilesW) * tilesH * 32 <= data.size(),
++          "BuildBC1FromCMPR: expected {} bytes, got {}",
++          static_cast<size_t>(src - data.data()) + static_cast<size_t>(tilesW) * tilesH * 32, data.size());
++    for (uint32_t by = 0; by < blocksH; ++by) {
++      for (uint32_t bx = 0; bx < blocksW; ++bx) {
++        const uint8_t* s =
++            src + (static_cast<size_t>(by / 2) * tilesW + (bx / 2)) * 32 + ((by % 2) * 2 + (bx % 2)) * 8;
++        dst[0] = s[1];
++        dst[1] = s[0];
++        dst[2] = s[3];
++        dst[3] = s[2];
++        for (uint32_t y = 0; y < 4; ++y) {
++          const uint8_t bits = s[4 + y];
++          dst[4 + y] = static_cast<uint8_t>(((bits & 0x03) << 6) | ((bits & 0x0C) << 2) | ((bits & 0x30) >> 2) |
++                                            ((bits & 0xC0) >> 6));
++        }
++        dst += 8;
++      }
++    }
++    src += static_cast<size_t>(tilesW) * tilesH * 32;
++    if (w > 1) {
++      w /= 2;
++    }
++    if (h > 1) {
++      h /= 2;
++    }
++  }
++
++  return buf;
++}
++
++// smstrikers-port: true only without transparent texels, which GX keeps coloured and BC1 makes black.
++bool cmpr_uses_bc1(uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data) noexcept {
++  if (!webgpu::g_cmprAsBc1) {
++    return false;
++  }
++  // smstrikers-port: WebGPU needs a BC texture's mip 0 in whole blocks.
++  if (width % 4 != 0 || height % 4 != 0) {
++    return false;
++  }
++  size_t blocks = 0;
++  for (uint32_t mip = 0, w = width, h = height; mip < mips; ++mip) {
++    blocks += static_cast<size_t>((w + 7) / 8) * ((h + 7) / 8) * 4;
++    w = w > 1 ? w / 2 : 1;
++    h = h > 1 ? h / 2 : 1;
++  }
++  if (blocks * 8 > data.size()) {
++    return false;
++  }
++  const uint8_t* s = data.data();
++  for (size_t b = 0; b < blocks; ++b, s += 8) {
++    const uint16_t color0 = static_cast<uint16_t>((s[0] << 8) | s[1]);
++    const uint16_t color1 = static_cast<uint16_t>((s[2] << 8) | s[3]);
++    if (color0 > color1) {
++      continue;
++    }
++    for (uint32_t y = 0; y < 4; ++y) {
++      const uint8_t bits = s[4 + y];
++      if ((bits & 0x03) == 0x03 || (bits & 0x0C) == 0x0C || (bits & 0x30) == 0x30 || (bits & 0xC0) == 0xC0) {
++        return false;
++      }
++    }
++  }
++  return true;
++}
++
+ static ByteBuffer BuildRGBA8FromBC1(uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data) {
+   const size_t texelCount = ComputeMippedTexelCount(width, height, mips);
+   ByteBuffer buf{sizeof(RGBA8) * texelCount};
+@@ -572,9 +658,39 @@ static ByteBuffer BuildRGBA8FromBC1(uint32_t width, uint32_t height, uint32_t mi
    return buf;
  }
  
@@ -837,8 +1845,32 @@ index b2f791b..915b382 100644
  ConvertedTexture convert_texture(u32 format, uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data) {
    ZoneScoped;
    ByteBuffer converted;
-@@ -638,6 +662,12 @@ ConvertedTexture convert_texture(u32 format, uint32_t width, uint32_t height, ui
-   if (!is_pc_texture_format(format) && wgpuFormat == wgpu::TextureFormat::RGBA8Unorm && mips > 1) {
++  bool cmprArbMips = false;
++  bool cmprBc1 = false;
+   switch (format) {
+     DEFAULT_FATAL("convert_texture: unknown texture format {}", format);
+   case GX_TF_R8_PC:
+@@ -630,16 +746,31 @@ ConvertedTexture convert_texture(u32 format, uint32_t width, uint32_t height, ui
+     converted = BuildRGBA8FromGCN(width, height, mips, data);
+     break;
+   case GX_TF_CMPR:
++    if (cmpr_uses_bc1(width, height, mips, data)) {
++      // smstrikers-port: arb_mip_check reads RGBA8, so decode once for it.
++      if (mips > 1) {
++        cmprArbMips = arb_mip_check(width, height, mips, BuildRGBA8FromCMPR(width, height, mips, data));
++      }
++      converted = BuildBC1FromCMPR(width, height, mips, data);
++      cmprBc1 = true;
++      break;
++    }
+     converted = BuildRGBA8FromCMPR(width, height, mips, data);
+     break;
+   }
+   const auto wgpuFormat = to_wgpu(format);
+-  bool hasArbitraryMips = false;
+-  if (!is_pc_texture_format(format) && wgpuFormat == wgpu::TextureFormat::RGBA8Unorm && mips > 1) {
++  bool hasArbitraryMips = cmprArbMips;
++  if (!cmprBc1 && !is_pc_texture_format(format) && wgpuFormat == wgpu::TextureFormat::RGBA8Unorm && mips > 1) {
      hasArbitraryMips = arb_mip_check(width, height, mips, converted);
    }
 +  // Tallied unconditionally, for the same reason as the pool peaks: the debug overlay reads this every frame.
@@ -848,21 +1880,952 @@ index b2f791b..915b382 100644
 +    g_texTally[format].dstBytes.fetch_add(converted.size());
 +  }
    return {
-       .format = wgpuFormat,
+-      .format = wgpuFormat,
++      .format = cmprBc1 ? wgpu::TextureFormat::BC1RGBAUnorm : wgpuFormat,
        .width = width,
+       .height = height,
+       .mips = mips,
+@@ -729,4 +860,53 @@ ConvertedTexture convert_texture_palette(u32 textureFormat, uint32_t width, uint
+       .hasArbitraryMips = hasArbitraryMips,
+   };
+ }
++
++ByteBuffer decode_rgba8(u32 format, uint32_t width, uint32_t height, ArrayRef<uint8_t> data, GXTlutFmt tlutFormat,
++                        uint16_t tlutEntries, ArrayRef<uint8_t> tlutData) {
++  ByteBuffer indices;
++  switch (format) {
++  default:
++    return {};
++  case GX_TF_I4:
++    return DecodeTiled<TextureDecoderI4>(width, height, 1, data);
++  case GX_TF_I8:
++    return DecodeTiled<TextureDecoderI8>(width, height, 1, data);
++  case GX_TF_IA4:
++    return DecodeTiled<TextureDecoderIA4>(width, height, 1, data);
++  case GX_TF_IA8:
++    return DecodeTiled<TextureDecoderIA8>(width, height, 1, data);
++  case GX_TF_RGB565:
++    return DecodeTiled<TextureDecoderRGB565>(width, height, 1, data);
++  case GX_TF_RGB5A3:
++    return DecodeTiled<TextureDecoderRGB5A3>(width, height, 1, data);
++  case GX_TF_RGBA8:
++    return BuildRGBA8FromGCN(width, height, 1, data);
++  case GX_TF_CMPR:
++    return BuildRGBA8FromCMPR(width, height, 1, data);
++  case GX_TF_C4:
++    indices = DecodeTiled<TextureDecoderC4>(width, height, 1, data);
++    break;
++  case GX_TF_C8:
++    indices = DecodeTiled<TextureDecoderC8>(width, height, 1, data);
++    break;
++  case GX_TF_C14X2:
++    indices = DecodeTiled<TextureDecoderC14X2>(width, height, 1, data);
++    break;
++  }
++
++  const auto palette = convert_tlut(tlut_texture_format(tlutFormat), tlutEntries, tlutData);
++  if (indices.empty() || palette.data.empty()) {
++    return {};
++  }
++  const size_t pixelCount = static_cast<size_t>(width) * height;
++  const auto* indexData = reinterpret_cast<const u16*>(indices.data());
++  ByteBuffer pixels;
++  pixels.reserve_extra(pixelCount * 4);
++  for (size_t i = 0; i < pixelCount; ++i) {
++    const u32 index = indexData[i];
++    constexpr uint8_t transparent[4] = {0, 0, 0, 0};
++    pixels.append(index < tlutEntries ? palette.data.data() + static_cast<size_t>(index) * 4 : transparent, 4);
++  }
++  return pixels;
++}
+ } // namespace aurora::gfx
+diff --git a/lib/gfx/texture_convert.hpp b/lib/gfx/texture_convert.hpp
+index c5f6c00..aae7371 100644
+--- a/lib/gfx/texture_convert.hpp
++++ b/lib/gfx/texture_convert.hpp
+@@ -39,6 +39,9 @@ inline wgpu::TextureFormat to_wgpu(u32 gxFormat) noexcept {
+   }
+ }
+ 
++// smstrikers-port: true if this CMPR texture uploads as BC1 instead of RGBA8.
++bool cmpr_uses_bc1(uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data) noexcept;
++
+ struct ConvertedTexture {
+   wgpu::TextureFormat format;
+   uint32_t width;
+@@ -57,4 +60,7 @@ ConvertedTexture convert_texture_palette(u32 textureFormat, uint32_t width, uint
+                                          ArrayRef<uint8_t> tlutData);
+ ConvertedTexture convert_tlut(u32 format, uint32_t width, ArrayRef<uint8_t> data);
+ GXTexFmt tlut_texture_format(GXTlutFmt format) noexcept;
++// smstrikers-port: the base level as RGBA8 whatever it uploads as, for texture dumps; not counted in the texture stats.
++ByteBuffer decode_rgba8(u32 format, uint32_t width, uint32_t height, ArrayRef<uint8_t> data, GXTlutFmt tlutFormat,
++                        uint16_t tlutEntries, ArrayRef<uint8_t> tlutData);
+ } // namespace aurora::gfx
+diff --git a/lib/gfx/texture_replacement.cpp b/lib/gfx/texture_replacement.cpp
+index 03dda46..c2ba2da 100644
+--- a/lib/gfx/texture_replacement.cpp
++++ b/lib/gfx/texture_replacement.cpp
+@@ -10,6 +10,7 @@
+ #include "png_io.hpp"
+ #include "texture_convert.hpp"
+ 
++#include <aurora/replacement.h>
+ #include <aurora/texture.hpp>
+ #include <fmt/format.h>
+ #include <tracy/Tracy.hpp>
+@@ -20,12 +21,14 @@
+ 
+ #include <algorithm>
+ #include <array>
++#include <atomic>
+ #include <charconv>
+ #include <chrono>
+ #include <condition_variable>
+ #include <cstring>
+ #include <deque>
+ #include <filesystem>
++#include <fstream>
+ #include <list>
+ #include <memory>
+ #include <mutex>
+@@ -42,7 +45,12 @@ namespace aurora::texture {
+ namespace {
+ constexpr Module Log{"aurora::texture"};
+ 
+-constexpr uint64_t kReplacementCacheBudgetBytes = 4294967296; // 4GB
++// smstrikers-port: set_replacement_cache_budget changes it.
++uint64_t s_replacementCacheBudgetBytes = 4294967296; // 4GB
++// smstrikers-port: a replacement drawn this recently is on screen and is never evicted.
++constexpr uint64_t kInUseFrames = 60;
++// smstrikers-port: how long a replacement the budget turned away keeps its original texture.
++constexpr uint64_t kDeniedFrames = 600;
+ constexpr uint64_t kReplacementWildcardTextureHash = kWildcardTextureHash;
+ constexpr uint64_t kReplacementWildcardTlutHash = kWildcardTlutHash;
+ 
+@@ -76,6 +84,8 @@ struct ReplacementEntry {
+   std::shared_ptr<VirtualReadState> virtualReadState;
+   std::optional<gfx::ConvertedTexture> thumbnail;
+   bool thumbnailIncludesBase = false;
++  // smstrikers-port: its size once loaded, so one that cannot fit the budget is not loaded again until it can.
++  uint64_t loadedBytes = 0;
+ };
+ 
+ enum class Tier {
+@@ -89,6 +99,8 @@ struct SelectedCache {
+   uint64_t bytes = 0;
+   std::list<ReplacementKey>::iterator lruIt;
+   Tier tier = Tier::Full;
++  // smstrikers-port: false for one loaded ahead that nothing has drawn yet.
++  bool drawn = true;
+ };
+ 
+ struct EntryLoadSnapshot {
+@@ -138,6 +150,8 @@ absl::flat_hash_set<uint64_t> s_failedIds;
+ absl::flat_hash_set<TextureSourceKey, SourceKeyHash> s_reportedMisses;
+ std::list<ReplacementKey> s_replacementLru;
+ uint64_t s_replacementCacheBytes = 0;
++absl::flat_hash_map<uint64_t, uint64_t> s_deniedUntilFrame;
++bool s_warnedOverBudget = false;
+ uint64_t s_nextRegistrationId = 1;
+ uint64_t s_nextSequence = 1;
+ uint32_t s_sourceEntryCount = 0;
+@@ -153,7 +167,15 @@ std::unordered_set<uint64_t> s_pendingThumbnailLoads;
+ std::vector<thread::Thread> s_workers;
+ uint64_t s_requestSequence = 0;
+ bool s_workersPaused = false;
++// smstrikers-port: counts pool stops, so a thread waiting on a job knows its worker is gone.
++uint64_t s_workerStops = 0;
++// smstrikers-port: full loads awaiting upload; strict budget pauses workers at two each, or long frames pile them up.
++uint32_t s_undeliveredFull = 0;
+ uint32_t s_workerCountOverride = 0;
++// smstrikers-port: set_replacement_wait changes it.
++std::atomic<bool> s_waitForReplacements = false;
++// smstrikers-port: set_replacement_strict_budget changes it.
++std::atomic<bool> s_strictBudget = false;
+ 
+ const ReplacementEntry* find_selected_entry_locked(const ReplacementKey& key) noexcept;
+ ReplacementEntry* find_entry_locked(const ReplacementKey& key, uint64_t id) noexcept;
+@@ -463,12 +485,91 @@ bool remove_mipmaps(gfx::ConvertedTexture& texture) noexcept {
+   }
+ 
+   ByteBuffer data{size};
++  if (data.data() == nullptr) {
++    return false;
++  }
+   std::memcpy(data.data(), texture.data.data(), size);
+   texture.mips = 1;
+   texture.data = std::move(data);
+   return true;
+ }
+ 
++// smstrikers-port: Dolphin names a dump `tex1_<w>x<h>_m_...` when the game gave the texture mipmaps.
++bool names_mipmapped_texture(std::string_view path) noexcept {
++  const size_t slash = path.find_last_of("/\\");
++  const std::string_view name = slash == std::string_view::npos ? path : path.substr(slash + 1);
++  constexpr std::string_view prefix = "tex1_";
++  if (!name.starts_with(prefix)) {
++    return false;
++  }
++  const size_t dims = name.find('_', prefix.size());
++  return dims != std::string_view::npos && name.substr(dims + 1).starts_with("m_");
++}
++
++// smstrikers-port: box-filtered mips for a pack that left them out, colour weighted by alpha to keep cut-outs clean.
++std::optional<gfx::ConvertedTexture> generate_mipmaps(const gfx::ConvertedTexture& base) noexcept {
++  if (base.format != wgpu::TextureFormat::RGBA8Unorm || base.mips != 1 || base.width == 0 || base.height == 0 ||
++      base.data.size() < static_cast<uint64_t>(base.width) * base.height * 4) {
++    return std::nullopt;
++  }
++  uint32_t mips = 1;
++  for (uint32_t w = base.width, h = base.height; w > 1 || h > 1; ++mips) {
++    w = std::max(w >> 1, 1u);
++    h = std::max(h >> 1, 1u);
++  }
++  const uint64_t n = gfx::calc_texture_size(base.format, base.width, base.height, mips);
++  if (n == 0) {
++    return std::nullopt;
++  }
++
++  ByteBuffer blob{n};
++  if (blob.data() == nullptr) {
++    return std::nullopt;
++  }
++  const uint64_t baseSize = static_cast<uint64_t>(base.width) * base.height * 4;
++  std::memcpy(blob.data(), base.data.data(), baseSize);
++  const uint8_t* src = blob.data();
++  uint8_t* dst = blob.data() + baseSize;
++  for (uint32_t mip = 1, sw = base.width, sh = base.height; mip < mips; ++mip) {
++    const uint32_t dw = std::max(sw >> 1, 1u);
++    const uint32_t dh = std::max(sh >> 1, 1u);
++    for (uint32_t y = 0; y < dh; ++y) {
++      const uint8_t* row0 = src + static_cast<size_t>(std::min(2 * y, sh - 1)) * sw * 4;
++      const uint8_t* row1 = src + static_cast<size_t>(std::min(2 * y + 1, sh - 1)) * sw * 4;
++      for (uint32_t x = 0; x < dw; ++x) {
++        const size_t x0 = static_cast<size_t>(std::min(2 * x, sw - 1)) * 4;
++        const size_t x1 = static_cast<size_t>(std::min(2 * x + 1, sw - 1)) * 4;
++        const uint8_t* t[4] = {row0 + x0, row0 + x1, row1 + x0, row1 + x1};
++        const uint32_t alpha = t[0][3] + t[1][3] + t[2][3] + t[3][3];
++        uint8_t* out = dst + (static_cast<size_t>(y) * dw + x) * 4;
++        for (int c = 0; c < 3; ++c) {
++          if (alpha != 0) {
++            const uint32_t sum = t[0][c] * t[0][3] + t[1][c] * t[1][3] + t[2][c] * t[2][3] + t[3][c] * t[3][3];
++            out[c] = static_cast<uint8_t>((sum + alpha / 2) / alpha);
++          } else {
++            out[c] = static_cast<uint8_t>((t[0][c] + t[1][c] + t[2][c] + t[3][c] + 2) / 4);
++          }
++        }
++        out[3] = static_cast<uint8_t>((alpha + 2) / 4);
++      }
++    }
++    src = dst;
++    dst += static_cast<size_t>(dw) * dh * 4;
++    sw = dw;
++    sh = dh;
++  }
++  if (static_cast<uint64_t>(dst - blob.data()) != n) {
++    return std::nullopt;
++  }
++  return gfx::ConvertedTexture{
++      .format = base.format,
++      .width = base.width,
++      .height = base.height,
++      .mips = mips,
++      .data = std::move(blob),
++  };
++}
++
+ constexpr bool is_unsupported_texture_format(wgpu::TextureFormat format) {
+   switch (format) {
+   case wgpu::TextureFormat::BC1RGBAUnorm:
+@@ -676,6 +777,12 @@ std::optional<gfx::ConvertedTexture> load_encoded_replacement(Source&& src) noex
+   }
+ 
+   if (more.empty()) {
++    // smstrikers-port: without its mipmaps a texture the game mipmapped shimmers in the distance.
++    if (names_mipmapped_texture(src.name())) {
++      if (auto chained = generate_mipmaps(*base)) {
++        return chained;
++      }
++    }
+     return base;
+   }
+ 
+@@ -687,6 +794,9 @@ std::optional<gfx::ConvertedTexture> load_encoded_replacement(Source&& src) noex
+ 
+   ByteBuffer blob{n};
+   uint8_t* const dst = blob.data();
++  if (dst == nullptr) {
++    return std::nullopt;
++  }
+   uint64_t o = 0;
+   const auto append = [&](const ByteBuffer& d) noexcept -> bool {
+     if (o + d.size() > n) {
+@@ -769,18 +879,20 @@ std::optional<gfx::dds::MipTail> load_thumbnail(const EntryLoadSnapshot& entry)
+ 
+ void worker_main(std::stop_token token) {
+   std::stop_callback notifyOnStop{token, [] { s_jobCv.notify_all(); }};
++  const auto canTakeFull = [] {
++    return !s_highPriorityJobs.empty() && (!s_strictBudget || s_undeliveredFull < 2 * s_workers.size());
++  };
+   while (true) {
+     LoadJob job;
+     {
+       std::unique_lock lock{s_jobMutex};
+       s_jobCv.wait(lock, [&] {
+-        return token.stop_requested() ||
+-               (!s_workersPaused && (!s_highPriorityJobs.empty() || !s_lowPriorityJobs.empty()));
++        return token.stop_requested() || (!s_workersPaused && (canTakeFull() || !s_lowPriorityJobs.empty()));
+       });
+       if (token.stop_requested()) {
+         return;
+       }
+-      if (!s_highPriorityJobs.empty()) {
++      if (canTakeFull()) {
+         job = std::move(s_highPriorityJobs.front());
+         s_highPriorityJobs.pop_front();
+       } else {
+@@ -818,6 +930,8 @@ void worker_main(std::stop_token token) {
+       if (!token.stop_requested()) {
+         if (job.tier == Tier::Thumbnail) {
+           s_pendingThumbnailLoads.erase(job.entry.id);
++        } else {
++          ++s_undeliveredFull;
+         }
+         s_workerCompletions.push_back({
+             .tier = job.tier,
+@@ -860,6 +974,7 @@ void stop_worker_pool() {
+     std::lock_guard lock{s_jobMutex};
+     s_highPriorityJobs.clear();
+     s_lowPriorityJobs.clear();
++    ++s_workerStops;
+   }
+   for (auto& worker : s_workers) {
+     worker.request_stop();
+@@ -874,6 +989,7 @@ void stop_worker_pool() {
+     std::lock_guard lock{s_jobMutex};
+     s_workers.clear();
+     s_workerCompletions.clear();
++    s_undeliveredFull = 0;
+     s_pendingFullLoads.clear();
+     s_pendingThumbnailLoads.clear();
+     s_requestSequence = 0;
+@@ -915,8 +1031,12 @@ void queue_thumbnail_load(const EntryLoadSnapshot& entry) {
+ }
+ 
+ void finish_full_load(uint64_t id) {
+-  std::lock_guard lock{s_jobMutex};
+-  s_pendingFullLoads.erase(id);
++  {
++    std::lock_guard lock{s_jobMutex};
++    s_pendingFullLoads.erase(id);
++    s_undeliveredFull -= std::min(s_undeliveredFull, 1u);
++  }
++  s_jobCv.notify_all();
+ }
+ 
+ uint64_t pending_full_load_count() {
+@@ -924,6 +1044,52 @@ uint64_t pending_full_load_count() {
+   return s_pendingFullLoads.size();
+ }
+ 
++// smstrikers-port: FIFO thread. The full texture now: a queued job is taken over, one a worker holds is waited for.
++std::optional<gfx::ConvertedTexture> take_full_load(const EntryLoadSnapshot& entry) noexcept {
++  const auto sameId = [&](const auto& item) { return item.entry.id == entry.id; };
++  {
++    std::unique_lock lock{s_jobMutex};
++    if (const auto ready = std::find_if(s_readyPublishes.begin(), s_readyPublishes.end(), sameId);
++        ready != s_readyPublishes.end()) {
++      auto texture = std::move(ready->texture);
++      s_readyPublishes.erase(ready);
++      s_pendingFullLoads.erase(entry.id);
++      s_undeliveredFull -= std::min(s_undeliveredFull, 1u);
++      lock.unlock();
++      s_jobCv.notify_all();
++      return texture;
++    }
++    if (const auto queued = std::find_if(s_highPriorityJobs.begin(), s_highPriorityJobs.end(), sameId);
++        queued != s_highPriorityJobs.end()) {
++      s_highPriorityJobs.erase(queued);
++      s_pendingFullLoads.erase(entry.id);
++    } else if (s_pendingFullLoads.contains(entry.id)) {
++      const uint64_t stops = s_workerStops;
++      const auto done = [&] {
++        return std::find_if(s_workerCompletions.begin(), s_workerCompletions.end(), [&](const LoadCompletion& c) {
++          return c.tier == Tier::Full && c.entry.id == entry.id;
++        });
++      };
++      s_jobCv.wait(lock, [&] { return s_workerStops != stops || done() != s_workerCompletions.end(); });
++      const auto it = done();
++      if (it == s_workerCompletions.end()) {
++        return std::nullopt;
++      }
++      auto texture = std::move(it->texture);
++      s_workerCompletions.erase(it);
++      s_pendingFullLoads.erase(entry.id);
++      s_undeliveredFull -= std::min(s_undeliveredFull, 1u);
++      lock.unlock();
++      s_jobCv.notify_all();
++      return texture;
++    }
++  }
++  if (entry.kind == EntryKind::File) {
++    return load_file_replacement(entry);
++  }
++  return entry.kind == EntryKind::Virtual ? load_virtual_replacement(entry) : std::nullopt;
++}
++
+ uint64_t converted_upload_bytes(const gfx::ConvertedTexture& texture) noexcept {
+   const auto info = gfx::format_info(texture.format);
+   uint64_t total = 0;
+@@ -975,7 +1141,17 @@ gfx::TextureHandle create_converted_texture_handle(const EntryLoadSnapshot& entr
+       .mipLevelCount = replacement.mips,
+       .sampleCount = 1,
+   };
++#if defined(__SWITCH__)
++  // smstrikers-port: a replacement the GPU has no memory for keeps its original instead of ending the game.
++  webgpu::g_device.PushErrorScope(wgpu::ErrorFilter::OutOfMemory);
++#endif
+   auto texture = webgpu::g_device.CreateTexture(&textureDescriptor);
++#if defined(__SWITCH__)
++  if (webgpu::pop_out_of_memory_scope()) {
++    Log.warn("texture_replacement: no memory for {}x{} {}", replacement.width, replacement.height, label);
++    return {};
++  }
++#endif
+   const auto viewLabel = fmt::format("{} view", label);
+   const wgpu::TextureViewDescriptor textureViewDescriptor{
+       .label = viewLabel.c_str(),
+@@ -987,7 +1163,9 @@ gfx::TextureHandle create_converted_texture_handle(const EntryLoadSnapshot& entr
+   auto handle = std::make_shared<gfx::TextureRef>(std::move(texture), std::move(textureView), wgpu::TextureView{}, size,
+                                                   replacement.format, replacement.mips, gfx::InvalidTextureFormat);
+   handle->isReplacement = true;
+-  aurora::gfx::write_texture(*handle, replacement.data);
++  if (!aurora::gfx::write_texture(*handle, replacement.data)) {
++    return {};
++  }
+   return handle;
+ }
+ 
+@@ -1033,26 +1211,68 @@ void touch_cached_replacement(decltype(s_cacheByKey)::iterator it) noexcept {
+   }
+ }
+ 
+-void evict_replacement_cache_if_needed() noexcept {
+-  while (s_replacementCacheBytes > kReplacementCacheBudgetBytes && !s_replacementLru.empty()) {
+-    const auto key = s_replacementLru.back();
+-    const auto cache = s_cacheByKey.find(key);
+-    const uint64_t id = cache == s_cacheByKey.end() ? 0 : cache->second.id;
++// smstrikers-port: off screen, and with `drawnOnly`, drawn at least once, so one loaded ahead cannot evict another.
++bool evictable(const SelectedCache& cache, uint64_t now, bool drawnOnly) noexcept {
++  return (!drawnOnly || cache.drawn) && gx::texture::replacement_last_used_frame(cache.id) + kInUseFrames <= now;
++}
++
++// smstrikers-port: evicts only replacements off screen, oldest first, and says whether the cache fits.
++bool evict_replacement_cache_if_needed(const ReplacementKey* keep = nullptr, bool drawnOnly = false) noexcept {
++  const uint64_t now = gx::texture::current_frame();
++  std::vector<ReplacementKey> cold;
++  uint64_t freed = 0;
++  for (auto it = s_replacementLru.rbegin();
++       it != s_replacementLru.rend() && s_replacementCacheBytes - freed > s_replacementCacheBudgetBytes; ++it) {
++    const auto cache = s_cacheByKey.find(*it);
++    if ((keep != nullptr && *it == *keep) || cache == s_cacheByKey.end() ||
++        !evictable(cache->second, now, drawnOnly)) {
++      continue;
++    }
++    freed += cache->second.bytes;
++    cold.push_back(*it);
++  }
++  for (const auto& key : cold) {
++    const uint64_t id = s_cacheByKey.find(key)->second.id;
+     erase_cache_locked(key);
+-    if (id != 0) {
+-      gx::texture::invalidate_replacement(id);
+-      gx::texture::invalidate_bindings();
++    gx::texture::invalidate_replacement(id);
++  }
++  if (!cold.empty()) {
++    gx::texture::invalidate_bindings();
++  }
++  return s_replacementCacheBytes <= s_replacementCacheBudgetBytes;
++}
++
++// smstrikers-port: whether `bytes` more would fit after evicting every replacement `evictable` accepts.
++bool fits_after_eviction_locked(uint64_t bytes, bool drawnOnly = false) noexcept {
++  const uint64_t now = gx::texture::current_frame();
++  uint64_t total = s_replacementCacheBytes + bytes;
++  for (auto it = s_replacementLru.rbegin(); it != s_replacementLru.rend() && total > s_replacementCacheBudgetBytes;
++       ++it) {
++    const auto cache = s_cacheByKey.find(*it);
++    if (cache != s_cacheByKey.end() && evictable(cache->second, now, drawnOnly)) {
++      total -= cache->second.bytes;
+     }
+   }
++  return total <= s_replacementCacheBudgetBytes;
++}
++
++void note_bytes_locked(const ReplacementKey& key, uint64_t id, uint64_t bytes) noexcept {
++  if (auto* entry = find_entry_locked(key, id); entry != nullptr) {
++    entry->loadedBytes = bytes;
++  }
+ }
+ 
+-void cache_replacement_locked(const ReplacementKey& key, uint64_t id, gfx::TextureHandle handle, Tier tier) noexcept {
++bool cache_replacement_locked(const ReplacementKey& key, uint64_t id, gfx::TextureHandle handle, Tier tier,
++                              bool drawn = true) noexcept {
+   erase_cache_locked(key);
+   if (!handle) {
+-    return;
++    return false;
+   }
+   const uint64_t replacementBytes =
+       gfx::calc_texture_size(handle->format, handle->size.width, handle->size.height, handle->mipCount);
++  if (tier == Tier::Full) {
++    note_bytes_locked(key, id, replacementBytes);
++  }
+   s_replacementLru.push_front(key);
+   s_cacheByKey.emplace(key, SelectedCache{
+                                 .handle = std::move(handle),
+@@ -1060,9 +1280,21 @@ void cache_replacement_locked(const ReplacementKey& key, uint64_t id, gfx::Textu
+                                 .bytes = replacementBytes,
+                                 .lruIt = s_replacementLru.begin(),
+                                 .tier = tier,
++                                .drawn = drawn,
+                             });
+   s_replacementCacheBytes += replacementBytes;
+-  evict_replacement_cache_if_needed();
++  if (evict_replacement_cache_if_needed(&key, !drawn)) {
++    return true;
++  }
++  // smstrikers-port: everything else cached is on screen, so this one keeps its original for now.
++  erase_cache_locked(key);
++  s_deniedUntilFrame[id] = gx::texture::current_frame() + kDeniedFrames;
++  if (!s_warnedOverBudget) {
++    s_warnedOverBudget = true;
++    Log.warn("texture replacements on screen fill the {} MB budget; the rest keep their original textures",
++             s_replacementCacheBudgetBytes >> 20);
++  }
++  return false;
+ }
+ 
+ const ReplacementEntry* select_entry(const std::vector<ReplacementEntry>& entries) noexcept {
+@@ -1144,8 +1376,45 @@ gfx::TextureHandle load_entry_handle(const ReplacementKey& key, const Replacemen
+   return handle;
+ }
+ 
++// smstrikers-port: FIFO thread, with the registry lock held in `lk`; it is let go while the texture loads.
+ std::optional<gfx::texture_replacement::ReplacementResult>
+-find_replacement_for_key_locked(const ReplacementKey& key) noexcept {
++wait_for_replacement_locked(const ReplacementKey& key, const ReplacementEntry& entry,
++                            std::unique_lock<std::mutex>& lk) noexcept {
++  const uint64_t id = entry.id;
++  if (s_failedIds.contains(id)) {
++    return gfx::texture_replacement::ReplacementResult{.id = id};
++  }
++  const auto snapshot = snapshot_entry(key, entry);
++  lk.unlock();
++  auto texture = take_full_load(snapshot);
++  lk.lock();
++
++  const auto* selected = find_selected_entry_locked(key);
++  if (selected == nullptr || selected->id != id) {
++    return std::nullopt;
++  }
++  if (!texture.has_value()) {
++    s_failedIds.insert(id);
++    return gfx::texture_replacement::ReplacementResult{.id = id};
++  }
++  const uint64_t bytes = gfx::calc_texture_size(texture->format, texture->width, texture->height, texture->mips);
++  note_bytes_locked(key, id, bytes);
++  if (!fits_after_eviction_locked(bytes)) {
++    s_deniedUntilFrame[id] = gx::texture::current_frame() + kDeniedFrames;
++    return gfx::texture_replacement::ReplacementResult{.id = id};
++  }
++  auto handle = create_converted_texture_handle(snapshot, *texture);
++  if (!handle) {
++    s_deniedUntilFrame[id] = gx::texture::current_frame() + kDeniedFrames;
++  }
++  if (!cache_replacement_locked(key, id, handle, Tier::Full)) {
++    return gfx::texture_replacement::ReplacementResult{.id = id};
++  }
++  return gfx::texture_replacement::ReplacementResult{.handle = std::move(handle), .id = id};
++}
++
++std::optional<gfx::texture_replacement::ReplacementResult>
++find_replacement_for_key_locked(const ReplacementKey& key, std::unique_lock<std::mutex>& lk) noexcept {
+   const auto* entry = find_selected_entry_locked(key);
+   if (entry == nullptr) {
+     return std::nullopt;
+@@ -1153,13 +1422,29 @@ find_replacement_for_key_locked(const ReplacementKey& key) noexcept {
+ 
+   if (const auto cache = s_cacheByKey.find(key); cache != s_cacheByKey.end() && cache->second.id == entry->id) {
+     touch_cached_replacement(cache);
+-    if (cache->second.tier == Tier::Thumbnail && !s_failedIds.contains(entry->id)) {
++    cache->second.drawn = true;
++    if (cache->second.tier == Tier::Thumbnail && !s_failedIds.contains(entry->id) &&
++        (!s_strictBudget || entry->loadedBytes == 0 || fits_after_eviction_locked(entry->loadedBytes))) {
+       queue_full_load(snapshot_entry(key, *entry));
+     }
+     return gfx::texture_replacement::ReplacementResult{.handle = cache->second.handle, .id = entry->id};
+   }
+ 
+   erase_cache_locked(key);
++  if (const auto denied = s_deniedUntilFrame.find(entry->id); denied != s_deniedUntilFrame.end()) {
++    if (gx::texture::current_frame() < denied->second) {
++      return gfx::texture_replacement::ReplacementResult{.id = entry->id};
++    }
++    s_deniedUntilFrame.erase(denied);
++  }
++  // smstrikers-port: one known not to fit keeps its original without being loaded again.
++  if (s_strictBudget && entry->loadedBytes != 0 && !fits_after_eviction_locked(entry->loadedBytes)) {
++    s_deniedUntilFrame[entry->id] = gx::texture::current_frame() + kDeniedFrames;
++    return gfx::texture_replacement::ReplacementResult{.id = entry->id};
++  }
++  if (entry->kind != EntryKind::Raw && s_waitForReplacements) {
++    return wait_for_replacement_locked(key, *entry, lk);
++  }
+   if constexpr (gx::texture::AsyncTextureReplacements) {
+     // Raw entry data is borrowed, so they must take the synchronous path.
+     if (entry->kind != EntryKind::Raw) {
+@@ -1171,7 +1456,9 @@ find_replacement_for_key_locked(const ReplacementKey& key) noexcept {
+         const auto snapshot = snapshot_entry(key, *entry);
+         thumbnailHandle = create_converted_texture_handle(snapshot, *entry->thumbnail);
+         tier = entry->thumbnailIncludesBase ? Tier::Full : Tier::Thumbnail;
+-        cache_replacement_locked(key, entry->id, thumbnailHandle, tier);
++        if (!cache_replacement_locked(key, entry->id, thumbnailHandle, tier)) {
++          return gfx::texture_replacement::ReplacementResult{.id = entry->id};
++        }
+       }
+       if (tier != Tier::Full && !s_failedIds.contains(entry->id)) {
+         queue_full_load(snapshot_entry(key, *entry));
+@@ -1184,7 +1471,9 @@ find_replacement_for_key_locked(const ReplacementKey& key) noexcept {
+   if (!handle) {
+     return gfx::texture_replacement::ReplacementResult{.id = entry->id};
+   }
+-  cache_replacement_locked(key, entry->id, handle, Tier::Full);
++  if (!cache_replacement_locked(key, entry->id, handle, Tier::Full)) {
++    return gfx::texture_replacement::ReplacementResult{.id = entry->id};
++  }
+   return gfx::texture_replacement::ReplacementResult{.handle = std::move(handle), .id = entry->id};
+ }
+ 
+@@ -1345,6 +1634,7 @@ void clear_replacement_runtime_state_locked(std::vector<std::shared_ptr<VirtualR
+   s_reportedMisses.clear();
+   s_replacementLru.clear();
+   s_replacementCacheBytes = 0;
++  s_deniedUntilFrame.clear();
+   s_sourceEntryCount = 0;
+ }
+ 
+@@ -1375,6 +1665,26 @@ ReplacementRegistration register_file_replacement(TextureSourceKey key, std::fil
+   gx::clear_static_texture_cache();
+   return registration;
+ }
++
++// smstrikers-port: a replacement file's size once loaded, from a PNG's header or a DDS's file size; 0 if unreadable.
++uint64_t loaded_bytes_estimate(const std::filesystem::path& path) {
++  if (iequals_ascii(io::fs_path_to_string(path.extension()), ".dds")) {
++    std::error_code ec;
++    const auto size = std::filesystem::file_size(path, ec);
++    return ec ? 0 : size;
++  }
++  std::array<unsigned char, 24> header{};
++  std::ifstream file(path, std::ios::binary);
++  if (!file.read(reinterpret_cast<char*>(header.data()), header.size()) || header[1] != 'P' || header[12] != 'I') {
++    return 0;
++  }
++  const auto be32 = [&](size_t at) {
++    return uint32_t{header[at]} << 24 | uint32_t{header[at + 1]} << 16 | uint32_t{header[at + 2]} << 8 |
++           uint32_t{header[at + 3]};
++  };
++  const uint64_t base = uint64_t{be32(16)} * be32(20) * 4;
++  return names_mipmapped_texture(io::fs_path_to_string(path)) ? base + base / 3 : base;
++}
+ } // namespace
+ 
+ std::optional<TextureSourceKey> parse_replacement_filename(std::string_view filename) noexcept {
+@@ -1667,8 +1977,39 @@ ReplacementGroup load_replacement_directory(const std::filesystem::path& root, R
+ 
+   std::sort(candidates.begin(), candidates.end(), compare_replacement_candidates);
+ 
++  // smstrikers-port: under the strict budget a pack, `root` or each folder in it, is left out whole if over budget.
++  const auto packOf = [&](const ReplacementCandidate& c) {
++    return !options.onePack && c.components.size() > 1 ? c.components.front() : std::string{};
++  };
++  absl::flat_hash_set<std::string> rejectedPacks;
++  if (s_strictBudget) {
++    uint64_t limit = 0;
++    {
++      std::lock_guard lk(s_registryMutex);
++      limit = s_replacementCacheBudgetBytes;
++    }
++    absl::flat_hash_map<std::string, uint64_t> packBytes;
++    for (const auto& candidate : candidates) {
++      auto& bytes = packBytes[packOf(candidate)];
++      if (bytes <= limit) {
++        bytes += loaded_bytes_estimate(candidate.path);
++      }
++    }
++    for (const auto& [pack, bytes] : packBytes) {
++      if (bytes > limit) {
++        rejectedPacks.insert(pack);
++        Log.warn("{} needs over {} MB once loaded, more than the {} MB for texture packs; not loaded",
++                 io::fs_path_to_string(pack.empty() ? root : root / io::fs_path_from_string(pack)), bytes >> 20,
++                 limit >> 20);
++      }
++    }
++  }
++
+   absl::flat_hash_set<TextureSourceKey, SourceKeyHash> registeredKeys;
+   for (const auto& candidate : candidates) {
++    if (!rejectedPacks.empty() && rejectedPacks.contains(packOf(candidate))) {
++      continue;
++    }
+     const auto parsed = parse_replacement_filename(io::fs_path_to_string(candidate.path.filename()));
+     if (!parsed.has_value() || registeredKeys.contains(*parsed)) {
+       continue;
+@@ -1696,8 +2037,106 @@ bool has_replacement(const GXTexObj* obj, const GXTlutObj* tlut) {
+   }
+   return gfx::texture_replacement::has_replacement(*obj_);
+ }
++
++DumpResult dump_texture(const GXTexObj* obj, const GXTlutObj* tlut, const std::filesystem::path& dir) {
++  const auto& obj_ = *reinterpret_cast<const GXTexObj_*>(obj);
++  const auto* tlut_ = reinterpret_cast<const GXTlutObj_*>(tlut);
++  const bool palette = gx::is_palette_format(obj_.format());
++  if (!obj_.has_data() || (palette && (tlut_ == nullptr || tlut_->data == nullptr))) {
++    return DumpResult::Failed;
++  }
++
++  const auto key = palette ? build_source_key(obj_, *tlut_) : build_source_key_base(obj_);
++  // Dolphin adds _m when the min filter samples mips.
++  const bool mipmapped = (GXTexObj_::get_bits(obj_.mode0, 3, 5) & 3) != 0;
++  std::string name = fmt::format("tex1_{}x{}{}_{:016x}", key.width, key.height, mipmapped ? "_m" : "", key.textureHash);
++  if (key.hasTlut) {
++    name += fmt::format("_{:016x}", key.tlutHash);
++  }
++  name += fmt::format("_{}.png", key.format);
++
++  const auto path = dir / name;
++  std::error_code ec;
++  if (std::filesystem::exists(path, ec)) {
++    return DumpResult::Exists;
++  }
++  const auto pixels = gfx::decode_rgba8(obj_.format(), key.width, key.height,
++                                        {static_cast<const uint8_t*>(obj_.data), texture_base_level_size(obj_)},
++                                        palette ? tlut_->format : GX_TL_IA8, palette ? tlut_->numEntries : 0,
++                                        palette ? tlut_bytes(*tlut_) : ArrayRef<uint8_t>{});
++  if (pixels.empty() || !io::create_directories(dir) ||
++      !gfx::png::write_rgba8_png(path, key.width, key.height, {pixels.data(), pixels.size()})) {
++    return DumpResult::Failed;
++  }
++  return DumpResult::Written;
++}
++
++void set_replacement_cache_budget(uint64_t bytes) {
++  std::lock_guard lk(s_registryMutex);
++  s_replacementCacheBudgetBytes = bytes;
++  evict_replacement_cache_if_needed();
++}
++
++// smstrikers-port: the game thread, as a texture is made; its replacement starts loading ahead of its first draw.
++void prefetch_replacement(const GXTexObj* obj_, const GXTlutObj* tlut_) {
++  const auto& obj = *reinterpret_cast<const GXTexObj_*>(obj_);
++  const auto* tlut = reinterpret_cast<const GXTlutObj_*>(tlut_);
++  const bool palette = gx::is_palette_format(obj.format());
++  if (!obj.has_data() || (palette && (tlut == nullptr || tlut->data == nullptr))) {
++    return;
++  }
++  const auto sourceKey = palette ? build_source_key(obj, *tlut) : build_source_key_base(obj);
++  std::lock_guard lk(s_registryMutex);
++  const auto key = find_source_replacement_key_locked(sourceKey);
++  const auto* entry = key.has_value() ? find_selected_entry_locked(*key) : nullptr;
++  if (entry == nullptr || entry->kind == EntryKind::Raw || s_failedIds.contains(entry->id) ||
++      s_deniedUntilFrame.contains(entry->id)) {
++    return;
++  }
++  if (const auto cache = s_cacheByKey.find(*key); cache != s_cacheByKey.end() && cache->second.id == entry->id) {
++    return;
++  }
++  queue_full_load(snapshot_entry(*key, *entry));
++}
++
++void set_replacement_wait(bool wait) { s_waitForReplacements = wait; }
++
++void set_replacement_strict_budget(bool strict) { s_strictBudget = strict; }
+ } // namespace aurora::texture
+ 
++extern "C" uint32_t aurora_replacement_load(const char* root, int32_t priority, int one_pack) {
++  const auto group = aurora::texture::load_replacement_directory(aurora::io::fs_path_from_string(root),
++                                                                 {.priority = priority, .onePack = one_pack != 0});
++  return static_cast<uint32_t>(group.registrations.size());
++}
++
++extern "C" void aurora_replacement_clear() { aurora::texture::clear_replacements(); }
++
++extern "C" void aurora_replacement_set_cache_budget(uint64_t bytes) {
++  aurora::texture::set_replacement_cache_budget(bytes);
++}
++
++extern "C" void aurora_replacement_prefetch(const GXTexObj* obj, const GXTlutObj* tlut) {
++  aurora::texture::prefetch_replacement(obj, tlut);
++}
++
++extern "C" void aurora_replacement_set_wait(int wait) { aurora::texture::set_replacement_wait(wait != 0); }
++
++extern "C" void aurora_replacement_set_strict_budget(int strict) {
++  aurora::texture::set_replacement_strict_budget(strict != 0);
++}
++
++extern "C" int aurora_replacement_dump(const GXTexObj* obj, const GXTlutObj* tlut, const char* dir) {
++  switch (aurora::texture::dump_texture(obj, tlut, aurora::io::fs_path_from_string(dir))) {
++  case aurora::texture::DumpResult::Written:
++    return 1;
++  case aurora::texture::DumpResult::Exists:
++    return 0;
++  default:
++    return -1;
++  }
++}
++
+ namespace aurora::gfx::texture_replacement {
+ using namespace aurora::texture;
+ 
+@@ -1711,6 +2150,27 @@ StreamingStats process_streaming() noexcept {
+     return {};
+   }
+ 
++  // smstrikers-port: a turned-away replacement gets another try once its wait is over.
++  std::vector<uint64_t> retry;
++  {
++    std::lock_guard lock{s_registryMutex};
++    const uint64_t now = gx::texture::current_frame();
++    for (auto it = s_deniedUntilFrame.begin(); it != s_deniedUntilFrame.end();) {
++      if (now < it->second) {
++        ++it;
++        continue;
++      }
++      retry.push_back(it->first);
++      s_deniedUntilFrame.erase(it++);
++    }
++  }
++  for (const uint64_t id : retry) {
++    gx::texture::invalidate_replacement(id);
++  }
++  if (!retry.empty()) {
++    gx::texture::invalidate_bindings();
++  }
++
+   std::vector<LoadCompletion> thumbnails;
+   {
+     std::lock_guard lock{s_jobMutex};
+@@ -1760,6 +2220,7 @@ StreamingStats process_streaming() noexcept {
+ 
+   StreamingStats stats;
+   std::vector<LoadCompletion> deferred;
++  // smstrikers-port: unlocked because take_full_load runs on the FIFO thread, which end_frame drains before this.
+   for (auto& completion : s_readyPublishes) {
+     bool selected = false;
+     {
+@@ -1781,13 +2242,34 @@ StreamingStats process_streaming() noexcept {
+       continue;
+     }
+ 
++    // smstrikers-port: one not drawn yet is only dropped, not denied; its first draw asks for it again.
++    const bool drawn = !s_strictBudget || gx::texture::replacement_last_used_frame(completion.entry.id) != 0;
++    bool fits = true;
++    if (s_strictBudget) {
++      std::lock_guard lock{s_registryMutex};
++      const auto& texture = *completion.texture;
++      const uint64_t textureBytes = gfx::calc_texture_size(texture.format, texture.width, texture.height, texture.mips);
++      note_bytes_locked(completion.entry.key, completion.entry.id, textureBytes);
++      fits = fits_after_eviction_locked(textureBytes, !drawn);
++      if (!fits && drawn) {
++        s_deniedUntilFrame[completion.entry.id] = gx::texture::current_frame() + kDeniedFrames;
++      }
++    }
++    if (!fits) {
++      finish_full_load(completion.entry.id);
++      continue;
++    }
++
+     auto handle = create_converted_texture_handle(completion.entry, *completion.texture);
+     bool published = false;
+     {
+       std::lock_guard lock{s_registryMutex};
++      if (!handle) {
++        s_deniedUntilFrame[completion.entry.id] = gx::texture::current_frame() + kDeniedFrames;
++      }
+       const auto* entry = find_selected_entry_locked(completion.entry.key);
+-      if (entry != nullptr && entry->id == completion.entry.id) {
+-        cache_replacement_locked(completion.entry.key, completion.entry.id, handle, Tier::Full);
++      if (entry != nullptr && entry->id == completion.entry.id &&
++          cache_replacement_locked(completion.entry.key, completion.entry.id, handle, Tier::Full, drawn)) {
+         s_failedIds.erase(completion.entry.id);
+         published = true;
+       }
+@@ -1808,7 +2290,8 @@ StreamingStats process_streaming() noexcept {
+ }
+ 
+ std::optional<ReplacementResult> find_source_replacement_locked(const GXTexObj_& obj,
+-                                                                const TextureSourceKey& sourceKey) noexcept {
++                                                                const TextureSourceKey& sourceKey,
++                                                                std::unique_lock<std::mutex>& lk) noexcept {
+   const auto replacementKey = find_source_replacement_key_locked(sourceKey);
+   if (!replacementKey.has_value()) {
+     const bool alwaysReportMissingKey = false; // Enable for debugging
+@@ -1818,7 +2301,7 @@ std::optional<ReplacementResult> find_source_replacement_locked(const GXTexObj_&
+     return std::nullopt;
+   }
+ 
+-  return find_replacement_for_key_locked(*replacementKey);
++  return find_replacement_for_key_locked(*replacementKey, lk);
+ }
+ 
+ std::optional<ReplacementResult> find_pointer_replacement(const GXTexObj_& obj) noexcept {
+@@ -1827,22 +2310,22 @@ std::optional<ReplacementResult> find_pointer_replacement(const GXTexObj_& obj)
+     return std::nullopt;
+   }
+ 
+-  std::lock_guard lk(s_registryMutex);
++  std::unique_lock lk(s_registryMutex);
+   ReplacementKey pointerKey{TexturePointerKey{.data = obj.data}};
+   if (!s_entriesByKey.contains(pointerKey)) {
+     return std::nullopt;
+   }
+-  return find_replacement_for_key_locked(pointerKey);
++  return find_replacement_for_key_locked(pointerKey, lk);
+ }
+ 
+ std::optional<ReplacementResult> find_source_replacement(const GXTexObj_& obj,
+                                                          const TextureSourceKey& sourceKey) noexcept {
+   ZoneScoped;
+-  std::lock_guard lk(s_registryMutex);
++  std::unique_lock lk(s_registryMutex);
+   if (s_sourceEntryCount == 0 && !g_config.allowTextureDumps) {
+     return std::nullopt;
+   }
+-  return find_source_replacement_locked(obj, sourceKey);
++  return find_source_replacement_locked(obj, sourceKey, lk);
+ }
+ 
+ bool should_build_source_key() noexcept {
 diff --git a/lib/gx/command_processor.cpp b/lib/gx/command_processor.cpp
-index 11450eb..152cf0d 100644
+index be59752..e42bafc 100644
 --- a/lib/gx/command_processor.cpp
 +++ b/lib/gx/command_processor.cpp
-@@ -3,6 +3,7 @@
- #include "../gfx/depth_peek.hpp"
+@@ -2,6 +2,7 @@
+ 
  #include "../gfx/recording.hpp"
  #include "../internal.hpp"
 +#include "fifo.hpp" // smstrikers-port: display list provenance
  #include "dolphin/gd/GDGeometry.h"
  #include "dolphin/gx/GXAurora.h"
  #include "gx.hpp"
-@@ -14,9 +15,11 @@
+@@ -11,73 +12,85 @@
+ #include "shader_info.hpp"
+ #include "texture.hpp"
+ 
++#include <absl/container/flat_hash_map.h>
  #include <tracy/Tracy.hpp>
  
  #include <algorithm>
@@ -874,7 +2837,135 @@ index 11450eb..152cf0d 100644
  #include <vector>
  
  namespace aurora::gx::fifo {
-@@ -237,6 +240,55 @@ gfx::Range push_fog_range_lut(const FogRangeLutKey& key) {
+ namespace {
+ constexpr Module Log{"aurora::gx::fifo"};
+ 
+-u16 prepare_idx_buffer(ByteBuffer& buf, GXPrimitive prim, u16 vtxStart, u16 vtxCount) noexcept {
+-  u16 numIndices = 0;
++// smstrikers-port: u32, since a strip, fan or quad draw of a u16 vertex count can need more than 65,535 indices.
++u32 prepare_idx_buffer(ByteBuffer& buf, GXPrimitive prim, u16 vtxStart, u16 vtxCount) noexcept {
++  u32 numIndices = 0;
++  // smstrikers-port: filled in place, since ByteBuffer::append costs a resize check and a memcpy per index.
+   if (prim == GX_QUADS) {
+-    buf.reserve_extra((vtxCount / 4) * 6 * sizeof(u16));
+-
+-    for (u16 v = 0; v < vtxCount; v += 4) {
+-      u16 idx0 = vtxStart + v;
+-      u16 idx1 = vtxStart + v + 1;
+-      u16 idx2 = vtxStart + v + 2;
+-      u16 idx3 = vtxStart + v + 3;
+-
+-      buf.append(idx0);
+-      buf.append(idx1);
+-      buf.append(idx2);
+-      numIndices += 3;
+-
+-      buf.append(idx2);
+-      buf.append(idx3);
+-      buf.append(idx0);
+-      numIndices += 3;
++    const u32 quads = vtxCount / 4;
++    numIndices = quads * 6;
++    u16* out = reinterpret_cast<u16*>(buf.append_uninitialized(numIndices * sizeof(u16)));
++    for (u32 q = 0; q < quads; ++q) {
++      const u16 idx0 = static_cast<u16>(vtxStart + q * 4);
++      out[0] = idx0;
++      out[1] = static_cast<u16>(idx0 + 1);
++      out[2] = static_cast<u16>(idx0 + 2);
++      out[3] = static_cast<u16>(idx0 + 2);
++      out[4] = static_cast<u16>(idx0 + 3);
++      out[5] = idx0;
++      out += 6;
+     }
+   } else if (prim == GX_TRIANGLES) {
+-    buf.reserve_extra(vtxCount * sizeof(u16));
++    numIndices = vtxCount;
++    u16* out = reinterpret_cast<u16*>(buf.append_uninitialized(numIndices * sizeof(u16)));
+     for (u16 v = 0; v < vtxCount; ++v) {
+-      const u16 idx = vtxStart + v;
+-      buf.append(idx);
+-      ++numIndices;
++      out[v] = static_cast<u16>(vtxStart + v);
+     }
+   } else if (prim == GX_TRIANGLEFAN) {
+-    buf.reserve_extra(((u32(vtxCount) - 3) * 3 + 3) * sizeof(u16));
+-    for (u16 v = 0; v < vtxCount; ++v) {
+-      const u16 idx = vtxStart + v;
+-      if (v < 3) {
+-        buf.append(idx);
+-        ++numIndices;
+-        continue;
++    if (vtxCount < 3) {
++      numIndices = vtxCount;
++      u16* out = reinterpret_cast<u16*>(buf.append_uninitialized(numIndices * sizeof(u16)));
++      for (u16 v = 0; v < vtxCount; ++v) {
++        out[v] = static_cast<u16>(vtxStart + v);
++      }
++    } else {
++      numIndices = (u32(vtxCount) - 2) * 3;
++      u16* out = reinterpret_cast<u16*>(buf.append_uninitialized(numIndices * sizeof(u16)));
++      for (u16 v = 2; v < vtxCount; ++v) {
++        const u16 idx = static_cast<u16>(vtxStart + v);
++        out[0] = vtxStart;
++        out[1] = static_cast<u16>(idx - 1);
++        out[2] = idx;
++        out += 3;
+       }
+-      buf.append(std::array{vtxStart, static_cast<u16>(idx - 1), idx});
+-      numIndices += 3;
+     }
+   } else if (prim == GX_TRIANGLESTRIP) {
+-    buf.reserve_extra(((static_cast<u32>(vtxCount) - 3) * 3 + 3) * sizeof(u16));
+-    for (u16 v = 0; v < vtxCount; ++v) {
+-      const u16 idx = vtxStart + v;
+-      if (v < 3) {
+-        buf.append(idx);
+-        ++numIndices;
+-        continue;
++    if (vtxCount < 3) {
++      numIndices = vtxCount;
++      u16* out = reinterpret_cast<u16*>(buf.append_uninitialized(numIndices * sizeof(u16)));
++      for (u16 v = 0; v < vtxCount; ++v) {
++        out[v] = static_cast<u16>(vtxStart + v);
+       }
+-      if ((v & 1) == 0) {
+-        buf.append(std::array{static_cast<u16>(idx - 2), static_cast<u16>(idx - 1), idx});
+-      } else {
+-        buf.append(std::array{static_cast<u16>(idx - 1), static_cast<u16>(idx - 2), idx});
++    } else {
++      numIndices = (u32(vtxCount) - 2) * 3;
++      u16* out = reinterpret_cast<u16*>(buf.append_uninitialized(numIndices * sizeof(u16)));
++      for (u16 v = 2; v < vtxCount; ++v) {
++        const u16 idx = static_cast<u16>(vtxStart + v);
++        if ((v & 1) == 0) {
++          out[0] = static_cast<u16>(idx - 2);
++          out[1] = static_cast<u16>(idx - 1);
++        } else {
++          out[0] = static_cast<u16>(idx - 1);
++          out[1] = static_cast<u16>(idx - 2);
++        }
++        out[2] = idx;
++        out += 3;
+       }
+-      numIndices += 3;
+     }
+   } else if (prim == GX_LINES || prim == GX_LINESTRIP || prim == GX_POINTS) {
+     buf.reserve_extra(6 * sizeof(u16));
+@@ -144,6 +157,13 @@ struct DrawCache {
+ };
+ DrawCache sDrawCache;
+ 
++// smstrikers-port: config, target layout and blocking mode decide both results, so each is analysed and looked up once.
++struct PipelineMemo {
++  ShaderInfo shaderInfo;
++  gfx::PipelineRef pipelineRef;
++};
++absl::flat_hash_map<HashType, PipelineMemo> sPipelineMemo;
++
+ FogRangeLutKey fog_range_lut_key() noexcept {
+   const auto& state = g_gxState.fog;
+   const f32 logicalWidth = std::max(g_gxState.logicalViewport.width, 1.f);
+@@ -196,6 +216,55 @@ gfx::Range push_fog_range_lut(const FogRangeLutKey& key) {
    return gfx::push_storage(reinterpret_cast<const u8*>(lut.data()), lut.size() * sizeof(f32));
  }
  
@@ -930,17 +3021,17 @@ index 11450eb..152cf0d 100644
  u8 line_mode_for_prim(GXPrimitive prim) noexcept {
    switch (prim) {
    case GX_LINES:
-@@ -253,14 +305,22 @@ u8 line_mode_for_prim(GXPrimitive prim) noexcept {
+@@ -212,14 +281,22 @@ u8 line_mode_for_prim(GXPrimitive prim) noexcept {
  
- static void handle_draw(u8 cmd, Reader& reader) noexcept;
- static void handle_aurora(Reader& reader) noexcept;
+ static void handle_draw(u8 cmd, ByteReader& reader) noexcept;
+ static void handle_aurora(ByteReader& reader) noexcept;
 +// smstrikers-port: see report_prim_desync.
-+[[noreturn]] static void report_prim_desync(u8 cmd, const Reader& reader, uint64_t streamPos) noexcept;
++[[noreturn]] static void report_prim_desync(u8 cmd, const ByteReader& reader, uint64_t streamPos) noexcept;
  
 -ProcessResult process(const u8* data, u32 size) noexcept {
 +ProcessResult process(const u8* data, u32 size, uint64_t streamPos) noexcept {
    ZoneScoped;
-   Reader reader{{data, size}};
+   ByteReader reader{{data, size}};
  
 +  // smstrikers-port: offsets are chunk-relative, so the trace is too.
 +  sCmdTraceCount = 0;
@@ -954,7 +3045,7 @@ index 11450eb..152cf0d 100644
  
      switch (opcode) {
      case CP_CMD_NOP:
-@@ -348,6 +408,11 @@ ProcessResult process(const u8* data, u32 size) noexcept {
+@@ -310,6 +387,11 @@ ProcessResult process(const u8* data, u32 size) noexcept {
      default:
        // Check if it's a draw command (0x80-0xBF range)
        if (cmd >= 0x80) {
@@ -966,14 +3057,14 @@ index 11450eb..152cf0d 100644
          handle_draw(cmd, reader);
        } else {
          // Hex dump surrounding bytes for debugging
-@@ -417,6 +482,133 @@ static u32 calc_vtx_size(GXVtxFmt fmt) noexcept {
+@@ -379,6 +461,133 @@ static u32 calc_vtx_size(GXVtxFmt fmt) noexcept {
    return vtxSize;
  }
  
 +// smstrikers-port: where the rejected byte sits inside the display list it came
 +// from. Mid-payload means the reader desynced, and the offset over the vertex
 +// count is the stride the data really had. Diagnostic only, on an aborting path.
-+[[noreturn]] static void report_prim_desync(const u8 cmd, const Reader& reader, const uint64_t streamPos) noexcept {
++[[noreturn]] static void report_prim_desync(const u8 cmd, const ByteReader& reader, const uint64_t streamPos) noexcept {
 +  const u8* data = reader.data();
 +  const size_t size = reader.size();
 +  const size_t pos = reader.offset() - 1; // the rejected byte itself
@@ -1100,7 +3191,29 @@ index 11450eb..152cf0d 100644
  static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Range vertRange, gfx::Range idxRange,
                           u32 numIndices) noexcept {
    auto& state = g_gxState;
-@@ -524,6 +716,64 @@ static void handle_draw_unmerged(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, g
+@@ -405,11 +614,18 @@ static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Rang
+     const auto prevSampledTextures = cache.shaderInfo.sampledTextures;
+     const auto prevSampledIndTextures = cache.shaderInfo.sampledIndTextures;
+     populate_pipeline_config(cache.config, prim, fmt);
+-    cache.shaderInfo = build_shader_info(cache.config.shaderConfig);
++    const HashType memoKey = xxh3_hash(cache.config, targetLayoutKey ^ static_cast<HashType>(g_gxState.drawsBlocking));
++    if (const auto it = sPipelineMemo.find(memoKey); it != sPipelineMemo.end()) {
++      cache.shaderInfo = it->second.shaderInfo;
++      cache.pipelineRef = it->second.pipelineRef;
++    } else {
++      cache.shaderInfo = build_shader_info(cache.config.shaderConfig);
+ #ifndef NDEBUG
+-    validate_shader_config(cache.config.shaderConfig, cache.shaderInfo, g_gxState.numTexGens);
++      validate_shader_config(cache.config.shaderConfig, cache.shaderInfo, g_gxState.numTexGens);
+ #endif
+-    cache.pipelineRef = gfx::pipeline_ref(cache.config);
++      cache.pipelineRef = gfx::pipeline_ref(cache.config);
++      sPipelineMemo.emplace(memoKey, PipelineMemo{cache.shaderInfo, cache.pipelineRef});
++    }
+     cache.targetLayoutKey = targetLayoutKey;
+     cache.fmt = fmt;
+     cache.lineMode = lineMode;
+@@ -491,6 +707,64 @@ static void handle_draw_unmerged(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, g
    push_gx_draw(prim, fmt, vtxCount, vertRange, idxRange, numIndices);
  }
  
@@ -1162,10 +3275,10 @@ index 11450eb..152cf0d 100644
 +  }
 +}
 +
- static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, Reader& reader) noexcept {
+ static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, ByteReader& reader) noexcept {
    ZoneScoped;
    u32 vtxSize;
-@@ -533,6 +783,14 @@ static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, Reader& read
+@@ -500,6 +774,14 @@ static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, ByteReader&
      UNLIKELY { vtxSize = calc_vtx_size(fmt); }
  
    u32 totalVtxBytes = vtxCount * vtxSize;
@@ -1180,7 +3293,7 @@ index 11450eb..152cf0d 100644
    if (totalVtxBytes > reader.remaining())
      UNLIKELY { handle_draw_overrun(totalVtxBytes, reader); }
  
-@@ -543,6 +801,7 @@ static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, Reader& read
+@@ -510,6 +792,7 @@ static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, ByteReader&
  
    // Push raw vertex data to buffer. Merged draws must remain contiguous with the previous range.
    const auto vertexData = reader.take(totalVtxBytes);
@@ -1188,7 +3301,7 @@ index 11450eb..152cf0d 100644
    gfx::Range vertRange = gfx::push_verts(vertexData.data(), vertexData.size(), canMerge ? 0 : 4);
  
    // Try to merge with previous draw call
-@@ -780,6 +1039,7 @@ void handle_aurora(Reader& reader) noexcept {
+@@ -755,6 +1038,7 @@ void handle_aurora(ByteReader& reader) noexcept {
      }
      const u32 totalVtxBytes = vtxCount * vtxSize;
      const auto vertexData = reader.take(totalVtxBytes);
@@ -1196,6 +3309,17 @@ index 11450eb..152cf0d 100644
      const gfx::Range vertRange = gfx::push_verts(vertexData.data(), vertexData.size(), 4);
      if (indexCount != 0) {
        push_gx_draw(prim, fmt, vtxCount, vertRange, idxRange, indexCount);
+@@ -775,6 +1059,10 @@ void handle_aurora(ByteReader& reader) noexcept {
+ }
+ 
+ void clear_draw_cache() noexcept {
++  // smstrikers-port: capped, as nothing else evicts from the memo.
++  if (sPipelineMemo.size() > 8192) {
++    sPipelineMemo.clear();
++  }
+   sDrawCache.bindGeneration = 0;
+   sDrawCache.uniformRange = {};
+   sDrawCache.fogRange = {};
 diff --git a/lib/gx/command_processor.hpp b/lib/gx/command_processor.hpp
 index fb9fe15..47279c8 100644
 --- a/lib/gx/command_processor.hpp
@@ -1314,10 +3438,10 @@ index 0d6a5d8..ebeb46f 100644
  void drain();
  
 diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
-index b12b327..b1100ae 100644
+index 490de4c..7cce6f4 100644
 --- a/lib/gx/gx.cpp
 +++ b/lib/gx/gx.cpp
-@@ -198,6 +198,12 @@ wgpu::PrimitiveState to_primitive_state(GXCullMode gx_cullMode) {
+@@ -207,6 +207,12 @@ wgpu::PrimitiveState to_primitive_state(GXCullMode gx_cullMode) {
    case GX_CULL_BACK:
      cullMode = wgpu::CullMode::Back;
      break;
@@ -1330,26 +3454,39 @@ index b12b327..b1100ae 100644
    case GX_CULL_NONE:
      break;
    }
-@@ -461,9 +467,11 @@ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXV
+@@ -487,9 +493,11 @@ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXV
        .polygonOffsetScaleBits = std::bit_cast<uint32_t>(polygonOffsetScale),
        .polygonOffsetClampBits = std::bit_cast<uint32_t>(g_gxState.clamp),
        .depthCompare = g_gxState.depthCompare,
 -      .depthUpdate = g_gxState.depthUpdate,
--      .alphaUpdate = g_gxState.alphaUpdate,
+-      .alphaUpdate = alphaUpdate,
 -      .colorUpdate = g_gxState.colorUpdate,
 +      // GX_CULL_ALL discards every triangle. wgpu cannot say that, so the draw
 +      // is made to write nothing instead; see to_primitive_state.
 +      .depthUpdate = cullMode == GX_CULL_ALL ? false : g_gxState.depthUpdate,
-+      .alphaUpdate = cullMode == GX_CULL_ALL ? false : g_gxState.alphaUpdate,
++      .alphaUpdate = cullMode == GX_CULL_ALL ? false : alphaUpdate,
 +      .colorUpdate = cullMode == GX_CULL_ALL ? false : g_gxState.colorUpdate,
    };
  }
  
+@@ -606,6 +614,12 @@ void initialize() noexcept {
+ 
+ void shutdown() noexcept {
+   // TODO we should probably store this all in g_state.gx instead
++  // smstrikers-port: released while the device lives; by static destruction a Vulkan layer may be gone.
++  g_emptyTextureBindGroup = {};
++  sEmptyTextureView = {};
++  sEmptyTexture = {};
++  sEmptySampler = {};
++  sPipelineLayout = {};
+   sTextureBindGroupLayout = {};
+   for (auto& item : g_gxState.textures) {
+     item.ref.reset();
 diff --git a/lib/gx/gx.hpp b/lib/gx/gx.hpp
-index a97b987..db16c61 100644
+index 77a821d..9157abb 100644
 --- a/lib/gx/gx.hpp
 +++ b/lib/gx/gx.hpp
-@@ -64,7 +64,11 @@ constexpr u32 MaxTevSwap = GX_MAX_TEVSWAP;
+@@ -63,7 +63,11 @@ constexpr u32 MaxTevSwap = GX_MAX_TEVSWAP;
  constexpr u32 MaxIndStages = GX_MAX_INDTEXSTAGE;
  constexpr u32 MaxIndTexMtxs = 3;
  constexpr u32 MaxVtxFmt = GX_MAX_VTXFMT;
@@ -1363,10 +3500,10 @@ index a97b987..db16c61 100644
  constexpr u32 MaxUniformSize = 3840;
  constexpr u32 XfRegCount = 0x58; // 0x1000-0x1057
 diff --git a/lib/gx/regs.cpp b/lib/gx/regs.cpp
-index 0c3925b..5858904 100644
+index a059918..f973ac5 100644
 --- a/lib/gx/regs.cpp
 +++ b/lib/gx/regs.cpp
-@@ -1011,12 +1011,21 @@ bool copy_xf_data(u32 addr, const u8* data, u32 len, std::endian e) noexcept {
+@@ -1029,6 +1029,15 @@ bool copy_xf_data(u32 addr, const u8* data, u32 len, std::endian e) noexcept {
      for (u32 i = 0; i < len; i++) {
        changed |= store_xf_f32(flat[i], read_bits<u32>(data + i * 4, e));
      }
@@ -1382,6 +3519,8 @@ index 0c3925b..5858904 100644
      if (changed) {
        g_gxState.dirty |= DirtyUniform;
      }
+@@ -1044,7 +1053,7 @@ bool copy_xf_data(u32 addr, const u8* data, u32 len, std::endian e) noexcept {
+     }
      return true;
    }
 -  if (addr >= 0x400 && addr < 0x45A) {
@@ -1390,10 +3529,10 @@ index 0c3925b..5858904 100644
      u32 nrmBase = addr - 0x400;
      u32 mtxIdx = nrmBase / 9;
 diff --git a/lib/gx/shader.cpp b/lib/gx/shader.cpp
-index 92f358b..b68b165 100644
+index 2d10095..7201c83 100644
 --- a/lib/gx/shader.cpp
 +++ b/lib/gx/shader.cpp
-@@ -814,8 +814,12 @@ auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8
+@@ -803,8 +803,12 @@ auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8
    if (cc.attnFn == GX_AF_NONE) {
      lightAttnFn = "attn = 1.0;"s;
    } else if (cc.attnFn == GX_AF_SPOT) {
@@ -1407,7 +3546,7 @@ index 92f358b..b68b165 100644
            var cos_attn = dot(light.cos_att, vec3f(1.0, cosine, cosine * cosine));
            var dist_attn = dot(light.dist_att, vec3f(1.0, dist, dist2));
            attn = max(0.0, cos_attn / dist_attn);)""");
-@@ -824,8 +828,10 @@ auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8
+@@ -812,8 +816,10 @@ auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8
      std::string dist_attn = diffFn != GX_DF_NONE
                                  ? "max(0.0, dot(normalize(light.dist_att), vec3f(1.0, attn, attn * attn)));"
                                  : "max(0.0, dot(light.dist_att, vec3f(1.0, attn, attn * attn)));";
@@ -1419,30 +3558,7 @@ index 92f358b..b68b165 100644
            var cos_attn = dot(light.cos_att, vec3f(1.0, attn, attn * attn));
            var dist_attn = {1};
            attn = max(0.0, cos_attn / dist_attn);)""",
-@@ -1234,10 +1240,18 @@ std::string build_shader_source(const ShaderConfig& config) noexcept {
-       vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f({}, 1.0);", i, vtx_attr(config, GX_VA_POS));
-     } else if (tcg.src == GX_TG_NRM) {
-       vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f({}, 1.0);", i, vtx_attr(config, GX_VA_NRM));
--    } else if (tcg.src == GX_TG_COLOR0) {
--      vtxXfrAttrs += fmt::format("\n    var tc{} = {};", i, vtx_attr(config, GX_VA_CLR0));
--    } else if (tcg.src == GX_TG_COLOR1) {
--      vtxXfrAttrs += fmt::format("\n    var tc{} = {};", i, vtx_attr(config, GX_VA_CLR1));
-+    } else if (tcg.src == GX_TG_COLOR0 || tcg.src == GX_TG_COLOR1) {
-+      // smstrikers-port: a colour-source texgen takes the channel's rasterized
-+      // output, the lit result, and not the raw vertex colour.
-+      const u32 ch = tcg.src == GX_TG_COLOR0 ? 0 : 1;
-+      const auto vtxSrc = vtx_attr(config, static_cast<GXAttr>(GX_VA_CLR0 + ch));
-+      // Per-pixel lighting computes the channel in the fragment stage, where a
-+      // vertex-stage texgen cannot reach it; fall back to the attribute there.
-+      if (!UsePerPixelLighting && info.sampledColorChannels.test(ch)) {
-+        vtxXfrAttrs += fmt::format("\n    var tc{} = out.cc{};", i, ch);
-+      } else {
-+        vtxXfrAttrs += fmt::format("\n    var tc{} = {};", i, vtxSrc);
-+      }
-     } else if (tcg.src == GX_TG_BINRM) {
-       vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f({}, 1.0);", i, nbt_slice_local(NbtSlice::B));
-     } else if (tcg.src == GX_TG_TANGENT) {
-@@ -1245,12 +1259,16 @@ std::string build_shader_source(const ShaderConfig& config) noexcept {
+@@ -1216,12 +1222,16 @@ std::string build_shader_source(const ShaderConfig& config, DstAlphaMode dstAlph
      } else
        UNLIKELY FATAL("unhandled tcg src {}", underlying(tcg.src));
      if (tcg.type == GX_TG_MTX2x4 || tcg.type == GX_TG_MTX3x4) {
@@ -1461,42 +3577,677 @@ index 92f358b..b68b165 100644
          vtxXfrAttrs += fmt::format("\n    var tc{0}_tmp = tc{0} * ubuf.postex_mtx[{1}];", i, texMtxIdx);
        }
        if (tcg.type == GX_TG_MTX2x4) {
-diff --git a/lib/gx/shader_info.cpp b/lib/gx/shader_info.cpp
-index c74bd6d..4c2ffde 100644
---- a/lib/gx/shader_info.cpp
-+++ b/lib/gx/shader_info.cpp
-@@ -307,6 +307,18 @@ ShaderInfo build_shader_info(const ShaderConfig& config) noexcept {
-     }
-   }
+diff --git a/lib/gx/texture.cpp b/lib/gx/texture.cpp
+index 33a8c99..2bde3a7 100644
+--- a/lib/gx/texture.cpp
++++ b/lib/gx/texture.cpp
+@@ -7,6 +7,7 @@
+ #include "../gfx/texture_convert.hpp"
+ #include "../gfx/texture_replacement.hpp"
+ #include "shader_info.hpp"
++#include "../thread.hpp"
  
-+  // smstrikers-port: GX_TG_SRTG reads a colour channel's rasterized output, so
-+  // that channel is computed even when no TEV stage samples it.
-+  for (int i = 0; i < info.sampledTexCoords.size(); ++i) {
-+    if (!info.sampledTexCoords.test(i)) {
+ #include <absl/container/flat_hash_map.h>
+ #include <absl/container/flat_hash_set.h>
+@@ -15,9 +16,16 @@
+ 
+ #include <algorithm>
+ #include <atomic>
++#include <chrono>
++#include <condition_variable>
+ #include <cstddef>
+ #include <cstdint>
++#include <cstdio>
++#include <cstdlib>
+ #include <cstring>
++#include <deque>
++#include <list>
++#include <mutex>
+ #include <optional>
+ #include <utility>
+ 
+@@ -126,6 +134,7 @@ gfx::LruCache<GXState::CopyTextureKey, GXState::CopyTextureRef> s_copyCache{
+     retire_copy_texture,
+ };
+ uint64_t s_frameCount = 0;
++uint64_t s_lastDrainNs = 0;  // smstrikers-port: for AURORA_TEX_LOG, see note_drain_wait
+ uint64_t s_bindGeneration = 1;
+ std::atomic<uint64_t> s_pendingInvalidations = 0;
+ std::atomic<uint64_t> s_pendingCacheClears = 0;
+@@ -262,12 +271,304 @@ void cache_content_texture(TextureContentKey key, const gfx::TextureHandle& hand
+   update_cache_stats();
+ }
+ 
++// smstrikers-port: converts textures in the background from GXInitTexObjLOD; any miss converts inline as before.
++namespace pre {
++constexpr uint64_t ReadyBudgetBytes = 128ull * 1024ull * 1024ull;  // converted results waiting to be drawn
++constexpr uint64_t QueueBudgetBytes = 64ull * 1024ull * 1024ull;   // source copies queued or being converted
++constexpr auto ReadyLifetime = std::chrono::seconds{120};          // results not drawn by then are dropped
++constexpr size_t KeySetLimit = 16384;                              // bounds seenContent and queuedObjects
++constexpr uint64_t MaintenanceFrames = 300;
++
++using Clock = std::chrono::steady_clock;
++
++struct Job {
++  ByteBuffer source;
++  u32 width = 0;
++  u32 height = 0;
++  u32 format = 0;
++  u32 mips = 0;
++};
++
++struct Parked {
++  ByteBuffer data;
++  wgpu::TextureFormat format = wgpu::TextureFormat::Undefined;
++  bool hasArbitraryMips = false;
++  Clock::time_point parkedAt;
++  std::list<TextureContentKey>::iterator lru;
++};
++
++struct Taken {
++  ByteBuffer data;
++  wgpu::TextureFormat format = wgpu::TextureFormat::Undefined;
++  bool hasArbitraryMips = false;
++};
++
++struct State {
++  std::mutex mutex;
++  std::condition_variable cv;
++  bool stop = false;
++  aurora::thread::Thread thread;
++
++  std::deque<Job> queue;
++  uint64_t queueBytes = 0;  // includes the job being converted
++
++  absl::flat_hash_map<TextureContentKey, Parked> parked;
++  std::list<TextureContentKey> parkedLru;  // most recent at the front
++  uint64_t parkedBytes = 0;
++
++  // Dedupe only: clearing either set at KeySetLimit costs repeat work, never a wrong texture.
++  absl::flat_hash_set<TextureContentKey> seenContent;
++  absl::flat_hash_set<uint64_t> queuedObjects;
++
++  // For AURORA_TEX_LOG.
++  uint64_t copiedBytes = 0;
++  uint64_t copyNs = 0;
++  uint64_t parkedPeakBytes = 0;
++  uint64_t expiredBytes = 0;
++};
++
++// Leaked: destroying a running std::jthread at static destruction terminates the process.
++State& state() noexcept {
++  static auto* s_state = new State;
++  return *s_state;
++}
++
++bool enabled() noexcept {
++  static const bool s_enabled = [] {
++    const char* e = std::getenv("AURORA_TEX_PRECONVERT");
++    return e == nullptr || *e == '\0' || std::strcmp(e, "0") != 0;
++  }();
++  return s_enabled;
++}
++
++// Palette formats need the TLUT bound at draw time, and PC formats upload unconverted.
++bool converts(u32 format) noexcept {
++  switch (format) {
++  case GX_TF_I4:
++  case GX_TF_I8:
++  case GX_TF_IA4:
++  case GX_TF_IA8:
++  case GX_TF_RGB565:
++  case GX_TF_RGB5A3:
++  case GX_TF_RGBA8:
++  case GX_TF_CMPR:
++    return true;
++  default:
++    return false;
++  }
++}
++
++void insert_bounded(absl::flat_hash_set<TextureContentKey>& set, const TextureContentKey& key) {
++  if (set.size() >= KeySetLimit) {
++    set.clear();
++  }
++  set.insert(key);
++}
++
++void erase_parked_locked(State& st, absl::flat_hash_map<TextureContentKey, Parked>::iterator it) {
++  st.parkedBytes -= it->second.data.size();
++  st.parkedLru.erase(it->second.lru);
++  st.parked.erase(it);
++}
++
++// Drops results past their lifetime, then the oldest until the budget holds.
++void expire_locked(State& st, Clock::time_point now) {
++  while (!st.parkedLru.empty()) {
++    const auto it = st.parked.find(st.parkedLru.back());
++    const bool stale = now - it->second.parkedAt > ReadyLifetime;
++    if (!stale && st.parkedBytes <= ReadyBudgetBytes) {
++      break;
++    }
++    st.expiredBytes += it->second.data.size();
++    erase_parked_locked(st, it);
++  }
++}
++
++void worker(std::stop_token) {
++  auto& st = state();
++  for (;;) {
++    Job job;
++    {
++      std::unique_lock lock{st.mutex};
++      st.cv.wait(lock, [&] { return st.stop || !st.queue.empty(); });
++      if (st.stop) {
++        return;
++      }
++      job = std::move(st.queue.front());
++      st.queue.pop_front();
++    }
++
++    // Must match hash_texture_source's contentKey for a texture without a TLUT.
++    const TextureContentKey key{
++        .textureHash = XXH3_128bits(job.source.data(), job.source.size()),
++        .width = job.width,
++        .height = job.height,
++        .format = job.format,
++        .mipCount = job.mips,
++    };
++    bool fresh;
++    {
++      std::lock_guard lock{st.mutex};
++      fresh = !st.seenContent.contains(key);
++      if (fresh) {
++        insert_bounded(st.seenContent, key);
++      }
++    }
++    gfx::ConvertedTexture converted;
++    if (fresh) {
++      converted = gfx::convert_texture(job.format, job.width, job.height, job.mips,
++                                       {job.source.data(), job.source.size()});
++    }
++
++    std::lock_guard lock{st.mutex};
++    st.queueBytes -= job.source.size();
++    if (converted.data.empty() || converted.data.size() > ReadyBudgetBytes || st.parked.contains(key)) {
 +      continue;
 +    }
-+    const auto& tcg = config.tcgs[i];
-+    if (tcg.type == GX_TG_SRTG && (tcg.src == GX_TG_COLOR0 || tcg.src == GX_TG_COLOR1)) {
-+      info.sampledColorChannels.set(tcg.src == GX_TG_COLOR0 ? 0 : 1);
++    st.parkedLru.push_front(key);
++    st.parkedBytes += converted.data.size();
++    st.parked.emplace(key, Parked{
++                               .data = std::move(converted.data),
++                               .format = converted.format,
++                               .hasArbitraryMips = converted.hasArbitraryMips,
++                               .parkedAt = Clock::now(),
++                               .lru = st.parkedLru.begin(),
++                           });
++    st.parkedPeakBytes = std::max(st.parkedPeakBytes, st.parkedBytes);
++    expire_locked(st, Clock::now());
++  }
++}
++
++// FIFO thread: the parked result for this content, if there is one.
++std::optional<Taken> take(const TextureContentKey& key) noexcept {
++  auto& st = state();
++  std::lock_guard lock{st.mutex};
++  const auto it = st.parked.find(key);
++  if (it == st.parked.end()) {
++    return std::nullopt;
++  }
++  Taken taken{.data = std::move(it->second.data),
++              .format = it->second.format,
++              .hasArbitraryMips = it->second.hasArbitraryMips};
++  st.parkedBytes -= taken.data.size();
++  st.parkedLru.erase(it->second.lru);
++  st.parked.erase(it);
++  return taken;
++}
++
++// FIFO thread: this content was converted inline and uploaded, so a later job for it has nothing to do.
++void mark_uploaded(const TextureContentKey& key) noexcept {
++  auto& st = state();
++  std::lock_guard lock{st.mutex};
++  insert_bounded(st.seenContent, key);
++}
++
++// Main thread, from GXInitTexObjLOD.
++void enqueue(const GXTexObj_& obj) noexcept {
++  const u32 mips = obj.mip_count();
++  const size_t bytes = texture::texture_source_size(obj.format(), obj.width(), obj.height(), mips);
++  if (bytes == 0) {
++    return;
++  }
++  const uint64_t objectKey = (static_cast<uint64_t>(obj.texObjId) << 32) | obj.texDataVersion;
++  auto& st = state();
++  {
++    std::lock_guard lock{st.mutex};
++    if (st.queueBytes + bytes > QueueBudgetBytes) {
++      return;
 +    }
++    if (st.queuedObjects.size() >= KeySetLimit) {
++      st.queuedObjects.clear();
++    }
++    if (!st.queuedObjects.insert(objectKey).second) {
++      return;
++    }
++    st.queueBytes += bytes;  // reserved before the copy, so the budget also bounds copies in progress
 +  }
 +
-   info.uniformSize += info.loadsTevReg.count() * sizeof(Vec4<float>);
-   for (int i = 0; i < info.sampledColorChannels.size(); ++i) {
-     if (info.sampledColorChannels.test(i)) {
++  // Copied here, on the thread that owns the data, so the game may free or rewrite it afterwards.
++  const bool timing = gfx::tex_log_enabled();
++  const uint64_t copyStart = timing ? gfx::tex_log_now_ns() : 0;
++  Job job{.width = obj.width(), .height = obj.height(), .format = obj.format(), .mips = mips};
++  std::memcpy(job.source.append_uninitialized(bytes), obj.data, bytes);
++  const uint64_t copyNs = timing ? gfx::tex_log_now_ns() - copyStart : 0;
++
++  {
++    std::lock_guard lock{st.mutex};
++    st.copiedBytes += bytes;
++    st.copyNs += copyNs;
++    st.queue.push_back(std::move(job));
++    if (!st.thread.joinable()) {
++      st.thread = aurora::thread::Thread{
++          aurora::thread::Options{.name = "Aurora tex preconv", .priority = aurora::thread::Priority::Low}, worker};
++    }
++  }
++  st.cv.notify_one();
++}
++
++// Expires undrawn results and prints the AURORA_TEX_LOG summary.
++void maintain(uint64_t frame) noexcept {
++  if (frame % MaintenanceFrames != 0) {
++    return;
++  }
++  auto& st = state();
++  std::lock_guard lock{st.mutex};
++  expire_locked(st, Clock::now());
++  if (gfx::tex_log_enabled() && (st.copiedBytes != 0 || st.expiredBytes != 0)) {
++    std::fprintf(stderr,
++                 "[texlog] frame %llu: pre-conversion copied %.2f MB of source in %.2f ms; parked %.2f MB now, "
++                 "%.2f MB peak; expired %.2f MB unused\n",
++                 static_cast<unsigned long long>(frame), static_cast<double>(st.copiedBytes) / 1048576.0,
++                 static_cast<double>(st.copyNs) * 1e-6, static_cast<double>(st.parkedBytes) / 1048576.0,
++                 static_cast<double>(st.parkedPeakBytes) / 1048576.0,
++                 static_cast<double>(st.expiredBytes) / 1048576.0);
++    st.copiedBytes = 0;
++    st.copyNs = 0;
++    st.expiredBytes = 0;
++  }
++}
++
++void shutdown() noexcept {
++  auto& st = state();
++  {
++    std::lock_guard lock{st.mutex};
++    st.stop = true;
++  }
++  st.cv.notify_all();
++  if (st.thread.joinable()) {
++    st.thread.join();
++  }
++  std::lock_guard lock{st.mutex};
++  st.thread = {};
++  st.queue.clear();
++  st.queueBytes = 0;
++  st.parked.clear();
++  st.parkedLru.clear();
++  st.parkedBytes = 0;
++  st.seenContent.clear();
++  st.queuedObjects.clear();
++  st.stop = false;
++}
++} // namespace pre
++
+ struct TextureKeys {
+   TextureContentKey contentKey;
+   std::optional<aurora::texture::TextureSourceKey> sourceKey;
+ };
+ 
++TextureKeys hash_texture_source_impl(const GXTexObj_& obj, const GXTlutObj_* tlut, bool buildSourceKey);
++
+ TextureKeys hash_texture_source(const GXTexObj_& obj, const GXTlutObj_* tlut, bool buildSourceKey) {
++  if (!gfx::tex_log_enabled()) {
++    return hash_texture_source_impl(obj, tlut, buildSourceKey);
++  }
++  const uint64_t t0 = gfx::tex_log_now_ns();
++  auto keys = hash_texture_source_impl(obj, tlut, buildSourceKey);
++  gfx::g_texLoadTiming.hashNs += gfx::tex_log_now_ns() - t0;
++  return keys;
++}
++
++TextureKeys hash_texture_source_impl(const GXTexObj_& obj, const GXTlutObj_* tlut, bool buildSourceKey) {
+   ZoneScoped;
+   const size_t textureBytes = texture::texture_source_size(obj.format(), obj.width(), obj.height(), obj.mip_count());
+   CHECK(obj.has_data() && textureBytes != 0, "invalid texture source for content hash");
+@@ -605,6 +906,22 @@ void invalidate_replacement(uint64_t replacementId) noexcept {
+   }
+ }
+ 
++uint64_t replacement_last_used_frame(uint64_t replacementId) noexcept {
++  const auto users = s_replacementUsers.find(replacementId);
++  if (users == s_replacementUsers.end()) {
++    return 0;
++  }
++  uint64_t last = 0;
++  for (const u32 texObjId : users->second) {
++    if (const auto it = s_textureObjectCaches.find(texObjId); it != s_textureObjectCaches.end()) {
++      last = std::max(last, it->second.lastUsedFrame);
++    }
++  }
++  return last;
++}
++
++uint64_t current_frame() noexcept { return s_frameCount; }
++
+ gfx::TextureHandle resolve_static_texture(const GXTexObj_& obj) {
+   ZoneScoped;
+ 
+@@ -642,8 +959,18 @@ gfx::TextureHandle resolve_static_texture(const GXTexObj_& obj) {
+       const auto nameStr = "GX Static Texture";
+ #endif
+       const size_t sourceBytes = texture_source_size(obj.format(), obj.width(), obj.height(), obj.mip_count());
+-      handle = gfx::new_static_texture_2d(obj.width(), obj.height(), obj.mip_count(), obj.format(),
+-                                          {static_cast<const uint8_t*>(obj.data), sourceBytes}, false, nameStr);
++      if (auto preconverted = pre::enabled() ? pre::take(keys->contentKey) : std::nullopt) {
++        handle = gfx::new_static_texture_2d_converted(obj.width(), obj.height(), obj.mip_count(), obj.format(),
++                                                      preconverted->format,
++                                                      {preconverted->data.data(), preconverted->data.size()},
++                                                      preconverted->hasArbitraryMips, nameStr);
++      } else {
++        handle = gfx::new_static_texture_2d(obj.width(), obj.height(), obj.mip_count(), obj.format(),
++                                            {static_cast<const uint8_t*>(obj.data), sourceBytes}, false, nameStr);
++        if (pre::enabled()) {
++          pre::mark_uploaded(keys->contentKey);
++        }
++      }
+       ++s_stats.misses;
+       s_stats.uploadBytes += texture_handle_size(handle);
+       cache_content_texture(std::move(keys->contentKey), handle);
+@@ -690,9 +1017,13 @@ gfx::TextureHandle resolve_static_palette_texture(const GXTexObj_& obj, const GX
+     if (!handle) {
+       const size_t textureBytes = texture_source_size(obj.format(), obj.width(), obj.height(), obj.mip_count());
+       const size_t tlutBytes = tlut_source_size(tlut.numEntries);
++      const uint64_t paletteStart = gfx::tex_log_enabled() ? gfx::tex_log_now_ns() : 0;
+       auto converted = gfx::convert_texture_palette(obj.format(), obj.width(), obj.height(), obj.mip_count(),
+                                                     {static_cast<const u8*>(obj.data), textureBytes}, tlut.format,
+                                                     tlut.numEntries, {static_cast<const u8*>(tlut.data), tlutBytes});
++      if (paletteStart != 0) {
++        gfx::g_texLoadTiming.paletteNs += gfx::tex_log_now_ns() - paletteStart;
++      }
+       if (converted.data.empty()) {
+         return {};
+       }
+@@ -712,6 +1043,22 @@ gfx::TextureHandle resolve_static_palette_texture(const GXTexObj_& obj, const GX
+ }
+ 
+ void end_frame() noexcept {
++  if (gfx::tex_log_enabled()) {
++    auto& t = gfx::g_texLoadTiming;
++    if (t.textures != 0) {
++      std::fprintf(stderr,
++                   "[texlog] t=%.3f frame %llu: %llu textures %.2f MB | hash %.2f palette %.2f create %.2f "
++                   "convert %.2f stage %.2f ms | %llu pre-converted | main waited in drain %.2f ms\n",
++                   static_cast<double>(gfx::tex_log_now_ns()) * 1e-9, static_cast<unsigned long long>(s_frameCount),
++                   static_cast<unsigned long long>(t.textures), static_cast<double>(t.bytes) / 1048576.0,
++                   t.hashNs * 1e-6, t.paletteNs * 1e-6, t.createNs * 1e-6, t.convertNs * 1e-6, t.queueNs * 1e-6,
++                   static_cast<unsigned long long>(t.preconverted), s_lastDrainNs * 1e-6);
++    }
++    t = {};
++  }
++  if (pre::enabled()) {
++    pre::maintain(s_frameCount);
++  }
+   const auto streamingStats = gfx::texture_replacement::process_streaming();
+   s_stats.pendingLoads = streamingStats.pendingLoads;
+   s_stats.publishes = streamingStats.publishes;
+@@ -744,9 +1091,24 @@ void end_frame() noexcept {
+   update_cache_stats();
+ }
+ 
++void preconvert_texture(const GXTexObj_& obj) noexcept {
++  if (pre::enabled() && obj.has_data() && pre::converts(obj.format())) {
++    pre::enqueue(obj);
++  }
++}
++
++bool preconversion_idle_for_testing() noexcept {
++  auto& st = pre::state();
++  std::lock_guard lock{st.mutex};
++  return st.queueBytes == 0;
++}
++
++void note_drain_wait(uint64_t ns) noexcept { s_lastDrainNs = ns; }
++
+ void shutdown() noexcept {
+   clear_copy_texture_cache();
+   s_copyCache.set_budget(gfx::RenderTextureCacheLimits.bytes);
++  pre::shutdown();
+   s_textureObjectCaches.clear();
+   s_tlutObjectCaches.clear();
+   s_replacementUsers.clear();
+diff --git a/lib/gx/texture.hpp b/lib/gx/texture.hpp
+index 4e06da3..4c849f8 100644
+--- a/lib/gx/texture.hpp
++++ b/lib/gx/texture.hpp
+@@ -42,7 +42,16 @@ size_t tlut_source_size(u16 numEntries) noexcept;
+ void invalidate_bindings() noexcept;
+ uint64_t current_bind_generation() noexcept;
+ void invalidate_replacement(uint64_t replacementId) noexcept;
++// smstrikers-port: the last frame a texture drawn with this replacement was bound in, 0 for none.
++uint64_t replacement_last_used_frame(uint64_t replacementId) noexcept;
++uint64_t current_frame() noexcept;
+ void end_frame() noexcept;
++// smstrikers-port: the main thread's last FIFO drain wait, reported by AURORA_TEX_LOG.
++void note_drain_wait(uint64_t ns) noexcept;
++// smstrikers-port: queue a background conversion of this texture's current contents, once its mip count is known.
++void preconvert_texture(const GXTexObj_& obj) noexcept;
++// True once every queued pre-conversion has finished. Tests only.
++bool preconversion_idle_for_testing() noexcept;
+ void shutdown() noexcept;
+ 
+ GXState::CopyTextureRef resolve_copy_texture(const GXState::CopyTextureKey& key) noexcept;
+diff --git a/lib/imgui.cpp b/lib/imgui.cpp
+index 77f65fd..e6fedc5 100644
+--- a/lib/imgui.cpp
++++ b/lib/imgui.cpp
+@@ -1,6 +1,7 @@
+ #include "imgui.hpp"
+ 
+ #include <cstddef>
++#include <chrono>
+ #include <cmath>
+ #include <cstring>
+ #include <memory>
+@@ -19,8 +20,10 @@
+ #include "window.hpp"
+ 
+ #define IMGUI_IMPL_WEBGPU_BACKEND_DAWN
++#ifndef __SWITCH__
+ #include "backends/imgui_impl_sdl3.h"
+ #include "backends/imgui_impl_sdlrenderer3.h"
++#endif
+ #include "backends/imgui_impl_wgpu.h"
+ #include "tracy/Tracy.hpp"
+ 
+@@ -133,12 +136,20 @@ void create_context() noexcept {
+ 
+ void initialize() noexcept {
+   ZoneScoped;
++#ifdef __SWITCH__
++  // smstrikers-port: no SDL3 platform backend on Switch; the overlay takes no pointer or key input.
++  SDL_Renderer* renderer = nullptr;
++#else
+   SDL_Renderer* renderer = window::get_sdl_renderer();
+   ImGui_ImplSDL3_InitForSDLRenderer(window::get_sdl_window(), renderer);
++#endif
+   g_useSdlRenderer = renderer != nullptr;
++#ifndef __SWITCH__
+   if (g_useSdlRenderer) {
+     ImGui_ImplSDLRenderer3_Init(renderer);
+-  } else {
++  } else
++#endif
++  {
+     ImGui_ImplWGPU_InitInfo info;
+     info.Device = webgpu::g_device.Get();
+     info.RenderTargetFormat = static_cast<WGPUTextureFormat>(webgpu::g_graphicsConfig.surfaceConfiguration.format);
+@@ -157,11 +168,15 @@ void shutdown() noexcept {
+   input::unregister_layer(g_inputLayer);
+   g_inputLayer = input::kInvalidLayerId;
+   if (g_useSdlRenderer) {
++#ifndef __SWITCH__
+     ImGui_ImplSDLRenderer3_Shutdown();
++#endif
+   } else {
+     ImGui_ImplWGPU_Shutdown();
+   }
++#ifndef __SWITCH__
+   ImGui_ImplSDL3_Shutdown();
++#endif
+   ImGui::DestroyContext();
+   for (const auto& texture : g_sdlTextures) {
+     SDL_DestroyTexture(texture);
+@@ -185,6 +200,9 @@ void set_cursor_managed(bool managed) noexcept {
+ }
+ 
+ void process_event(const SDL_Event& event) noexcept {
++#ifdef __SWITCH__
++  (void)event;
++#else
+   auto renderEvent = event;
+   if (g_useSdlRenderer) {
+     if (SDL_Renderer* renderer = window::get_sdl_renderer()) {
+@@ -192,6 +210,7 @@ void process_event(const SDL_Event& event) noexcept {
+     }
+   }
+   ImGui_ImplSDL3_ProcessEvent(&renderEvent);
++#endif
+ }
+ 
+ void new_frame(const AuroraWindowSize& size) noexcept {
+@@ -202,6 +221,7 @@ void new_frame(const AuroraWindowSize& size) noexcept {
+   };
+   ImVec2 displaySize{static_cast<float>(size.width), static_cast<float>(size.height)};
+ 
++#ifndef __SWITCH__
+   if (g_useSdlRenderer) {
+     if (SDL_Renderer* renderer = window::get_sdl_renderer()) {
+       float renderScaleX = 1.0f;
+@@ -221,7 +241,9 @@ void new_frame(const AuroraWindowSize& size) noexcept {
+     }
+     ImGui_ImplSDLRenderer3_NewFrame();
+     g_scale = size.scale;
+-  } else {
++  } else
++#endif
++  {
+     if (g_scale != size.scale) {
+       if (g_scale > 0.f) {
+         ImGui_ImplWGPU_CreateDeviceObjects();
+@@ -233,7 +255,20 @@ void new_frame(const AuroraWindowSize& size) noexcept {
+     }
+     ImGui_ImplWGPU_NewFrame();
+   }
++#ifdef __SWITCH__
++  // smstrikers-port: set the frame delta the SDL3 backend would.
++  {
++    static std::chrono::steady_clock::time_point sLast{};
++    const auto now = std::chrono::steady_clock::now();
++    const float delta = sLast.time_since_epoch().count() == 0
++                            ? 1.f / 60.f
++                            : std::chrono::duration<float>{now - sLast}.count();
++    sLast = now;
++    ImGui::GetIO().DeltaTime = delta > 0.f ? delta : 1.f / 60.f;
++  }
++#else
+   ImGui_ImplSDL3_NewFrame();
++#endif
+ 
+   ImGuiIO& io = ImGui::GetIO();
+   io.DisplayFramebufferScale = framebufferScale;
+@@ -241,6 +276,8 @@ void new_frame(const AuroraWindowSize& size) noexcept {
+   ImGui::NewFrame();
+ }
+ 
++bool DrawData::empty() const noexcept { return !m_impl || m_impl->drawData.CmdListsCount == 0; }
++
+ DrawData freeze() noexcept {
+   ZoneScoped;
+   ImGui::Render();
+@@ -268,12 +305,15 @@ void render(const wgpu::RenderPassEncoder& pass, const DrawData& drawData) noexc
+   if (data->CmdListsCount == 0) {
+     return;
+   }
++#ifndef __SWITCH__
+   if (g_useSdlRenderer) {
+     SDL_Renderer* renderer = window::get_sdl_renderer();
+     SDL_RenderClear(renderer);
+     ImGui_ImplSDLRenderer3_RenderDrawData(data, renderer);
+     SDL_RenderPresent(renderer);
+-  } else {
++  } else
++#endif
++  {
+     pass.PushDebugGroup("Aurora: Dear Imgui");
+     ImGui_ImplWGPU_RenderDrawData(data, pass.Get());
+     pass.PopDebugGroup();
+@@ -281,6 +321,7 @@ void render(const wgpu::RenderPassEncoder& pass, const DrawData& drawData) noexc
+ }
+ 
+ ImTextureID add_texture(uint32_t width, uint32_t height, const uint8_t* data) noexcept {
++#ifndef __SWITCH__
+   if (SDL_Renderer* renderer = window::get_sdl_renderer()) {
+     SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, width, height);
+     SDL_UpdateTexture(texture, nullptr, data, width * 4);
+@@ -288,6 +329,7 @@ ImTextureID add_texture(uint32_t width, uint32_t height, const uint8_t* data) no
+     g_sdlTextures.push_back(texture);
+     return reinterpret_cast<ImTextureID>(texture);
+   }
++#endif
+   const wgpu::Extent3D size{
+       .width = width,
+       .height = height,
+diff --git a/lib/imgui.hpp b/lib/imgui.hpp
+index a40f297..626fbeb 100644
+--- a/lib/imgui.hpp
++++ b/lib/imgui.hpp
+@@ -16,6 +16,8 @@ class DrawData {
+ public:
+   DrawData() noexcept = default;
+   [[nodiscard]] explicit operator bool() const noexcept { return m_impl != nullptr; }
++  // smstrikers-port: no draw lists, so the overlay pass can be skipped.
++  [[nodiscard]] bool empty() const noexcept;
+ 
+ private:
+   struct Impl;
 diff --git a/lib/internal.hpp b/lib/internal.hpp
-index b446d2c..b65697b 100644
+index d1adb6c..408e249 100644
 --- a/lib/internal.hpp
 +++ b/lib/internal.hpp
-@@ -7,6 +7,7 @@
- #include <array>
- #include <cassert>
- #include <cstdint>
+@@ -11,6 +11,7 @@
+ #include <limits>
+ #include <span>
+ #include <string>
 +#include <cstdio>
  #include <type_traits>
  #include <vector>
- #include <cstring>
-@@ -331,6 +332,15 @@ private:
+ 
+@@ -314,6 +315,14 @@ public:
+   void clear() { m_length = 0; }
+   void reserve_extra(size_t size) { resize(m_length + size, true); }
+ 
++  // smstrikers-port: grow by `size` bytes and return where they start, for writing in place.
++  [[nodiscard]] uint8_t* append_uninitialized(size_t size) {
++    resize(m_length + size, false);
++    uint8_t* out = m_data + m_length;
++    m_length += size;
++    return out;
++  }
++
+   ByteBuffer clone() const {
+     ByteBuffer clone{m_length};
+     std::memcpy(clone.data(), m_data, m_length);
+@@ -334,6 +343,15 @@ private:
        m_owned = true;
      } else if (size > m_capacity) {
        if (!m_owned) {
@@ -1513,10 +4264,18 @@ index b446d2c..b65697b 100644
        }
        if (size < m_capacity * 2) {
 diff --git a/lib/webgpu/gpu.cpp b/lib/webgpu/gpu.cpp
-index 592b8ab..0d70dba 100644
+index 7ad9e4d..10b5f22 100644
 --- a/lib/webgpu/gpu.cpp
 +++ b/lib/webgpu/gpu.cpp
-@@ -28,6 +28,11 @@
+@@ -1,6 +1,7 @@
+ #include "gpu.hpp"
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <atomic>
+ #include <array>
+ #include <cmath>
+@@ -28,6 +29,11 @@
  #ifdef WEBGPU_DAWN
  #include "../dawn/TracyPlatform.hpp"
  #include <dawn/native/DawnNative.h>
@@ -1527,8 +4286,27 @@ index 592b8ab..0d70dba 100644
 +#endif
  #endif
  
- namespace aurora::gx {
-@@ -784,12 +789,27 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+ namespace aurora::webgpu {
+@@ -61,6 +67,7 @@ static wgpu::SurfaceCapabilities g_surfaceCapabilities;
+ bool g_hasCoreFeatures = false;
+ bool g_dualSourceBlendingSupported = false;
+ bool g_bcTexturesSupported = false;
++bool g_cmprAsBc1 = false;
+ bool g_astcTexturesSupported = false;
+ bool g_textureComponentSwizzleSupported = false;
+ static std::atomic_bool g_initialized = false;
+@@ -667,6 +674,10 @@ const TextureWithSampler& resample_present_source(const wgpu::CommandEncoder& en
+   const auto& source = present_source();
+   const uint32_t width = viewport_extent(viewport.width);
+   const uint32_t height = viewport_extent(viewport.height);
++  // smstrikers-port: at 1:1 the resample is an identity copy, so the blit reads the frame buffer directly.
++  if (source.size.width == width && source.size.height == height) {
++    return source;
++  }
+   if (!g_resampledFrameBuffer.view || g_resampledFrameBuffer.size.width != width ||
+       g_resampledFrameBuffer.size.height != height || g_resampledFrameBuffer.format != source.format) {
+     g_resampledFrameBuffer = create_render_texture(width, height, false);
+@@ -814,12 +825,27 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
      return false;
    }
    {
@@ -1557,8 +4335,8 @@ index 592b8ab..0d70dba 100644
      Log.info("Requesting adapter\n  Feature level: {}\n  Power preference: {}\n  Backend: {}\n  Compatible surface: {}",
               magic_enum::enum_name(options.featureLevel), magic_enum::enum_name(options.powerPreference),
               magic_enum::enum_name(options.backendType), static_cast<bool>(options.compatibleSurface));
-@@ -895,6 +915,16 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
-     g_textureComponentSwizzleSupported = false;
+@@ -926,6 +952,16 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+     g_dualSourceBlendingSupported = false;
      wgpu::SupportedFeatures supportedFeatures;
      g_adapter.GetFeatures(&supportedFeatures);
 +    {
@@ -1574,11 +4352,317 @@ index 592b8ab..0d70dba 100644
      for (size_t i = 0; i < supportedFeatures.featureCount; ++i) {
        const auto feature = supportedFeatures.features[i];
        if (feature == wgpu::FeatureName::CoreFeaturesAndLimits || feature == wgpu::FeatureName::TextureCompressionBC ||
+@@ -944,12 +980,25 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+         }
+         requiredFeatures.push_back(feature);
+       }
+-#ifdef TRACY_ENABLE
++      // smstrikers-port: also requested without Tracy when AURORA_GPU_PROF_LOG is set.
+       if (feature == wgpu::FeatureName::TimestampQuery) {
+-        requiredFeatures.push_back(feature);
+-      }
++#ifndef TRACY_ENABLE
++        const char* prof = std::getenv("AURORA_GPU_PROF_LOG");
++        if (prof != nullptr && *prof != '\0')
+ #endif
++        {
++          requiredFeatures.push_back(feature);
++        }
++      }
+     }
++#ifdef __SWITCH__
++    // smstrikers-port: BC1 is 4 bits a pixel to decoded CMPR's 32 but blends in thirds where GX uses eighths.
++    {
++      const char* e = std::getenv("STRIKERS_CMPR_BC1");
++      g_cmprAsBc1 = g_bcTexturesSupported && (e == nullptr || *e != '0');
++    }
++#endif
++
+     std::string featureList;
+     for (auto featureName : requiredFeatures) {
+       featureList += "\n  ";
+@@ -1182,6 +1231,19 @@ void resize_swapchain(uint32_t width, uint32_t height, uint32_t nativeWidth, uin
+   gfx::gpu_synchronize();
+   resize_swapchain_internal(width, height, nativeWidth, nativeHeight, force);
+ }
++
++bool pop_out_of_memory_scope() noexcept {
++  bool outOfMemory = false;
++  const wgpu::Future future = g_device.PopErrorScope(
++      wgpu::CallbackMode::WaitAnyOnly, [&outOfMemory](wgpu::PopErrorScopeStatus status, wgpu::ErrorType type,
++                                                      wgpu::StringView) {
++        outOfMemory = status == wgpu::PopErrorScopeStatus::Success && type == wgpu::ErrorType::OutOfMemory;
++      });
++  wgpu::FutureWaitInfo wait{};
++  wait.future = future;
++  g_instance.WaitAny(1, &wait, UINT64_MAX);
++  return outOfMemory;
++}
+ } // namespace aurora::webgpu
+ 
+ void aurora_enable_vsync(const bool enabled) {
+@@ -1190,3 +1252,8 @@ void aurora_enable_vsync(const bool enabled) {
+       aurora::webgpu::select_present_mode(aurora::webgpu::g_surfaceCapabilities);
+   aurora::window::push_custom_event(aurora::window::CustomEvent::RefreshSurface);
+ }
++
++bool aurora_present_waits_for_vblank() {
++  const auto mode = aurora::webgpu::g_graphicsConfig.surfaceConfiguration.presentMode;
++  return mode == wgpu::PresentMode::Fifo || mode == wgpu::PresentMode::FifoRelaxed;
++}
+diff --git a/lib/webgpu/gpu.hpp b/lib/webgpu/gpu.hpp
+index a1ce5c0..bba1cbf 100644
+--- a/lib/webgpu/gpu.hpp
++++ b/lib/webgpu/gpu.hpp
+@@ -58,6 +58,8 @@ extern wgpu::Instance g_instance;
+ extern wgpu::AdapterInfo g_adapterInfo;
+ extern bool g_hasCoreFeatures;
+ extern bool g_bcTexturesSupported;
++// smstrikers-port: upload eligible CMPR textures as BC1 instead of RGBA8.
++extern bool g_cmprAsBc1;
+ extern bool g_astcTexturesSupported;
+ extern bool g_textureComponentSwizzleSupported;
+ extern bool g_dualSourceBlendingSupported;
+@@ -71,6 +73,8 @@ TextureWithSampler create_render_texture(uint32_t width, uint32_t height, bool m
+ bool enable_normal_buffer();
+ const TextureWithSampler& present_source() noexcept;
+ wgpu::BindGroup create_copy_bind_group(const TextureWithSampler& source);
++// smstrikers-port: pops an OutOfMemory error scope this thread pushed; true if an allocation inside it failed.
++bool pop_out_of_memory_scope() noexcept;
+ void set_resampler(AuroraSampler sampler) noexcept;
+ AuroraSampler get_resampler() noexcept;
+ Viewport calculate_present_viewport(uint32_t surface_width, uint32_t surface_height, uint32_t content_width,
+diff --git a/lib/webgpu/gpu_cache.cpp b/lib/webgpu/gpu_cache.cpp
+index 6ef44ea..7ca79a5 100644
+--- a/lib/webgpu/gpu_cache.cpp
++++ b/lib/webgpu/gpu_cache.cpp
+@@ -99,6 +99,89 @@ INSERT INTO aurora_schema VALUES ({});)",
+   return true;
+ }
+ 
++#ifdef __SWITCH__
++// smstrikers-port: bundled shader blobs must match the Dawn and NVK builds in this executable.
++constexpr const char* InitialDawnCacheName = "initial_dawn_cache.db";
++
++static std::string dawn_cache_seed_path() {
++  std::string path;
++  if (g_config.resourcesPath != nullptr && g_config.resourcesPath[0] != '\0') {
++    path = g_config.resourcesPath;
++    if (path.back() != '/' && path.back() != '\\') {
++      path += '/';
++    }
++  }
++  path += InitialDawnCacheName;
++  return path;
++}
++
++// Merge missing entries so upgrades receive new seeds without replacing local blobs.
++static void seed_dawn_cache() {
++  if (db == nullptr || cache_broken) {
++    return;
++  }
++  const auto seedPath = dawn_cache_seed_path();
++  sqlite3* seedDb = nullptr;
++  if (sqlite3_open_v2(seedPath.c_str(), &seedDb, SQLITE_OPEN_READONLY | SQLITE_OPEN_PRIVATECACHE, nullptr) !=
++      SQLITE_OK) {
++    if (seedDb != nullptr) {
++      sqlite3_close(seedDb);
++    }
++    return;   // no seed shipped, which is not an error
++  }
++
++  sqlite3_stmt* read = nullptr;
++  if (sqlite3_prepare_v3(seedDb, "SELECT key, value, size, compressed FROM cache", -1, 0, &read, nullptr) !=
++      SQLITE_OK) {
++    Log.warn("Bundled Dawn cache '{}' could not be read: {}", seedPath, sqlite3_errmsg(seedDb));
++    sqlite3_close(seedDb);
++    return;
++  }
++
++  sqlite3_stmt* insert = nullptr;
++  if (sqlite3_prepare_v3(db, "INSERT OR IGNORE INTO cache (key, value, size, compressed) VALUES (?, ?, ?, ?)",
++                         -1, 0, &insert, nullptr) != SQLITE_OK) {
++    sqlite3_finalize(read);
++    sqlite3_close(seedDb);
++    return;
++  }
++
++  uint32_t merged = 0;
++  {
++    sqlite::Transaction tx(db, Log, true);
++    if (!tx) {
++      sqlite3_finalize(insert);
++      sqlite3_finalize(read);
++      sqlite3_close(seedDb);
++      return;
++    }
++    while (sqlite3_step(read) == SQLITE_ROW) {
++      const auto* keyBlob = sqlite3_column_blob(read, 0);
++      const auto keyBytes = sqlite3_column_bytes(read, 0);
++      const auto* valueBlob = sqlite3_column_blob(read, 1);
++      const auto valueBytes = sqlite3_column_bytes(read, 1);
++      if (keyBlob == nullptr || valueBlob == nullptr || keyBytes <= 0 || valueBytes <= 0) {
++        continue;
++      }
++      sqlite3_reset(insert);
++      sqlite3_bind_blob(insert, 1, keyBlob, keyBytes, SQLITE_TRANSIENT);
++      sqlite3_bind_blob(insert, 2, valueBlob, valueBytes, SQLITE_TRANSIENT);
++      sqlite3_bind_int64(insert, 3, sqlite3_column_int64(read, 2));
++      sqlite3_bind_int(insert, 4, sqlite3_column_int(read, 3));
++      if (sqlite3_step(insert) == SQLITE_DONE) {
++        merged += sqlite3_changes(db);
++      }
++    }
++    sqlite3_reset(insert);
++    tx.commit();
++  }
++  sqlite3_finalize(insert);
++  sqlite3_finalize(read);
++  sqlite3_close(seedDb);
++  Log.info("Seeded Dawn cache from '{}' ({} blobs)", seedPath, merged);
++}
++#endif
++
+ static bool cache_init_core() {
+   Log.debug("SQLite version {}", sqlite3_libversion());
+ 
+@@ -216,6 +299,9 @@ static bool cache_init() {
+   }
+ 
+   Log.debug("SQLite cache init succeeded");
++#ifdef __SWITCH__
++  seed_dawn_cache();
++#endif
+ 
+   return true;
+ }
 diff --git a/lib/webgpu/gpu_prof.cpp b/lib/webgpu/gpu_prof.cpp
-index c8c9549..c04bcba 100644
+index c8c9549..55fdd6c 100644
 --- a/lib/webgpu/gpu_prof.cpp
 +++ b/lib/webgpu/gpu_prof.cpp
-@@ -196,6 +196,22 @@ void emit_frame(Slot& slot) {
+@@ -5,11 +5,17 @@
+ 
+ #include <tracy/Tracy.hpp>
+ 
++// smstrikers-port: builds without Tracy; AURORA_GPU_PROF_LOG=<seconds> prints per-pass GPU time at that interval.
+ #ifdef TRACY_ENABLE
+-
+ #include <tracy/TracyC.h>
++#endif
+ 
+ #include <algorithm>
++#include <cstdio>
++#include <cstdlib>
++#include <map>
++
++#include <aurora/gfx.h> // aurora_get_stats, for the draw counts in the log
+ #include <array>
+ #include <atomic>
+ #include <bitset>
+@@ -107,6 +113,7 @@ const char* intern_name(std::string_view name) {
+   return stable;
+ }
+ 
++#ifdef TRACY_ENABLE
+ // tracy::GpuContextType not exposed through TracyC.h
+ uint8_t tracy_context_type(wgpu::BackendType backend) {
+   switch (backend) {
+@@ -161,6 +168,94 @@ void emit_zone_end(uint64_t gpuNs) {
+   ___tracy_emit_gpu_zone_end_serial({.queryId = queryId, .context = ContextId});
+   ___tracy_emit_gpu_time_serial({.gpuTime = int64_t(gpuNs), .queryId = queryId, .context = ContextId});
+ }
++#endif // TRACY_ENABLE
++
++// smstrikers-port: the AURORA_GPU_PROF_LOG aggregation.
++struct LogAcc {
++  uint64_t ns = 0;
++  uint64_t calls = 0;
++};
++std::map<std::string, LogAcc> g_logZones;
++uint64_t g_logFrames = 0, g_logFrameNs = 0, g_logFrameMaxNs = 0, g_logPasses = 0, g_logIdleNs = 0;
++int64_t g_logLastPrint = 0;
++double g_logIntervalSec = 0.0; // 0: logging off
++
++void log_print() {
++  if (g_logFrames == 0) {
++    return;
++  }
++  std::vector<std::pair<std::string, LogAcc>> rows(g_logZones.begin(), g_logZones.end());
++  std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.second.ns > b.second.ns; });
++  const double frames = double(g_logFrames);
++  std::fprintf(stderr,
++               "\n=== aurora gpu profile: %llu frames, gpu frame mean %.3f ms max %.3f ms, "
++               "passes/frame %.1f, gpu idle within frame %.3f ms ===\n"
++               "  %-28s %9s %11s %9s\n",
++               static_cast<unsigned long long>(g_logFrames), double(g_logFrameNs) / frames * 1e-6,
++               double(g_logFrameMaxNs) * 1e-6, double(g_logPasses) / frames, double(g_logIdleNs) / frames * 1e-6,
++               "pass / zone", "ms/frame", "calls/frame", "us/call");
++  for (const auto& [name, acc] : rows) {
++    std::fprintf(stderr, "  %-28s %9.3f %11.2f %9.1f\n", name.c_str(), double(acc.ns) / frames * 1e-6,
++                 double(acc.calls) / frames, acc.calls ? double(acc.ns) / double(acc.calls) * 1e-3 : 0.0);
++  }
++  if (const AuroraStats* st = aurora_get_stats(); st != nullptr) {
++    std::fprintf(stderr,
++                 "  last frame: %u draws (%u merged), %u pipelines created so far; staged bytes: verts %u "
++                 "uniforms %u indices %u storage %u textures %u\n",
++                 st->drawCallCount, st->mergedDrawCallCount, st->createdPipelines, st->lastVertSize,
++                 st->lastUniformSize, st->lastIndexSize, st->lastStorageSize, st->lastTextureUploadSize);
++  }
++  std::fprintf(stderr, "\n");
++  g_logZones.clear();
++  g_logFrames = g_logFrameNs = g_logFrameMaxNs = g_logPasses = g_logIdleNs = 0;
++}
++
++void log_frame(const Slot& slot, const uint64_t* ts, uint64_t frameBegin, uint64_t frameEnd) {
++  ++g_logFrames;
++  const uint64_t frameNs = frameEnd - frameBegin;
++  g_logFrameNs += frameNs;
++  g_logFrameMaxNs = std::max(g_logFrameMaxNs, frameNs);
++  g_logPasses += slot.passCount;
++  // Pair begins with ends by nesting, as the Tracy path does; unwritten timestamps read 0.
++  std::vector<const Event*> stack;
++  uint64_t topLevelEnd = frameBegin;
++  uint64_t idleNs = 0;
++  for (const auto& event : slot.events) {
++    if (event.kind == EventKind::End) {
++      if (stack.empty()) {
++        continue;
++      }
++      const Event* begin = stack.back();
++      stack.pop_back();
++      const uint64_t tb = ts[begin->query];
++      const uint64_t te = ts[event.query];
++      if (tb != 0 && te > tb) {
++        auto& acc = g_logZones[begin->name];
++        acc.ns += te - tb;
++        ++acc.calls;
++        if (stack.empty()) {
++          topLevelEnd = std::max(topLevelEnd, te);
++        }
++      }
++    } else {
++      if (stack.empty()) {
++        const uint64_t tb = ts[event.query];
++        if (tb > topLevelEnd) {
++          idleNs += tb - topLevelEnd;
++        }
++      }
++      stack.push_back(&event);
++    }
++  }
++  g_logIdleNs += idleNs;
++  const int64_t now = now_ns();
++  if (g_logLastPrint == 0) {
++    g_logLastPrint = now;
++  } else if (double(now - g_logLastPrint) * 1e-9 >= g_logIntervalSec) {
++    log_print();
++    g_logLastPrint = now;
++  }
++}
+ 
+ TimestampBounds event_bounds(const Slot& slot, const uint64_t* ts) {
+   TimestampBounds bounds;
+@@ -196,6 +291,22 @@ void emit_frame(Slot& slot) {
      frameEnd = ts[FrameEndQuery];
    }
    if (frameBegin == 0 || frameEnd <= frameBegin) {
@@ -1601,11 +4685,79 @@ index c8c9549..c04bcba 100644
      return;
    }
  
+@@ -214,6 +325,11 @@ void emit_frame(Slot& slot) {
+     }
+   }
+ 
++  if (g_logIntervalSec > 0.0) {
++    log_frame(slot, ts, frameBegin, frameEnd);
++  }
++
++#ifdef TRACY_ENABLE
+   if (!TracyIsConnected) {
+     return;
+   }
+@@ -277,6 +393,7 @@ void emit_frame(Slot& slot) {
+   TracyPlot("aurora: gpuFrameMs", double(frameEnd - frameBegin) * 1e-6);
+   TracyPlot("aurora: gpuIdleMs", double(idleNs) * 1e-6);
+   TracyPlot("aurora: gpuPasses", int64_t(slot.passCount));
++#endif // TRACY_ENABLE
+ }
+ 
+ Slot& record_slot() { return g_slots[g_recordSlot]; }
+@@ -290,6 +407,18 @@ uint32_t alloc_zone() {
+ } // namespace
+ 
+ void initialize() {
++  if (const char* env = std::getenv("AURORA_GPU_PROF_LOG"); env != nullptr && *env != '\0') {
++    g_logIntervalSec = std::atof(env);
++    if (g_logIntervalSec <= 0.0) {
++      g_logIntervalSec = 10.0;
++    }
++  }
++#ifndef TRACY_ENABLE
++  if (g_logIntervalSec <= 0.0) {
++    g_enabled = false;
++    return;
++  }
++#endif
+   g_enabled = g_device.HasFeature(wgpu::FeatureName::TimestampQuery);
+   if (!g_enabled) {
+     Log.info("Timestamp queries unsupported; GPU profiling disabled");
+@@ -328,6 +457,9 @@ void initialize() {
+ }
+ 
+ void shutdown() {
++  if (g_logIntervalSec > 0.0) {
++    log_print();
++  }
+   g_querySet = {};
+   g_resolveBuffer = {};
+   for (auto& slot : g_slots) {
+@@ -457,18 +589,3 @@ Zone::~Zone() {
+ }
+ 
+ } // namespace aurora::webgpu::gpu_prof
+-
+-#else
+-
+-namespace aurora::webgpu::gpu_prof {
+-void initialize() {}
+-void shutdown() {}
+-void frame_begin(const wgpu::CommandEncoder&) {}
+-void frame_end(const wgpu::CommandEncoder&) {}
+-void after_submit() {}
+-const wgpu::PassTimestampWrites* pass_writes(std::string_view) { return nullptr; }
+-Zone::Zone(const wgpu::CommandEncoder&, std::string_view) {}
+-Zone::~Zone() = default;
+-} // namespace aurora::webgpu::gpu_prof
+-
+-#endif
 diff --git a/lib/window.cpp b/lib/window.cpp
-index 037a5fd..23d503c 100644
+index cf84de3..9c7a686 100644
 --- a/lib/window.cpp
 +++ b/lib/window.cpp
-@@ -299,6 +299,10 @@ bool create_window(AuroraBackend backend) {
+@@ -345,6 +345,10 @@ bool create_window(AuroraBackend backend) {
    if (g_config.startFullscreen) {
      flags |= SDL_WINDOW_FULLSCREEN;
    }
@@ -1616,7 +4768,7 @@ index 037a5fd..23d503c 100644
  #endif
    auto width = static_cast<Sint32>(g_config.windowWidth);
    auto height = static_cast<Sint32>(g_config.windowHeight);
-@@ -437,10 +441,18 @@ AuroraWindowSize get_window_size() {
+@@ -488,10 +492,18 @@ AuroraWindowSize get_window_size() {
      fb_h = scaledH;
    }
    if (g_frameBufferAspectFit) {
@@ -1639,7 +4791,7 @@ index 037a5fd..23d503c 100644
        fb_w = fitW;
        fb_h = fitH;
      }
-@@ -541,6 +553,16 @@ void request_frame_buffer_resize() {
+@@ -592,6 +604,13 @@ void request_frame_buffer_resize() {
    }
  }
  
@@ -1650,77 +4802,120 @@ index 037a5fd..23d503c 100644
 +  }
 +}
 +
-+// smstrikers-port: non-zero once the caller has pinned the render target to the VI render mode rather than the window, which GXAdjustForOverscan needs to know.
-+float get_frame_buffer_scale() { return g_frameBufferScale; }
-+
  void set_frame_buffer_scale(float scale) {
    if (scale < 0.f) {
      scale = 0.f;
 diff --git a/lib/window.hpp b/lib/window.hpp
-index 51257ea..e8c368f 100644
+index 51257ea..50cca23 100644
 --- a/lib/window.hpp
 +++ b/lib/window.hpp
-@@ -48,7 +48,10 @@ void set_window_size(uint32_t width, uint32_t height);
+@@ -48,6 +48,8 @@ void set_window_size(uint32_t width, uint32_t height);
  void set_window_position(uint32_t x, uint32_t y);
  void center_window();
  void request_frame_buffer_resize();
 +// smstrikers-port: the work request_frame_buffer_resize defers to the next event pump, done now; a wrapper because resize_swapchain has internal linkage.
 +void resize_frame_buffer_now();
  void set_frame_buffer_scale(float scale);
-+float get_frame_buffer_scale();  // smstrikers-port
  void set_frame_buffer_aspect_fit(bool fit);
  void set_background_input(bool value);
- }; // namespace aurora::window
 diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
-index 8323015..ccac8d0 100644
+index 0a9c58a..786275b 100644
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -84,6 +84,7 @@ if (AURORA_ENABLE_GX)
-     ../lib/gx/attr_fmt.cpp
+@@ -125,6 +125,7 @@ if (AURORA_ENABLE_GX)
      ../lib/gx/dl.cpp
      gx_dl_test.cpp
+     gx_readback_test.cpp
 +    gx_overscan_test.cpp
    )
  
    target_include_directories(gx_fifo_tests PRIVATE
+@@ -153,6 +154,7 @@ if (AURORA_ENABLE_GX)
+     gx_texture_cache_test.cpp
+     gx_texture_cache_test_stubs.cpp
+     ../lib/gx/texture.cpp
++    ../lib/thread.cpp
+   )
+   target_include_directories(gx_texture_cache_tests PRIVATE
+     ../include
+diff --git a/tests/gx_fifo_test.cpp b/tests/gx_fifo_test.cpp
+index f897896..1bf63d0 100644
+--- a/tests/gx_fifo_test.cpp
++++ b/tests/gx_fifo_test.cpp
+@@ -7,17 +7,21 @@
+ #include "gx_test_common.hpp"
+ #include "__gx.h"
+ #include "gx/regs.hpp"
++#include "gx/pipeline.hpp"
+ 
+ #include <algorithm>
++#include <array>
+ #include <atomic>
+ #include <bit>
+ #include <chrono>
+ #include <cmath>
+ #include <thread>
++#include <utility>
+ 
+ using aurora::gx::g_gxState;
+ 
+ namespace aurora::gfx {
++extern gx::DrawData g_testLastDraw;
+ extern uint32_t g_testDrawCount;
+ extern std::atomic<uint32_t> g_testProcessedDrawCount;
+ namespace testing {
+@@ -127,6 +131,36 @@ TEST_F(GXFifoTest, AutoSizedDrawPublishesAfterLengthPatch) {
+   EXPECT_EQ(aurora::gfx::g_testDrawCount, 1u);
+ }
+ 
++// smstrikers-port: each of these draws needs 65,538 indices, two more than a u16 count holds.
++TEST_F(GXFifoTest, IndexCountPastU16) {
++  const std::array<std::pair<GXPrimitive, u16>, 3> draws{{
++      {GX_TRIANGLESTRIP, 21848},
++      {GX_TRIANGLEFAN, 21848},
++      {GX_QUADS, 43692},
++  }};
++  for (const auto& [prim, vertices] : draws) {
++    SCOPED_TRACE(static_cast<int>(prim));
++    aurora::gx::fifo::init();
++    aurora::gx::fifo::begin_frame();
++    GXClearVtxDesc();
++    GXSetVtxDesc(GX_VA_POS, GX_DIRECT);
++    GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_U8, 0);
++    aurora::gfx::g_testDrawCount = 0;
++
++    GXBegin(prim, GX_VTXFMT0, vertices);
++    for (u32 v = 0; v < vertices; ++v) {
++      GXPosition3u8(0, 0, 0);
++    }
++    GXEnd();
++    aurora::gx::fifo::drain();
++    aurora::gx::fifo::end_frame();
++    aurora::gx::fifo::shutdown();
++
++    EXPECT_EQ(aurora::gfx::g_testDrawCount, 1u);
++    EXPECT_EQ(aurora::gfx::g_testLastDraw.indexCount, 65538u);
++  }
++}
++
+ TEST_F(GXFifoTest, CommandsAfterFinalDrawRemainPendingUntilDrain) {
+   aurora::gx::fifo::init();
+   aurora::gx::fifo::begin_frame();
 diff --git a/tests/gx_overscan_test.cpp b/tests/gx_overscan_test.cpp
 new file mode 100644
-index 0000000..bd98df6
+index 0000000..821a601
 --- /dev/null
 +++ b/tests/gx_overscan_test.cpp
-@@ -0,0 +1,58 @@
-+// smstrikers-port: GXAdjustForOverscan has two answers, and which one a game
-+// gets depends on whether it pinned the render target to the VI mode.
+@@ -0,0 +1,34 @@
++// smstrikers-port: GXAdjustForOverscan against the SDK's arithmetic.
 +#include <gtest/gtest.h>
 +
 +#include <dolphin/gx.h>
 +
-+namespace aurora::window::testing {
-+extern float g_frameBufferScale;
-+}
-+
 +namespace {
 +
-+struct OverscanTest : ::testing::Test {
-+  void TearDown() override { aurora::window::testing::g_frameBufferScale = 0.f; }
-+};
-+
-+// Stock Aurora: the framebuffer is the window, whatever the mode says.
-+TEST_F(OverscanTest, ReportsTheWindowWhenTheRenderTargetIsNotPinned) {
-+  aurora::window::testing::g_frameBufferScale = 0.f;
-+  GXRenderModeObj out{};
-+  GXAdjustForOverscan(&GXNtsc480Int, &out, 8, 16);
-+  EXPECT_EQ(out.fbWidth, 640);
-+  EXPECT_EQ(out.efbHeight, 480);
-+  EXPECT_EQ(out.xfbHeight, 480);
-+  EXPECT_EQ(out.viWidth, GXNtsc480Int.viWidth);
-+  EXPECT_EQ(out.viXOrigin, GXNtsc480Int.viXOrigin);
-+}
-+
-+// Pinned: the SDK's own arithmetic. NTSC interlaced, double-strike field buffer,
-+// so the vertical trim is applied whole to every height.
-+TEST_F(OverscanTest, DoesTheSdkArithmeticWhenTheRenderTargetIsPinned) {
-+  aurora::window::testing::g_frameBufferScale = 1.f;
++// NTSC interlaced, double-strike field buffer, so the vertical trim is applied whole to every height.
++TEST(OverscanTest, DoesTheSdkArithmetic) {
 +  GXRenderModeObj out{};
 +  GXAdjustForOverscan(&GXNtsc480Int, &out, 8, 16);
 +  EXPECT_EQ(out.fbWidth, 640 - 16);
@@ -1735,8 +4930,7 @@ index 0000000..bd98df6
 +
 +// A single-strike field buffer at 240 lines trims the XFB by half the amount,
 +// which is the one place the SDK's formula is not uniform.
-+TEST_F(OverscanTest, HalvesTheXfbTrimForASingleStrikeFieldBuffer) {
-+  aurora::window::testing::g_frameBufferScale = 1.f;
++TEST(OverscanTest, HalvesTheXfbTrimForASingleStrikeFieldBuffer) {
 +  GXRenderModeObj in = GXNtsc480Int;
 +  in.xFBmode = VI_XFBMODE_SF;
 +  in.xfbHeight = 240;
@@ -1748,22 +4942,387 @@ index 0000000..bd98df6
 +
 +} // namespace
 diff --git a/tests/gx_test_stubs.cpp b/tests/gx_test_stubs.cpp
-index 6268a0c..26abb0d 100644
+index 4419448..b9ddc18 100644
 --- a/tests/gx_test_stubs.cpp
 +++ b/tests/gx_test_stubs.cpp
-@@ -291,8 +291,15 @@ bool has_replacement(const GXTexObj_&, const GXTlutObj_&) noexcept { return fals
- // --- Window stub ---
- #include "../lib/window.hpp"
- namespace aurora::window {
-+namespace testing {
-+// smstrikers-port: GXAdjustForOverscan takes the SDK arithmetic when a game
-+// has pinned the render target (set_frame_buffer_scale > 0). 0 is the stock
-+// behaviour; gx_overscan_test.cpp sets it to exercise the other branch.
-+float g_frameBufferScale = 0.f;
-+} // namespace testing
- AuroraWindowSize get_window_size() { return {640, 480, 640, 480, 640, 480, 1.0f}; }
- void set_frame_buffer_aspect_fit(bool) {}
-+float get_frame_buffer_scale() { return testing::g_frameBufferScale; }
- } // namespace aurora::window
+@@ -217,7 +217,7 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
+   return {};
+ }
+ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept { return {}; }
+-void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept {}
++bool write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept { return true; }
+ void queue_texture_upload(TextureUpload upload) {}
+ void queue_texture_upload_data(const uint8_t* data, size_t length, uint32_t bytesPerRow, uint32_t rowsPerImage,
+                                wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size) {}
+@@ -322,3 +322,8 @@ void aurora::gfx::push_debug_group(std::string) {}
+ void push_debug_group(const char*) {}
+ void pop_debug_group() {}
+ void aurora::gfx::insert_debug_marker(std::string) {}
++
++// smstrikers-port: GXInitTexObjLOD calls this, and the FIFO tests do not link the texture cache.
++namespace aurora::gx::texture {
++void preconvert_texture(const GXTexObj_&) noexcept {}
++} // namespace aurora::gx::texture
+diff --git a/tests/gx_texture_cache_test.cpp b/tests/gx_texture_cache_test.cpp
+index 9949fb2..420bffc 100644
+--- a/tests/gx_texture_cache_test.cpp
++++ b/tests/gx_texture_cache_test.cpp
+@@ -6,6 +6,8 @@
+ #include <xxhash.h>
  
- // --- WebGPU C API stubs (prevent linker errors from wgpu:: destructors) ---
+ #include <array>
++#include <chrono>
++#include <thread>
+ #include <cstdint>
+ #include <vector>
+ 
+@@ -14,6 +16,8 @@ void reset_texture_stubs();
+ uint64_t texture_allocations();
+ uint64_t palette_conversions();
+ uint64_t copy_allocations();
++uint64_t texture_conversions();
++uint64_t converted_allocations();
+ gfx::TextureHandle make_texture_handle(uint32_t width, uint32_t height, u32 format = GX_TF_RGBA8_PC);
+ void set_replacement(gfx::TextureHandle handle, uint64_t id = 1);
+ void set_source_replacement(aurora::texture::TextureSourceKey key, gfx::TextureHandle handle);
+@@ -603,5 +607,92 @@ TEST_F(GxTextureCacheTest, ShutdownRestoresContentCacheBudgetAndAccounting) {
+   EXPECT_EQ(texture_stats().contentCacheBytes, 64);
+   EXPECT_EQ(texture_stats().contentCacheEntries, 1);
+ }
++
++// smstrikers-port: background pre-conversion.
++bool wait_for_preconversion() {
++  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
++  while (!texture::preconversion_idle_for_testing()) {
++    if (std::chrono::steady_clock::now() > deadline) {
++      return false;
++    }
++    std::this_thread::sleep_for(std::chrono::milliseconds{1});
++  }
++  return true;
++}
++
++TEST_F(GxTextureCacheTest, PreconvertedContentIsUsedAtFirstBind) {
++  std::array<uint8_t, 64> pixels{};
++  pixels[5] = 7;
++  const auto obj = make_texture(pixels.data(), 1, GX_TF_RGBA8, 4, 4);
++  texture::preconvert_texture(obj);
++  ASSERT_TRUE(wait_for_preconversion());
++  EXPECT_EQ(testing::texture_conversions(), 1);
++
++  const auto handle = texture::resolve_static_texture(obj);
++
++  EXPECT_TRUE(handle);
++  EXPECT_EQ(testing::converted_allocations(), 1);
++  EXPECT_EQ(testing::texture_allocations(), 0);
++}
++
++TEST_F(GxTextureCacheTest, ContentRewrittenAfterPreconversionConvertsInline) {
++  std::array<uint8_t, 64> pixels{};
++  const auto obj = make_texture(pixels.data(), 1, GX_TF_RGBA8, 4, 4);
++  texture::preconvert_texture(obj);
++  ASSERT_TRUE(wait_for_preconversion());
++
++  pixels[0] = 1;  // the game rewrote the texture after completing the object
++  texture::resolve_static_texture(obj);
++
++  EXPECT_EQ(testing::converted_allocations(), 0);
++  EXPECT_EQ(testing::texture_allocations(), 1);
++}
++
++TEST_F(GxTextureCacheTest, SourceIsCopiedWhenQueued) {
++  std::vector<uint8_t> pixels(64, 3);
++  auto obj = make_texture(pixels.data(), 1, GX_TF_RGBA8, 4, 4);
++  texture::preconvert_texture(obj);
++  // The game may free or reuse the memory as soon as GXInitTexObjLOD returns.
++  std::vector<uint8_t>(64, 9).swap(pixels);
++  ASSERT_TRUE(wait_for_preconversion());
++
++  std::array<uint8_t, 64> original{};
++  original.fill(3);
++  obj.data = original.data();
++  texture::resolve_static_texture(obj);
++
++  EXPECT_EQ(testing::converted_allocations(), 1);
++}
++
++TEST_F(GxTextureCacheTest, UploadedContentIsNotConvertedAgain) {
++  std::array<uint8_t, 64> pixels{};
++  texture::resolve_static_texture(make_texture(pixels.data(), 1, GX_TF_RGBA8, 4, 4));
++  const uint64_t conversions = testing::texture_conversions();
++
++  texture::preconvert_texture(make_texture(pixels.data(), 2, GX_TF_RGBA8, 4, 4));
++  ASSERT_TRUE(wait_for_preconversion());
++
++  EXPECT_EQ(testing::texture_conversions(), conversions);
++}
++
++TEST_F(GxTextureCacheTest, SameObjectIsQueuedOnce) {
++  std::array<uint8_t, 64> pixels{};
++  const auto obj = make_texture(pixels.data(), 1, GX_TF_RGBA8, 4, 4);
++  texture::preconvert_texture(obj);
++  texture::preconvert_texture(obj);  // LOD set twice on one object
++  ASSERT_TRUE(wait_for_preconversion());
++
++  EXPECT_EQ(testing::texture_conversions(), 1);
++}
++
++TEST_F(GxTextureCacheTest, PaletteAndPcFormatsAreNotPreconverted) {
++  std::array<uint8_t, 64> pixels{};
++  texture::preconvert_texture(make_texture(pixels.data(), 1, GX_TF_C8, 4, 4));
++  texture::preconvert_texture(make_texture(pixels.data(), 2, GX_TF_RGBA8_PC, 4, 4));
++  ASSERT_TRUE(wait_for_preconversion());
++
++  EXPECT_EQ(testing::texture_conversions(), 0);
++}
++
+ } // namespace
+ } // namespace aurora::gx
+diff --git a/tests/gx_texture_cache_test_stubs.cpp b/tests/gx_texture_cache_test_stubs.cpp
+index 5918205..5a8b44c 100644
+--- a/tests/gx_texture_cache_test_stubs.cpp
++++ b/tests/gx_texture_cache_test_stubs.cpp
+@@ -7,6 +7,7 @@
+ #include "internal.hpp"
+ 
+ #include <algorithm>
++#include <atomic>
+ #include <cstdio>
+ #include <fmt/format.h>
+ #include <memory>
+@@ -16,6 +17,8 @@ namespace {
+ uint64_t s_textureAllocations = 0;
+ uint64_t s_paletteConversions = 0;
+ uint64_t s_copyAllocations = 0;
++std::atomic<uint64_t> s_textureConversions{0};
++uint64_t s_convertedAllocations = 0;
+ aurora::gfx::TextureHandle s_replacement;
+ std::optional<aurora::texture::TextureSourceKey> s_sourceKey;
+ aurora::gfx::TextureHandle s_sourceReplacement;
+@@ -50,6 +53,8 @@ void reset_texture_stubs() {
+   s_textureAllocations = 0;
+   s_paletteConversions = 0;
+   s_copyAllocations = 0;
++  s_textureConversions = 0;
++  s_convertedAllocations = 0;
+   s_replacement.reset();
+   s_sourceKey.reset();
+   s_sourceReplacement.reset();
+@@ -60,6 +65,8 @@ void reset_texture_stubs() {
+ uint64_t texture_allocations() { return s_textureAllocations; }
+ uint64_t palette_conversions() { return s_paletteConversions; }
+ uint64_t copy_allocations() { return s_copyAllocations; }
++uint64_t texture_conversions() { return s_textureConversions; }
++uint64_t converted_allocations() { return s_convertedAllocations; }
+ void set_replacement(gfx::TextureHandle handle, uint64_t id) {
+   s_replacement = std::move(handle);
+   s_replacementId = id;
+@@ -89,6 +96,34 @@ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mi
+   return handle;
+ }
+ 
++TextureHandle new_static_texture_2d_converted(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
++                                              wgpu::TextureFormat wgpuFormat, ArrayRef<uint8_t> converted,
++                                              bool hasArbitraryMips, const char* label) noexcept {
++  ++s_convertedAllocations;
++  auto handle = gx::testing::make_texture_handle(width, height, gxFormat);
++  handle->mipCount = mips;
++  return handle;
++}
++
++ConvertedTexture convert_texture(u32 format, uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data) {
++  ++s_textureConversions;
++  size_t pixels = 0;
++  for (uint32_t mip = 0; mip < mips; ++mip) {
++    pixels += static_cast<size_t>(std::max(width >> mip, 1u)) * std::max(height >> mip, 1u);
++  }
++  return ConvertedTexture{
++      .format = wgpu::TextureFormat::RGBA8Unorm,
++      .width = width,
++      .height = height,
++      .mips = mips,
++      .data = ByteBuffer(pixels * 4),
++  };
++}
++
++TexLoadTiming g_texLoadTiming;
++bool tex_log_enabled() noexcept { return false; }
++uint64_t tex_log_now_ns() noexcept { return 0; }
++
+ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept {
+   ++s_copyAllocations;
+   return gx::testing::make_texture_handle(width, height, gxFormat);
+diff --git a/tests/texture_replacement_streaming_test.cpp b/tests/texture_replacement_streaming_test.cpp
+index 18da654..f8ca5bd 100644
+--- a/tests/texture_replacement_streaming_test.cpp
++++ b/tests/texture_replacement_streaming_test.cpp
+@@ -1,4 +1,6 @@
+ #include "gfx/dds_io.hpp"
++#include "internal.hpp"
++#include "gfx/png_io.hpp"
+ #include "gfx/texture_replacement.hpp"
+ 
+ #include <aurora/texture.hpp>
+@@ -13,8 +15,10 @@
+ #include <filesystem>
+ #include <fstream>
+ #include <future>
++#include <iterator>
+ #include <mutex>
+ #include <string>
++#include <string_view>
+ #include <vector>
+ 
+ namespace aurora::gfx::texture_replacement {
+@@ -152,6 +156,151 @@ TEST_F(ReplacementStreamingTest, StaleFailureDoesNotPoisonNewRegistration) {
+   texture::unregister_replacement(newRegistration);
+ }
+ 
++std::vector<uint8_t> encode_png(uint32_t width, uint32_t height) {
++  std::vector<uint8_t> pixels(static_cast<size_t>(width) * height * 4, 0x80);
++  const auto path =
++      std::filesystem::temp_directory_path() /
++      ("aurora-png-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".png");
++  EXPECT_TRUE(png::write_rgba8_png(path, width, height, {pixels.data(), pixels.size()}));
++  std::vector<uint8_t> bytes;
++  {
++    std::ifstream file(path, std::ios::binary);
++    bytes.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
++  }
++  std::error_code removeError;
++  std::filesystem::remove(path, removeError);
++  return bytes;
++}
++
++struct PngSource {
++  std::vector<uint8_t> bytes;
++  std::atomic<uint32_t> reads = 0;
++
++  // Only the base level exists; the loader also asks for `_mip1` sidecars.
++  static bool read(void* userData, const char* path, std::vector<uint8_t>& outBytes) {
++    auto& source = *static_cast<PngSource*>(userData);
++    if (std::string_view{path} != VirtualPngPath) {
++      return false;
++    }
++    ++source.reads;
++    outBytes = source.bytes;
++    return true;
++  }
++};
++
++class ReplacementWaitTest : public ReplacementStreamingTest {
++protected:
++  void TearDown() override {
++    texture::set_replacement_wait(false);
++    texture::set_replacement_strict_budget(false);
++    texture::set_replacement_cache_budget(4294967296);
++    ReplacementStreamingTest::TearDown();
++  }
++};
++
++TEST_F(ReplacementWaitTest, StrictBudgetLeavesOutPackBiggerThanBudget) {
++  const auto root = std::filesystem::temp_directory_path() /
++                    ("aurora-packs-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
++  const auto write = [&](const char* pack, const char* name, uint32_t size) {
++    std::filesystem::create_directories(root / pack);
++    const auto bytes = encode_png(size, size);
++    std::ofstream file(root / pack / name, std::ios::binary);
++    file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
++  };
++  write("Small", "tex1_4x4_0000000000000001_6.png", 4);
++  write("Big", "tex1_4x4_0000000000000002_6.png", 16);
++
++  // The loader keeps dumps out of the scan, so it needs a cache path.
++  const auto cachePath = root.string();
++  const char* savedCachePath = g_config.cachePath;
++  g_config.cachePath = cachePath.c_str();
++  texture::set_replacement_strict_budget(true);
++  texture::set_replacement_cache_budget(512);
++  const auto group = texture::load_replacement_directory(root);
++  const auto whole = texture::load_replacement_directory(root, {.onePack = true});
++  g_config.cachePath = savedCachePath;
++  std::error_code removeError;
++  std::filesystem::remove_all(root, removeError);
++
++  EXPECT_TRUE(whole.registrations.empty());
++  texture::unregister_replacements(whole);
++  ASSERT_EQ(group.registrations.size(), 1u);
++  EXPECT_EQ(std::get<texture::TextureSourceKey>(group.registrations.front().key).textureHash, 1u);
++  texture::unregister_replacements(group);
++}
++
++TEST_F(ReplacementWaitTest, FirstDrawTakesOverQueuedLoad) {
++  RecordingSource source;
++  testing::set_workers_paused(true);
++  const auto registration =
++      texture::register_virtual_replacement(VirtualPngPath, {.read = &RecordingSource::read, .userData = &source});
++  ASSERT_NE(registration.id, 0u);
++  GXTexObj_ obj{};
++  const auto key = std::get<texture::TextureSourceKey>(registration.key);
++  ASSERT_TRUE(find_source_replacement(obj, key).has_value());
++
++  texture::set_replacement_wait(true);
++  const auto result = find_source_replacement(obj, key);
++  ASSERT_TRUE(result.has_value());
++  EXPECT_EQ(result->id, registration.id);
++  {
++    std::lock_guard lock{source.mutex};
++    EXPECT_EQ(source.paths.size(), 1u);
++  }
++
++  testing::set_workers_paused(false);
++  EXPECT_FALSE(testing::wait_for_completions(registration.id, 1, 100));
++  std::lock_guard lock{source.mutex};
++  EXPECT_EQ(source.paths.size(), 1u);
++}
++
++TEST_F(ReplacementWaitTest, FirstDrawWaitsForRunningLoad) {
++  BlockingSource source;
++  const auto registration =
++      texture::register_virtual_replacement(VirtualPngPath, {.read = &BlockingSource::read, .userData = &source});
++  ASSERT_NE(registration.id, 0u);
++  GXTexObj_ obj{};
++  const auto key = std::get<texture::TextureSourceKey>(registration.key);
++  ASSERT_TRUE(find_source_replacement(obj, key).has_value());
++  {
++    std::unique_lock lock{source.mutex};
++    ASSERT_TRUE(source.cv.wait_for(lock, 2s, [&] { return source.entered; }));
++  }
++
++  texture::set_replacement_wait(true);
++  auto draw = std::async(std::launch::async, [&] { return find_source_replacement(obj, key); });
++  EXPECT_EQ(draw.wait_for(50ms), std::future_status::timeout);
++  {
++    std::lock_guard lock{source.mutex};
++    source.release = true;
++  }
++  source.cv.notify_all();
++
++  ASSERT_EQ(draw.wait_for(2s), std::future_status::ready);
++  EXPECT_TRUE(draw.get().has_value());
++  EXPECT_EQ(source.reads.load(), 1u);
++}
++
++TEST_F(ReplacementWaitTest, ReplacementThatCannotFitIsNotLoadedAgain) {
++  PngSource source{.bytes = encode_png(4, 4)};
++  texture::set_replacement_strict_budget(true);
++  texture::set_replacement_cache_budget(1);
++  const auto registration =
++      texture::register_virtual_replacement(VirtualPngPath, {.read = &PngSource::read, .userData = &source});
++  ASSERT_NE(registration.id, 0u);
++  GXTexObj_ obj{};
++  const auto key = std::get<texture::TextureSourceKey>(registration.key);
++  ASSERT_TRUE(find_source_replacement(obj, key).has_value());
++  ASSERT_TRUE(testing::wait_for_completions(registration.id, 1, 2000));
++  process_streaming();
++
++  const auto again = find_source_replacement(obj, key);
++  ASSERT_TRUE(again.has_value());
++  EXPECT_FALSE(again->handle);
++  EXPECT_FALSE(testing::wait_for_completions(registration.id, 1, 100));
++  EXPECT_EQ(source.reads.load(), 1u);
++}
++
+ template <typename T>
+ void write_u32(std::vector<uint8_t>& bytes, size_t offset, T value) {
+   const uint32_t word = static_cast<uint32_t>(value);

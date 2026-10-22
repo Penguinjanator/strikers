@@ -4,6 +4,10 @@ include(${CMAKE_CURRENT_LIST_DIR}/../cmake/AuroraCopyRuntimeDLLs.cmake)
 
 set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
 
+if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+  add_compile_options(/Zc:__cplusplus)
+endif ()
+
 if (NOT TARGET gtest)
   FetchContent_Declare(googletest
     URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz
@@ -23,6 +27,40 @@ target_include_directories(io_tests PRIVATE ../lib)
 target_link_libraries(io_tests PRIVATE gtest gtest_main ${AURORA_SDL3_TARGET})
 aurora_copy_runtime_dlls(io_tests)
 gtest_discover_tests(io_tests)
+
+add_executable(input_tests
+  input_binding_test.cpp
+  input_router_test.cpp
+  ../lib/input/binding.cpp
+  ../lib/input/capture.cpp
+  ../lib/input/router.cpp
+  ../lib/input/source_state.cpp
+)
+target_include_directories(input_tests PRIVATE
+  ../include
+  ../lib
+)
+target_compile_definitions(input_tests PRIVATE AURORA TARGET_PC)
+target_link_libraries(input_tests PRIVATE gtest gtest_main ${AURORA_SDL3_TARGET})
+aurora_copy_runtime_dlls(input_tests)
+gtest_discover_tests(input_tests)
+
+add_executable(pad_adapter_tests
+  pad_adapter_test.cpp
+)
+target_include_directories(pad_adapter_tests PRIVATE
+  ../include
+  ../lib
+)
+target_link_libraries(pad_adapter_tests PRIVATE aurora::pad gtest gtest_main)
+if (AURORA_ENABLE_GX)
+  target_link_libraries(pad_adapter_tests PRIVATE aurora::gx aurora::vi)
+  if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(pad_adapter_tests PRIVATE $<LINK_GROUP:RESCAN,aurora::gx,aurora::vi,aurora::core>)
+  endif ()
+endif ()
+aurora_copy_runtime_dlls(pad_adapter_tests)
+gtest_discover_tests(pad_adapter_tests)
 
 add_executable(time_tests
   time_test.cpp
@@ -45,7 +83,7 @@ target_include_directories(os_time_tests PRIVATE
   ../include
   ../lib
 )
-target_compile_definitions(os_time_tests PRIVATE AURORA TARGET_PC)
+target_compile_definitions(os_time_tests PRIVATE AURORA TARGET_PC=1)
 target_link_libraries(os_time_tests PRIVATE fmt::fmt gtest gtest_main)
 gtest_discover_tests(os_time_tests)
 
@@ -78,12 +116,15 @@ if (AURORA_ENABLE_GX)
     # FIFO/command processor (encoder + decoder)
     ../lib/gx/fifo.cpp
     ../lib/gx/command_processor.cpp
+    ../lib/gx/readback.cpp
     ../lib/gx/regs.cpp
+    ../lib/gfx/readback/readback.cpp
     ../lib/thread.cpp
     # Display list reader/optimizer
     ../lib/gx/attr_fmt.cpp
     ../lib/gx/dl.cpp
     gx_dl_test.cpp
+    gx_readback_test.cpp
     gx_overscan_test.cpp
   )
 
@@ -93,17 +134,17 @@ if (AURORA_ENABLE_GX)
     ../lib/dolphin/gx
   )
 
-  target_compile_definitions(gx_fifo_tests PRIVATE AURORA TARGET_PC)
+  target_compile_definitions(gx_fifo_tests PRIVATE AURORA TARGET_PC=1)
 
   target_link_libraries(gx_fifo_tests PRIVATE
     gtest
     gtest_main
     fmt::fmt
-    xxhash
+    xxHash::xxhash
     absl::flat_hash_map
     absl::btree
     dawn::dawncpp_headers
-    TracyClient
+    Tracy::TracyClient
     ${AURORA_SDL3_TARGET}
   )
 
@@ -119,19 +160,24 @@ if (AURORA_ENABLE_GX)
     ../include
     ../lib
   )
-  target_compile_definitions(gx_texture_cache_tests PRIVATE AURORA TARGET_PC)
+  target_compile_definitions(gx_texture_cache_tests PRIVATE AURORA TARGET_PC=1)
   target_link_libraries(gx_texture_cache_tests PRIVATE
     gtest
     gtest_main
     fmt::fmt
-    xxhash
+    xxHash::xxhash
     absl::flat_hash_map
     dawn::webgpu_dawn
-    TracyClient
+    Tracy::TracyClient
     ${AURORA_SDL3_TARGET}
   )
   aurora_copy_runtime_dlls(gx_texture_cache_tests)
   gtest_discover_tests(gx_texture_cache_tests)
+
+  add_executable(lru_cache_tests lru_cache_test.cpp)
+  target_include_directories(lru_cache_tests PRIVATE ../lib)
+  target_link_libraries(lru_cache_tests PRIVATE gtest gtest_main absl::flat_hash_map)
+  gtest_discover_tests(lru_cache_tests)
 
   add_executable(texture_replacement_streaming_tests
     texture_replacement_streaming_test.cpp
@@ -140,7 +186,7 @@ if (AURORA_ENABLE_GX)
     ../include
     ../lib
   )
-  target_compile_definitions(texture_replacement_streaming_tests PRIVATE AURORA TARGET_PC)
+  target_compile_definitions(texture_replacement_streaming_tests PRIVATE AURORA TARGET_PC=1)
   target_link_libraries(texture_replacement_streaming_tests PRIVATE
     aurora::gx
     aurora::vi
@@ -160,11 +206,11 @@ if (AURORA_ENABLE_GX)
     ../include
     ../lib
   )
-  target_compile_definitions(render_worker_tests PRIVATE AURORA TARGET_PC)
+  target_compile_definitions(render_worker_tests PRIVATE AURORA TARGET_PC=1)
   target_link_libraries(render_worker_tests PRIVATE
     gtest
     gtest_main
-    TracyClient
+    Tracy::TracyClient
     ${AURORA_SDL3_TARGET}
   )
   gtest_discover_tests(render_worker_tests)
@@ -177,15 +223,34 @@ if (AURORA_ENABLE_GX)
     ../include
     ../lib
   )
-  target_compile_definitions(gfx_recording_tests PRIVATE AURORA TARGET_PC)
+  target_compile_definitions(gfx_recording_tests PRIVATE AURORA TARGET_PC=1)
   target_link_libraries(gfx_recording_tests PRIVATE
     aurora::gx
     aurora::vi
+    absl::flat_hash_map
     gtest
     gtest_main
   )
   aurora_copy_runtime_dlls(gfx_recording_tests)
   gtest_discover_tests(gfx_recording_tests)
+
+  add_executable(gfx_readback_tests
+    gfx_readback_test.cpp
+  )
+  target_include_directories(gfx_readback_tests PRIVATE
+    ../include
+    ../lib
+  )
+  target_compile_definitions(gfx_readback_tests PRIVATE AURORA TARGET_PC=1)
+  target_link_libraries(gfx_readback_tests PRIVATE
+    aurora::gx
+    aurora::vi
+    absl::flat_hash_map
+    gtest
+    gtest_main
+  )
+  aurora_copy_runtime_dlls(gfx_readback_tests)
+  gtest_discover_tests(gfx_readback_tests)
 endif () # AURORA_ENABLE_GX
 
 # DVD API tests
@@ -215,6 +280,6 @@ add_executable(os_alloc_tests
 target_include_directories(os_alloc_tests PRIVATE
   ../include
 )
-target_compile_definitions(os_alloc_tests PRIVATE AURORA TARGET_PC)
+target_compile_definitions(os_alloc_tests PRIVATE AURORA TARGET_PC=1)
 target_link_libraries(os_alloc_tests PRIVATE gtest gtest_main fmt::fmt)
 gtest_discover_tests(os_alloc_tests)

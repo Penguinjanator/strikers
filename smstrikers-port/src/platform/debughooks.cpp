@@ -3,7 +3,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "dolphin/types.h"
 #include "NL/plat/plataudio.h"
 
 void InstallFloatingPointExceptionHandler(void)
@@ -16,14 +15,6 @@ void InstallCallStackDumper(void)
 {
     std::fprintf(stderr, "[port] callStackDumper: ignored; src/platform/crashlog.c "
                          "already reports a backtrace on a fatal signal.\n");
-}
-
-// EFB-to-XFB vertical scale; the port renders at Aurora's size, so this is 1.
-extern "C" f32 GXGetYScaleFactor(u16 efbHeight, u16 xfbHeight)
-{
-    if (efbHeight == 0 || xfbHeight == 0)
-        return 1.0f;
-    return (f32)xfbHeight / (f32)efbHeight;
 }
 
 namespace PlatAudio

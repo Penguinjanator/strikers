@@ -133,10 +133,16 @@ void bp_tev_ind(u8 reg, u32 value) noexcept {
 void bp_scissor(u8, u32) noexcept {
   const u32 scis0 = g_gxState.bpRegCache[0x20];
   const u32 scis1 = g_gxState.bpRegCache[0x21];
-  const s32 tp = static_cast<s32>(reg_get(scis0, 11, 0)) - 342;
-  const s32 lf = static_cast<s32>(reg_get(scis0, 11, 12)) - 342;
-  const s32 bm = static_cast<s32>(reg_get(scis1, 11, 0)) - 342;
-  const s32 rt = static_cast<s32>(reg_get(scis1, 11, 12)) - 342;
+
+  const u32 boxOffset = g_gxState.bpRegCache[0x59];
+  // The box offset fields are signed 9-bit values and also halved, like the viewport registers. Sign extend.
+  const s32 offsX = static_cast<s32>(reg_get(boxOffset, 10, 0)) << 23 >> 22;
+  const s32 offsY = static_cast<s32>(reg_get(boxOffset, 10, 10)) << 23 >> 22;
+
+  const s32 tp = static_cast<s32>(reg_get(scis0, 11, 0)) + offsY;
+  const s32 lf = static_cast<s32>(reg_get(scis0, 11, 12)) + offsX;
+  const s32 bm = static_cast<s32>(reg_get(scis1, 11, 0)) + offsY;
+  const s32 rt = static_cast<s32>(reg_get(scis1, 11, 12)) + offsX;
   const s32 wd = std::max(rt - lf + 1, 0);
   const s32 ht = std::max(bm - tp + 1, 0);
   set_logical_scissor({lf, tp, wd, ht});
@@ -536,11 +542,12 @@ constexpr auto kBpRegs = [] {
   regs[0x40] = {bp_z_mode, DirtyPipeline};
   regs[0x41] = {bp_cmode0, DirtyPipeline};
   regs[0x42] = {bp_cmode1, DirtyPipeline};
-  regs[0x43] = {bp_pe_ctrl};
+  regs[0x43] = {bp_pe_ctrl, DirtyPipeline};
   regs[0x4F] = {bp_clear_ra};
   regs[0x50] = {bp_clear_bg};
   regs[0x51] = {bp_clear_depth};
   regs[0x52] = {bp_efb_copy, 0, /* alwaysHandle */ true};
+  regs[0x59] = {bp_scissor};
   regs[0x64] = {}; // TLUT load address; bp_tlut_load reads from shadow
   regs[0x65] = {bp_tlut_load, DirtyTextures, /* alwaysHandle */ true};
   for (u32 base : {0x80u, 0xA0u}) {
@@ -821,6 +828,16 @@ void xf_post_mtx(u8 reg, u32 value) noexcept {
   g_gxState.tcgs[tcIdx].normalize = reg_get(value, 1, 8) != 0;
 }
 
+// Clip disable (0x05)
+void xf_clip_disable(u8, u32 value) noexcept {
+  static bool warned = false;
+  if (value != 0 && !warned) {
+    warned = true;
+    Log.debug("STUB: GXSetClipMode(GX_CLIP_DISABLE) is not implemented (value 0x{:08X})",
+             value);
+  }
+}
+
 void xf_unhandled(u8 reg, u32 value) noexcept {
 #ifndef NDEBUG
   Log.debug("Unhandled XF register 0x{:04X} (value 0x{:08X})", static_cast<u32>(reg), value);
@@ -835,6 +852,7 @@ constexpr auto kXfRegs = [] {
   for (auto& reg : regs) {
     reg = {xf_unhandled};
   }
+  regs[0x05] = {xf_clip_disable};
   regs[0x08] = {}; // vertex specs (numColors/numNormals/numTexCoords)
   regs[0x09] = {xf_num_chans};
   for (u8 r = 0x0A; r <= 0x0D; ++r) {
@@ -1025,6 +1043,16 @@ bool copy_xf_data(u32 addr, const u8* data, u32 len, std::endian e) noexcept {
     }
     return true;
   }
+  // GX_IDENTITY is synthesized by the shader; identity writes are harmless.
+  if (addr == 0x0F0 && (len == 8 || len == 12)) {
+    for (u32 i = 0; i < len; i++) {
+      const u32 expected = i % 5 == 0 ? 0x3F800000u : 0u;
+      if (read_bits<u32>(data + i * 4, e) != expected) {
+        return false;
+      }
+    }
+    return true;
+  }
   if (addr >= 0x400 && addr < 0x400 + MaxPnMtx * 9) {
     // Normal matrices (0x400-0x459)
     u32 nrmBase = addr - 0x400;
@@ -1059,6 +1087,16 @@ bool copy_xf_data(u32 addr, const u8* data, u32 len, std::endian e) noexcept {
     }
     if (changed) {
       g_gxState.dirty |= DirtyUniform;
+    }
+    return true;
+  }
+  if (addr == 0x5F4 && len == 12) {
+    // GX_PTIDENTITY is synthesized by the shader, like GX_IDENTITY above.
+    for (u32 i = 0; i < len; ++i) {
+      const u32 expected = i % 5 == 0 ? 0x3F800000u : 0u;
+      if (read_bits<u32>(data + i * 4, e) != expected) {
+        return false;
+      }
     }
     return true;
   }

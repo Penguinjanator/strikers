@@ -1,11 +1,9 @@
 #include "gx.hpp"
 #include "__gx.h"
 
-#include "../../gfx/tex_copy_conv.hpp"
 #include "../../gfx/texture.hpp"
 #include "../../gfx/recording.hpp"
 #include "../../window.hpp"
-#include "../../gfx/clear.hpp"
 #include "../../webgpu/gpu.hpp"
 #include "../../gx/texture.hpp"
 #include "../vi/vi_internal.hpp"
@@ -38,50 +36,22 @@ void copy_tex(const void* dest, GXBool clear) noexcept {
   const auto rect = map_logical_scissor(g_gxState.texCopySrc);
   const auto [dstWidth, dstHeight] = scale_copy_dst(g_gxState.texCopyDstWidth, g_gxState.texCopyDstHeight);
   const auto texCopyFmt = g_gxState.texCopyFmt;
-
-  const GXState::CopyTextureKey key{
+  const auto copy = texture::resolve_copy_texture({
       .dest = dest,
       .width = dstWidth,
       .height = dstHeight,
       .format = texCopyFmt,
-  };
-  auto it = g_gxState.copyTextureCache.find(key);
-  if (it == g_gxState.copyTextureCache.end()) {
-    gfx::TextureHandle handle;
-    if (gfx::tex_copy_conv::needs_conversion(texCopyFmt)) {
-      handle = gfx::new_conv_texture(dstWidth, dstHeight, texCopyFmt, "Copy Conv Texture");
-    } else {
-      // Configure the texture swizzle to use alpha 1.0 if targeting RGB565 or EFB doesn't have alpha
-      const auto fmt =
-          texCopyFmt == GX_TF_RGB565 || g_gxState.pixelFmt == GX_PF_RGB8_Z24 || g_gxState.pixelFmt == GX_PF_RGB565_Z16
-              ? GX_TF_RGB565
-              : GX_TF_RGBA8;
-      handle = gfx::new_render_texture(dstWidth, dstHeight, fmt, "Resolved Texture");
-    }
-    it = g_gxState.copyTextureCache.emplace(key, GXState::CopyTextureRef{.handle = handle, .revision = 0}).first;
-  }
-  auto& handle = it->second;
+  });
+  auto& current = g_gxState.copyTextures[dest];
+  current.width = g_gxState.texCopyDstWidth;
+  current.height = g_gxState.texCopyDstHeight;
+  current.pixelFormat = g_gxState.pixelFmt;
 
-  if (g_gxState.alphaUpdate && g_gxState.dstAlpha != UINT32_MAX) {
-    if (!clear) {
-      // TODO: figure out the right behavior here.
-      // should the copy have a specific alpha value but the EFB remains untouched?
-    }
-    // Overwrite alpha before resolving
-    gfx::push_draw_command(gfx::clear::DrawData{
-        .pipeline =
-            gfx::pipeline_ref(gfx::clear::make_pipeline_config(gfx::get_render_target_layout(), false, true, false)),
-        .color = wgpu::Color{0.f, 0.f, 0.f, g_gxState.dstAlpha / 255.f},
-    });
-  }
   const auto clearColor = clear && g_gxState.colorUpdate;
-  const auto clearAlpha = clear && g_gxState.alphaUpdate;
+  const auto clearAlpha = clear && g_gxState.alphaUpdate && efb_has_alpha(g_gxState.pixelFmt);
   const auto clearDepth = clear && g_gxState.depthUpdate;
-  gfx::resolve_pass_into(handle.handle, rect, clearColor, clearAlpha, clearDepth, g_gxState.clearColor,
-                         clear_depth_value(), texCopyFmt);
-  ++handle.revision;
-  g_gxState.copyTextures[dest] = handle;
-  texture::invalidate_bindings();
+  gfx::resolve_pass_into(copy.handle, rect, clearColor, clearAlpha, clearDepth, g_gxState.clearColor,
+                         clear_depth_value(), texCopyFmt, g_gxState.pixelFmt);
 }
 } // namespace aurora::gx
 
@@ -149,30 +119,21 @@ GXRenderModeObj GXMpal480IntDf = {
 
 void GXAdjustForOverscan(GXRenderModeObj* rmin, GXRenderModeObj* rmout, u16 hor, u16 ver) {
   *rmout = *rmin;
-  // smstrikers-port: the window is the wrong EFB size once the render target is
-  // pinned to the VI mode, because this answer feeds VIConfigure and becomes the
-  // logical framebuffer. Do the SDK's own arithmetic in that case.
-  if (aurora::window::get_frame_buffer_scale() > 0.f) {
-    const u16 hor2 = static_cast<u16>(hor * 2);
-    const u16 ver2 = static_cast<u16>(ver * 2);
-    const u32 mode = rmin->viTVmode & 3;
-    rmout->fbWidth = static_cast<u16>(rmin->fbWidth - hor2);
-    if (rmin->xfbHeight != 0) {
-      const u32 verf = (static_cast<u32>(ver2) * rmin->efbHeight) / rmin->xfbHeight;
-      rmout->efbHeight = static_cast<u16>(rmin->efbHeight - verf);
-    }
-    rmout->xfbHeight = static_cast<u16>(rmin->xfbHeight -
-                                        ((rmin->xFBmode == VI_XFBMODE_SF && mode == 0) ? ver2 / 2 : ver2));
-    rmout->viWidth = static_cast<u16>(rmin->viWidth - hor2);
-    rmout->viHeight = static_cast<u16>(rmin->viHeight - (mode == 1 ? ver2 * 2 : ver2));
-    rmout->viXOrigin = static_cast<u16>(rmin->viXOrigin + hor);
-    rmout->viYOrigin = static_cast<u16>(rmin->viYOrigin + ver);
-    return;
+  // smstrikers-port: the SDK's arithmetic: mode 1 trims VI height twice, only mode 0 halves a single-strike XFB.
+  const u16 hor2 = static_cast<u16>(hor * 2);
+  const u16 ver2 = static_cast<u16>(ver * 2);
+  const u32 mode = rmin->viTVmode & 3;
+  rmout->fbWidth = static_cast<u16>(rmin->fbWidth - hor2);
+  if (rmin->xfbHeight != 0) {
+    const u32 verf = (static_cast<u32>(ver2) * rmin->efbHeight) / rmin->xfbHeight;
+    rmout->efbHeight = static_cast<u16>(rmin->efbHeight - verf);
   }
-  const auto size = aurora::window::get_window_size();
-  rmout->fbWidth = size.fb_width;
-  rmout->efbHeight = size.fb_height;
-  rmout->xfbHeight = size.fb_height;
+  rmout->xfbHeight =
+      static_cast<u16>(rmin->xfbHeight - ((rmin->xFBmode == VI_XFBMODE_SF && mode == 0) ? ver2 / 2 : ver2));
+  rmout->viWidth = static_cast<u16>(rmin->viWidth - hor2);
+  rmout->viHeight = static_cast<u16>(rmin->viHeight - (mode == 1 ? ver2 * 2 : ver2));
+  rmout->viXOrigin = static_cast<u16>(rmin->viXOrigin + hor);
+  rmout->viYOrigin = static_cast<u16>(rmin->viYOrigin + ver);
 }
 
 void GXSetDispCopySrc(u16 left, u16 top, u16 wd, u16 ht) {}
@@ -195,8 +156,9 @@ void GXSetTexCopyDst(u16 wd, u16 ht, GXTexFmt fmt, GXBool mipmap) {
   GX_WRITE_U8(mipmap != GX_FALSE);
 }
 
-// TODO GXSetDispCopyFrame2Field
-// TODO GXSetCopyClamp
+void GXSetDispCopyFrame2Field(GXCopyMode mode) {}
+
+void GXSetCopyClamp(GXFBClamp clamp) {}
 
 u32 GXSetDispCopyYScale(f32 vscale) { return 0; }
 
@@ -223,7 +185,7 @@ void GXSetCopyClear(GXColor color, u32 depth) {
   __gx->bpSent = 1;
 }
 
-void GXSetCopyFilter(GXBool aa, u8 sample_pattern[12][2], GXBool vf, u8 vfilter[7]) {}
+void GXSetCopyFilter(GXBool aa, const u8 sample_pattern[12][2], GXBool vf, const u8 vfilter[7]) {}
 
 void GXSetDispCopyGamma(GXGamma gamma) {}
 
@@ -240,8 +202,50 @@ void GXCopyTex(void* dest, GXBool clear) {
   aurora::gx::fifo::publish();
 }
 
-// TODO GXGetYScaleFactor
-// TODO GXGetNumXfbLines
+static u32 get_num_xfb_lines(u32 height, u32 scale) {
+  u32 actualHeight = (height - 1) * 0x100 / scale + 1;
+
+  u32 newScale = scale;
+  if (newScale > 0x80 && newScale < 0x100) {
+    while (newScale % 2 == 0) {
+      newScale /= 2;
+    }
+    if (height % newScale == 0) {
+      actualHeight++;
+    }
+  }
+
+  if (actualHeight > 0x400) {
+    actualHeight = 0x400;
+  }
+  return actualHeight;
+}
+
+f32 GXGetYScaleFactor(u16 efbHeight, u16 xfbHeight) {
+  u32 height1 = xfbHeight;
+  f32 scale1 = static_cast<f32>(xfbHeight) / static_cast<f32>(efbHeight);
+  u32 height2 = get_num_xfb_lines(efbHeight, static_cast<u32>(256.0f / scale1) & 0x1FF);
+
+  while (height2 > xfbHeight) {
+    height1--;
+    scale1 = static_cast<f32>(height1) / static_cast<f32>(efbHeight);
+    height2 = get_num_xfb_lines(efbHeight, static_cast<u32>(256.0f / scale1) & 0x1FF);
+  }
+
+  f32 scale2 = scale1;
+  while (height2 < xfbHeight) {
+    scale2 = scale1;
+    height1++;
+    scale1 = static_cast<f32>(height1) / static_cast<f32>(efbHeight);
+    height2 = get_num_xfb_lines(efbHeight, static_cast<u32>(256.0f / scale1) & 0x1FF);
+  }
+
+  return scale2;
+}
+
+u16 GXGetNumXfbLines(u16 efbHeight, f32 yScale) {
+  return get_num_xfb_lines(efbHeight, static_cast<u32>(256.0f / yScale) & 0x1FF);
+}
 // TODO GXClearBoundingBox
 // TODO GXReadBoundingBox
 }

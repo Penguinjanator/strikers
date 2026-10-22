@@ -11,9 +11,12 @@ void GXPokeColorUpdate(GXBool update_enable);
 void GXPokeDstAlpha(GXBool enable, u8 alpha);
 void GXPokeDither(GXBool dither);
 void GXPokeZMode(GXBool compare_enable, GXCompare func, GXBool update_enable);
+// Use AuroraReadbackCapturePeeks (GXAurora.h)
+// smstrikers-port: declared for the game's debug screenshot and crash dump, which link it to a no-op.
 void GXPeekARGB(u16 x, u16 y, u32* color);
 void GXPokeARGB(u16 x, u16 y, u32 color);
-void GXPeekZ(u16 x, u16 y, u32* z);
+// Use AuroraReadbackCapturePeeks (GXAurora.h)
+// void GXPeekZ(u16 x, u16 y, u32* z);
 void GXPokeZ(u16 x, u16 y, u32 z);
 u32 GXCompressZ16(u32 z24, GXZFmt16 zfmt);
 u32 GXDecompressZ16(u32 z16, GXZFmt16 zfmt);

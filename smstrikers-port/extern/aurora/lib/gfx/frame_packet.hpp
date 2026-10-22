@@ -9,8 +9,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 #include <vector>
+
+namespace aurora::gfx::readback {
+struct Job;
+}
 
 namespace aurora::gfx::detail {
 
@@ -82,14 +87,17 @@ struct RenderPass {
   wgpu::Texture copySourceTexture;
   wgpu::TextureView copySourceView;
   wgpu::TextureView copySourceDepthView;
+  wgpu::Texture copySourceNormalTexture;
   uint32_t msaaSamples = 1;
 
   TextureHandle resolveTarget;
   GXTexFmt resolveFormat = GX_TF_RGBA8;
+  GXPixelFmt resolveSourceFormat = GX_PF_RGBA6_Z24;
   ClipRect resolveRect;
   Range resolveUniformRange;
   wgpu::Texture snapshotColorDst;
   wgpu::TextureView snapshotDepthDst;
+  wgpu::Texture snapshotNormalDst;
   float clearDepthValue = 1.f;
   wgpu::LoadOp depthLoadOp = wgpu::LoadOp::Undefined;
   wgpu::StoreOp depthStoreOp = wgpu::StoreOp::Store;
@@ -102,12 +110,11 @@ struct RenderPass {
   bool hasStencil = false;
   bool hasDraws = false;
   bool discardable = false;
-  bool captureDepthSnapshot = false;
   bool sealed = false;
   std::vector<tex_palette_conv::ConvRequest> paletteConvs;
 
   RenderTargetLayout target_layout() const noexcept;
-  bool has_consumer() const { return resolveTarget || snapshotColorDst || snapshotDepthDst; }
+  bool has_consumer() const { return resolveTarget || snapshotColorDst || snapshotDepthDst || snapshotNormalDst; }
   bool has_content() const {
     if (hasDraws || clearDepth) {
       return true;
@@ -163,10 +170,15 @@ struct EncoderTask {
   uint32_t payloadSize = 0;
 };
 
+struct ReadbackTask {
+  std::shared_ptr<readback::Job> job;
+};
+
 enum class FrameOpType : uint8_t {
   RenderPass,
   TextureCopy,
   EncoderTask,
+  Readback,
 };
 
 struct FrameOp {
@@ -175,6 +187,7 @@ struct FrameOp {
   RenderPass* renderPass = nullptr;
   TextureCopy* textureCopy = nullptr;
   EncoderTask* encoderTask = nullptr;
+  ReadbackTask* readbackTask = nullptr;
   StagingHighWater highWater;
   std::vector<const TextureUpload*> textureUploads;
 };
@@ -185,6 +198,7 @@ struct FramePacket {
   RenderPassList renderPasses;
   std::deque<TextureCopy> textureCopies;
   std::deque<EncoderTask> encoderTasks;
+  std::deque<ReadbackTask> readbackTasks;
   std::deque<FrameOp> ops;
   std::deque<TextureUpload> textureUploads;
 #ifdef AURORA_GFX_DEBUG_GROUPS

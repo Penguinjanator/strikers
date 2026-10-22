@@ -208,6 +208,7 @@ int main() { std::jthread t([](std::stop_token) {}); }
         add_library(TracyClient INTERFACE)
         target_include_directories(TracyClient INTERFACE
             "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/switch/tracy")
+        add_library(Tracy::TracyClient ALIAS TracyClient)
     endif()
 
     add_subdirectory(extern/aurora EXCLUDE_FROM_ALL)
@@ -438,8 +439,8 @@ target_compile_options(strikers_musyx PRIVATE
 # Monocypher, the online session's key exchange and encryption: one C file.
 include(FetchContent)
 FetchContent_Declare(monocypher
-    URL https://monocypher.org/download/monocypher-4.0.2.tar.gz
-    URL_HASH SHA256=38d07179738c0c90677dba3ceb7a7b8496bcfea758ba1a53e803fed30ae0879c
+    URL https://monocypher.org/download/monocypher-4.0.3.tar.gz
+    URL_HASH SHA256=8cc9bc341a66249016db9bd70e9142d8d0aef9945973744b1ac05dbc55d8ee66
     DOWNLOAD_EXTRACT_TIMESTAMP FALSE
 )
 FetchContent_MakeAvailable(monocypher)

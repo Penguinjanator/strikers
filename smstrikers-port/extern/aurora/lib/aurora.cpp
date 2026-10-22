@@ -25,7 +25,7 @@
 #include "rmlui.hpp"
 #endif
 
-#include "input.hpp"
+#include "gamepad.hpp"
 #include "internal.hpp"
 #include "thread.hpp"
 #include "window.hpp"
@@ -222,7 +222,7 @@ void shutdown() noexcept {
   gfx::shutdown();
   webgpu::shutdown();
 #endif
-  input::shutdown();
+  gamepad::shutdown();
   window::shutdown();
 }
 
@@ -230,7 +230,7 @@ const AuroraEvent* update() noexcept {
   ZoneScoped;
   if (g_initialFrame) {
     g_initialFrame = false;
-    input::initialize();
+    gamepad::initialize();
   }
 #ifdef AURORA_ENABLE_GX
   gx::update();
@@ -573,7 +573,6 @@ void end_frame() noexcept {
         callback();
       }
     }
-    gfx::after_submit();
 
     TracyPlotConfig("aurora: lastVertSize", tracy::PlotFormatType::Memory, false, true, 0);
     TracyPlotConfig("aurora: lastUniformSize", tracy::PlotFormatType::Memory, false, true, 0);
@@ -640,6 +639,10 @@ void aurora_capture_frame(const char* path) {
 const AuroraEvent* aurora_update() { return aurora::update(); }
 bool aurora_begin_frame() { return aurora::begin_frame(); }
 void aurora_end_frame() { aurora::end_frame(); }
+SDL_Window* aurora_get_window() { return aurora::window::get_sdl_window(); }
+AuroraWindowSize aurora_get_window_size() {
+  return aurora::window::get_sdl_window() != nullptr ? aurora::window::get_window_size() : AuroraWindowSize{};
+}
 AuroraBackend aurora_get_backend() { return aurora::g_config.desiredBackend; }
 const AuroraBackend* aurora_get_available_backends(size_t* count) {
   if (count != nullptr) {

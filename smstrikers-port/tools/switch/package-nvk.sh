@@ -14,9 +14,12 @@ cd "$W"
 
 # The whole driver; the other archives the build produces are its parts.
 cp "$B/src/nouveau/vulkan/libvulkan.a" mesa-vulkan.a
+# vulkan-dispatch.o is the driver already linked from members the archive also keeps, so it goes in first and alone.
+"$D-ar" x mesa-vulkan.a vulkan-dispatch.o
+"$D-ar" d mesa-vulkan.a vulkan-dispatch.o
 # Its index lacks the Rust objects' symbols (core::panicking::*).
 "$D-ranlib" mesa-vulkan.a
-INPUTS="mesa-vulkan.a $LIBS/libexpat.a $LIBS/libzstd.a"
+INPUTS="vulkan-dispatch.o mesa-vulkan.a $LIBS/libexpat.a $LIBS/libzstd.a"
 
 "$D-nm" -g --defined-only $INPUTS 2>/dev/null | awk 'NF==3{print $3}' | sort -u > archdef.txt
 "$D-nm" -g --defined-only mesa-vulkan.a 2>/dev/null \
@@ -44,7 +47,9 @@ done
 
 # Only vk* stays global, or the driver's Mesa collides with the older Mesa in devkitPro's libEGL.a.
 "$D-nm" -g --defined-only nvk.o | awk 'NF==3 && $3 ~ /^vk/ {print $3}' | sort -u > keep.txt
-"$D-objcopy" --keep-global-symbols=keep.txt nvk.o nvk-hidden.o
+# devkitA64's newlib declares flockfile and funlockfile but only libsysbase's __-prefixed pair exists.
+"$D-objcopy" --keep-global-symbols=keep.txt \
+    --redefine-sym flockfile=__flockfile --redefine-sym funlockfile=__funlockfile nvk.o nvk-hidden.o
 
 mkdir -p "$OUT/lib" "$OUT/include"
 "$D-ar" rcs "$OUT/lib/libvulkan.a" nvk-hidden.o

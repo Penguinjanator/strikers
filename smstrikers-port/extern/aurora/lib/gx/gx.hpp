@@ -47,7 +47,6 @@ constexpr float GX_LARGE_NUMBER = -1048576.0f;
 namespace aurora::gx {
 constexpr bool EnableNormalVisualization = false;
 constexpr bool EnableDebugPrints = false;
-constexpr bool UsePerPixelLighting = false;
 constexpr bool UseReversedZ = true;
 
 constexpr u32 MaxTextures = GX_MAX_TEXMAP;
@@ -311,12 +310,6 @@ inline bool operator==(const AttrArray& lhs, const AttrArray& rhs) {
 inline bool operator!=(const AttrArray& lhs, const AttrArray& rhs) { return !(lhs == rhs); }
 
 struct GXState {
-  struct CopyTextureRef {
-    gfx::TextureHandle handle;
-    u32 revision = 0;
-
-    operator bool() const noexcept { return handle.operator bool(); }
-  };
   struct CopyTextureKey {
     const void* dest = nullptr;
     u32 width = 0;
@@ -331,6 +324,17 @@ struct GXState {
     friend H AbslHashValue(H h, const CopyTextureKey& key) {
       return H::combine(std::move(h), key.dest, key.width, key.height, key.format);
     }
+  };
+
+  struct CopyTextureRef {
+    gfx::TextureHandle handle;
+    u32 revision = 0;
+    CopyTextureKey key;
+    u32 width = 0;
+    u32 height = 0;
+    GXPixelFmt pixelFormat = GX_PF_RGB8_Z24;
+
+    operator bool() const noexcept { return handle.operator bool(); }
   };
 
   // Decoded state
@@ -411,9 +415,9 @@ struct GXState {
   bool texCopyDstWide = false;
   const void* texCopyDest = nullptr;
   absl::flat_hash_map<const void*, CopyTextureRef> copyTextures;
-  absl::flat_hash_map<CopyTextureKey, CopyTextureRef> copyTextureCache;
 
   // Cache state
+  bool drawsBlocking = false;
   std::array<gfx::TextureBind, MaxTextures> textures;
   u16 lastVtxSize = 0;
   GXVtxFmt lastVtxFmt = GX_MAX_VTXFMT;
@@ -490,6 +494,9 @@ struct AttrConfig {
   bool le = true;
   bool nbt3 = false; // GX_NRM_NBT3
 };
+
+enum class DstAlphaMode : u8 { None, Replace, DualSource };
+
 struct ShaderConfig {
   u8 fogType = GX_FOG_NONE;
   u8 vtxStride = 0;
@@ -512,6 +519,7 @@ struct ShaderConfig {
 static_assert(std::has_unique_object_representations_v<ShaderConfig>);
 
 struct PipelineConfig;
+struct PipelineOptions;
 
 struct GXBindGroups {
   gfx::BindGroupRef textureBindGroup;
@@ -538,12 +546,17 @@ struct BindGroupRanges {
   std::array<gfx::Range, MaxIndexAttr> vaRanges{};
 };
 void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXVtxFmt fmt) noexcept;
-wgpu::RenderPipeline build_pipeline(const PipelineConfig& config, ArrayRef<wgpu::VertexBufferLayout> vtxBuffers,
+wgpu::RenderPipeline build_pipeline(const PipelineConfig& config, const gfx::RenderTargetLayout& layout,
+                                    const PipelineOptions& options, ArrayRef<wgpu::VertexBufferLayout> vtxBuffers,
                                     wgpu::ShaderModule shader, const char* label) noexcept;
-std::string build_shader_source(const ShaderConfig& config) noexcept;
-wgpu::ShaderModule build_shader(const ShaderConfig& config) noexcept;
+std::string build_shader_source(const ShaderConfig& config, DstAlphaMode dstAlphaMode,
+                                uint32_t normalAttachment = UINT32_MAX) noexcept;
+wgpu::ShaderModule build_shader(const ShaderConfig& config, const gfx::RenderTargetLayout& layout,
+                                DstAlphaMode dstAlphaMode) noexcept;
 GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept;
 
 u8 comp_type_size(GXAttr attr, GXCompType type) noexcept;
 u8 comp_cnt_count(GXAttr attr, GXCompCnt cnt) noexcept;
+
+constexpr bool efb_has_alpha(GXPixelFmt format) noexcept { return format == GX_PF_RGBA6_Z24; }
 } // namespace aurora::gx

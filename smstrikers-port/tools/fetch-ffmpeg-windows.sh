@@ -10,8 +10,8 @@ set -e
 
 PORT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 DEST="${1:-$PORT/extern/ffmpeg-windows-x86_64}"
-PINNED_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-31-13-27/ffmpeg-n9.0.1-11-ge47273f4d9-win64-lgpl-shared-9.0.zip"
-PINNED_SHA="83a824f0729a69d143c9865125bb86988a11dd388325f0033711045522068aa0"
+PINNED_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-win64-lgpl-shared-9.0.zip"
+PINNED_SHA="7157177b8a6cb2174c1650ba8c71b363f2c78cba5330f88c4c02cf5b2b880646"
 URL="${STRIKERS_FFMPEG_URL:-$PINNED_URL}"
 if [ -n "${STRIKERS_FFMPEG_URL:-}" ] && [ "$STRIKERS_FFMPEG_URL" != "$PINNED_URL" ]; then
     # Another build than the pinned one: only a digest given for it applies.

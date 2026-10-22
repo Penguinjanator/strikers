@@ -1,7 +1,7 @@
 #include "frame.hpp"
 
-#include "depth_peek.hpp"
 #include "pipeline_cache.hpp"
+#include "readback/readback.hpp"
 #include "recording.hpp"
 #include "render_worker.hpp"
 #include "resource_cache.hpp"
@@ -293,6 +293,14 @@ RenderTargetLayout scene_render_target_layout() noexcept {
       .depthStencilFormat = webgpu::g_graphicsConfig.depthFormat,
       .sampleCount = webgpu::g_graphicsConfig.msaaSamples,
   };
+  if (webgpu::g_graphicsConfig.normalBuffer) {
+    layout.colorAttachments[layout.colorAttachmentCount++] = {
+        .semantic = ColorAttachmentSemantic::Normal,
+        .format = webgpu::g_normalBuffer.format,
+        .width = webgpu::g_normalBuffer.size.width,
+        .height = webgpu::g_normalBuffer.size.height,
+    };
+  }
   finalize_render_target_layout(layout);
   return layout;
 }
@@ -391,7 +399,7 @@ void initialize() {
   //     g_instance.ProcessEvents();
   //   }
   // });
-  depth_peek::initialize();
+  readback::initialize();
   tex_copy_conv::initialize();
   tex_palette_conv::initialize();
 
@@ -531,7 +539,7 @@ void shutdown() {
     g_presentTimes.clear();
   }
   shutdown_pipeline_cache();
-  depth_peek::shutdown();
+  readback::shutdown();
   tex_copy_conv::shutdown();
   tex_palette_conv::shutdown();
   texture_replacement::shutdown();
@@ -696,8 +704,6 @@ void end_frame(EndFrameCallback callback) {
 }
 
 uint32_t current_frame() noexcept { return g_frameIndex; }
-
-void after_submit() noexcept { depth_peek::after_submit(); }
 
 void gpu_synchronize() { render_worker::synchronize(); }
 

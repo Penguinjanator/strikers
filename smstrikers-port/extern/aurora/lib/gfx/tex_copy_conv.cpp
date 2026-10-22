@@ -8,6 +8,7 @@
 #include "../webgpu/gpu_prof.hpp"
 #include "texture.hpp"
 #include "../gx/gx_fmt.hpp"
+#include "efb_wgsl.hpp"
 
 #include <absl/container/flat_hash_map.h>
 
@@ -24,11 +25,12 @@ static constexpr std::string_view ShaderPreamble = R"(
 @group(0) @binding(0) var src_samp: sampler;
 @group(0) @binding(1) var src: texture_2d<f32>;
 
-struct UVTransform {
+struct Uniforms {
     offset: vec2f,
     scale: vec2f,
+    opaqueAlpha: u32,
 };
-@group(0) @binding(2) var<uniform> uv_xf: UVTransform;
+@group(0) @binding(2) var<uniform> ubuf: Uniforms;
 
 struct VertexOutput {
     @builtin(position) pos: vec4f,
@@ -49,8 +51,13 @@ var<private> uvs: array<vec2f, 3> = array(
 @vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VertexOutput {
     var out: VertexOutput;
     out.pos = vec4f(positions[vi], 0.0, 1.0);
-    out.uv = uvs[vi] * uv_xf.scale + uv_xf.offset;
+    out.uv = uvs[vi] * ubuf.scale + ubuf.offset;
     return out;
+}
+
+fn sample_efb(uv: vec2f) -> vec4f {
+    let c = textureSample(src, src_samp, uv);
+    return vec4f(c.rgb, select(c.a, 1.0, ubuf.opaqueAlpha != 0u));
 }
 
 fn intensity(rgb: vec3f) -> f32 {
@@ -63,7 +70,7 @@ fn quantize4(v: f32) -> f32 {
 }
 )"sv;
 
-static const std::string DepthShaderPreamble = R"(
+static constexpr std::string_view DepthShaderPreambleBody = R"(
 @group(0) @binding(0) var src: texture_depth_2d;
 
 struct UVTransform {
@@ -94,34 +101,31 @@ var<private> uvs: array<vec2f, 3> = array(
     out.uv = uvs[vi] * uv_xf.scale + uv_xf.offset;
     return out;
 }
-)"s + (gx::UseReversedZ ? R"(
+
 fn gx_z24(uv: vec2f) -> u32 {
     let texSize = vec2i(textureDimensions(src));
     let coord = clamp(vec2i(floor(uv * vec2f(texSize))), vec2i(0), texSize - vec2i(1));
-    let depth = textureLoad(src, coord, 0);
-    return min(u32(clamp(1.0 - depth, 0.0, 1.0) * 16777215.0 + 0.5), 0x00ffffffu);
+    return gx_z24_from_depth(textureLoad(src, coord, 0));
 }
-)"s
-                        : R"(
-fn gx_z24(uv: vec2f) -> u32 {
-    let texSize = vec2i(textureDimensions(src));
-    let coord = clamp(vec2i(floor(uv * vec2f(texSize))), vec2i(0), texSize - vec2i(1));
-    let depth = textureLoad(src, coord, 0);
-    return min(u32(clamp(depth, 0.0, 1.0) * 16777215.0 + 0.5), 0x00ffffffu);
+
+fn z_byte(z24: u32, shift: u32) -> f32 {
+    return f32((z24 >> shift) & 0xFFu) / 255.0;
 }
-)"s);
+)"sv;
+
+static const std::string DepthShaderPreamble = std::string{efb_wgsl::z24()} + std::string{DepthShaderPreambleBody};
 
 // Passthrough blit (for scaling)
 static constexpr std::string_view FragPassthrough = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    return textureSample(src, src_samp, in.uv);
+    return sample_efb(in.uv);
 }
 )"sv;
 
 // GX_TF_I4: 4-bit intensity -> R8Unorm (quantized)
 static constexpr std::string_view FragI4 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let rgb = textureSample(src, src_samp, in.uv).rgb;
+    let rgb = sample_efb(in.uv).rgb;
     let i = quantize4(intensity(rgb));
     return vec4f(i, i, i, i);
 }
@@ -130,7 +134,7 @@ static constexpr std::string_view FragI4 = R"(
 // GX_TF_I8: 8-bit intensity -> R8Unorm
 static constexpr std::string_view FragI8 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let rgb = textureSample(src, src_samp, in.uv).rgb;
+    let rgb = sample_efb(in.uv).rgb;
     let i = intensity(rgb);
     return vec4f(i, i, i, i);
 }
@@ -139,7 +143,7 @@ static constexpr std::string_view FragI8 = R"(
 // GX_TF_IA4: 4-bit intensity + 4-bit alpha -> RG8Unorm
 static constexpr std::string_view FragIA4 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let c = textureSample(src, src_samp, in.uv);
+    let c = sample_efb(in.uv);
     let i = quantize4(intensity(c.rgb));
     let a = quantize4(c.a);
     return vec4f(i, i, i, a);
@@ -149,7 +153,7 @@ static constexpr std::string_view FragIA4 = R"(
 // GX_TF_IA8: 8-bit intensity + 8-bit alpha -> RG8Unorm
 static constexpr std::string_view FragIA8 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let c = textureSample(src, src_samp, in.uv);
+    let c = sample_efb(in.uv);
     let i = intensity(c.rgb);
     return vec4f(i, i, i, c.a);
 }
@@ -158,7 +162,7 @@ static constexpr std::string_view FragIA8 = R"(
 // GX_TF_RGB565: Blit alpha to 1.0
 static constexpr std::string_view FragRGB565 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let c = textureSample(src, src_samp, in.uv);
+    let c = sample_efb(in.uv);
     return vec4f(c.rgb, 1.0);
 }
 )"sv;
@@ -166,7 +170,7 @@ static constexpr std::string_view FragRGB565 = R"(
 // GX_CTF_R4: 4-bit red -> R8Unorm
 static constexpr std::string_view FragR4 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let r = quantize4(textureSample(src, src_samp, in.uv).r);
+    let r = quantize4(sample_efb(in.uv).r);
     return vec4f(r, r, r, r);
 }
 )"sv;
@@ -174,7 +178,7 @@ static constexpr std::string_view FragR4 = R"(
 // GX_CTF_RA4: 4-bit red + 4-bit alpha -> RG8Unorm
 static constexpr std::string_view FragRA4 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let c = textureSample(src, src_samp, in.uv);
+    let c = sample_efb(in.uv);
     let r = quantize4(c.r);
     return vec4f(r, r, r, quantize4(c.a));
 }
@@ -183,7 +187,7 @@ static constexpr std::string_view FragRA4 = R"(
 // GX_CTF_RA8: 8-bit red + 8-bit alpha -> RG8Unorm
 static constexpr std::string_view FragRA8 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let c = textureSample(src, src_samp, in.uv);
+    let c = sample_efb(in.uv);
     return vec4f(c.r, c.r, c.r, c.a);
 }
 )"sv;
@@ -191,7 +195,7 @@ static constexpr std::string_view FragRA8 = R"(
 // GX_CTF_A8: 8-bit alpha -> R8Unorm
 static constexpr std::string_view FragA8 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let a = textureSample(src, src_samp, in.uv).a;
+    let a = sample_efb(in.uv).a;
     return vec4f(a, a, a, a);
 }
 )"sv;
@@ -199,7 +203,7 @@ static constexpr std::string_view FragA8 = R"(
 // GX_CTF_R8: 8-bit red -> R8Unorm
 static constexpr std::string_view FragR8 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let r = textureSample(src, src_samp, in.uv).r;
+    let r = sample_efb(in.uv).r;
     return vec4f(r, r, r, r);
 }
 )"sv;
@@ -207,7 +211,7 @@ static constexpr std::string_view FragR8 = R"(
 // GX_CTF_G8: 8-bit green -> R8Unorm
 static constexpr std::string_view FragG8 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let g = textureSample(src, src_samp, in.uv).g;
+    let g = sample_efb(in.uv).g;
     return vec4f(g, g, g, g);
 }
 )"sv;
@@ -215,7 +219,7 @@ static constexpr std::string_view FragG8 = R"(
 // GX_CTF_B8: 8-bit blue -> R8Unorm
 static constexpr std::string_view FragB8 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let b = textureSample(src, src_samp, in.uv).b;
+    let b = sample_efb(in.uv).b;
     return vec4f(b, b, b, b);
 }
 )"sv;
@@ -223,7 +227,7 @@ static constexpr std::string_view FragB8 = R"(
 // GX_CTF_RG8: 8-bit red + 8-bit green -> RG8Unorm
 static constexpr std::string_view FragRG8 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let c = textureSample(src, src_samp, in.uv);
+    let c = sample_efb(in.uv);
     return vec4f(c.r, c.r, c.r, c.g);
 }
 )"sv;
@@ -231,26 +235,66 @@ static constexpr std::string_view FragRG8 = R"(
 // GX_CTF_GB8: 8-bit green + 8-bit blue -> RG8Unorm
 static constexpr std::string_view FragGB8 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let c = textureSample(src, src_samp, in.uv);
+    let c = sample_efb(in.uv);
     return vec4f(c.g, c.g, c.g, c.b);
 }
 )"sv;
 
-// GX_TF_Z8: Upper 8-bits depth -> I8
+// GX_CTF_Z4: Upper 4 bits of depth -> I4
+static constexpr std::string_view FragZ4 = R"(
+@fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+    let z4 = f32((gx_z24(in.uv) >> 20u) & 0xFu) / 15.0;
+    return vec4f(z4, z4, z4, z4);
+}
+)"sv;
+
+// GX_TF_Z8: Upper 8 bits of depth -> I8
 static constexpr std::string_view FragZ8 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let z8 = f32((gx_z24(in.uv) >> 16u) & 0xFFu) / 255.0;
+    let z8 = z_byte(gx_z24(in.uv), 16u);
     return vec4f(z8, z8, z8, z8);
 }
 )"sv;
 
-// GX_TF_Z16: Upper 16-bits depth -> IA8
+// GX_CTF_Z8M: Middle 8 bits of depth -> I8
+static constexpr std::string_view FragZ8M = R"(
+@fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+    let z8 = z_byte(gx_z24(in.uv), 8u);
+    return vec4f(z8, z8, z8, z8);
+}
+)"sv;
+
+// GX_CTF_Z8L: Lower 8 bits of depth -> I8
+static constexpr std::string_view FragZ8L = R"(
+@fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+    let z8 = z_byte(gx_z24(in.uv), 0u);
+    return vec4f(z8, z8, z8, z8);
+}
+)"sv;
+
+// GX_TF_Z16: Upper 16 bits of depth -> IA8 (I = Z[23:16], A = Z[15:8])
 static constexpr std::string_view FragZ16 = R"(
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let z16 = gx_z24(in.uv) >> 8u;
-    let i = f32((z16 >> 8u) & 0xFFu) / 255.0;
-    let a = f32(z16 & 0xFFu) / 255.0;
-    return vec4f(i, i, i, a);
+    let z24 = gx_z24(in.uv);
+    let i = z_byte(z24, 16u);
+    return vec4f(i, i, i, z_byte(z24, 8u));
+}
+)"sv;
+
+// GX_CTF_Z16L: Lower 16 bits of depth -> IA8 (I = Z[15:8], A = Z[7:0])
+static constexpr std::string_view FragZ16L = R"(
+@fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+    let z24 = gx_z24(in.uv);
+    let i = z_byte(z24, 8u);
+    return vec4f(i, i, i, z_byte(z24, 0u));
+}
+)"sv;
+
+// GX_TF_Z24X8: Depth -> RGBA8 (R = Z[23:16], G = Z[15:8], B = Z[7:0])
+static constexpr std::string_view FragZ24X8 = R"(
+@fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+    let z24 = gx_z24(in.uv);
+    return vec4f(z_byte(z24, 16u), z_byte(z24, 8u), z_byte(z24, 0u), 1.0);
 }
 )"sv;
 
@@ -318,8 +362,13 @@ static constexpr std::array ConvPipelines{
 };
 
 static constexpr std::array DepthConvPipelines{
+    ConvPipeline{GX_CTF_Z4, FragZ4, wgpu::TextureFormat::RGBA8Unorm, "TexCopyConv Z4"},
     ConvPipeline{GX_TF_Z8, FragZ8, wgpu::TextureFormat::RGBA8Unorm, "TexCopyConv Z8"},
+    ConvPipeline{GX_CTF_Z8M, FragZ8M, wgpu::TextureFormat::RGBA8Unorm, "TexCopyConv Z8M"},
+    ConvPipeline{GX_CTF_Z8L, FragZ8L, wgpu::TextureFormat::RGBA8Unorm, "TexCopyConv Z8L"},
     ConvPipeline{GX_TF_Z16, FragZ16, wgpu::TextureFormat::RGBA8Unorm, "TexCopyConv Z16"},
+    ConvPipeline{GX_CTF_Z16L, FragZ16L, wgpu::TextureFormat::RGBA8Unorm, "TexCopyConv Z16L"},
+    ConvPipeline{GX_TF_Z24X8, FragZ24X8, wgpu::TextureFormat::RGBA8Unorm, "TexCopyConv Z24X8"},
 };
 
 static wgpu::BindGroupLayout g_bindGroupLayout;
@@ -470,7 +519,7 @@ void initialize() {
       },
       wgpu::BindGroupLayoutEntry{
           .binding = 2,
-          .visibility = wgpu::ShaderStage::Vertex,
+          .visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment,
           .buffer =
               wgpu::BufferBindingLayout{
                   .type = wgpu::BufferBindingType::Uniform,

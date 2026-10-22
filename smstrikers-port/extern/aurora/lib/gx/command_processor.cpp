@@ -1,6 +1,5 @@
 #include "command_processor.hpp"
 
-#include "../gfx/depth_peek.hpp"
 #include "../gfx/recording.hpp"
 #include "../internal.hpp"
 #include "fifo.hpp" // smstrikers-port: display list provenance
@@ -8,6 +7,7 @@
 #include "dolphin/gx/GXAurora.h"
 #include "gx.hpp"
 #include "pipeline.hpp"
+#include "readback.hpp"
 #include "regs.hpp"
 #include "shader_info.hpp"
 #include "texture.hpp"
@@ -26,48 +26,6 @@
 namespace aurora::gx::fifo {
 namespace {
 constexpr Module Log{"aurora::gx::fifo"};
-
-class Reader {
-public:
-  explicit Reader(std::span<const u8> data) noexcept : mData{data} {}
-
-  [[nodiscard]] bool empty() const noexcept { return mPos == mData.size(); }
-  [[nodiscard]] size_t offset() const noexcept { return mPos; }
-  [[nodiscard]] size_t size() const noexcept { return mData.size(); }
-  [[nodiscard]] size_t remaining() const noexcept { return mData.size() - mPos; }
-  [[nodiscard]] const u8* data() const noexcept { return mData.data(); }
-
-  template <typename T>
-    requires(std::is_arithmetic_v<T>)
-  T read() noexcept {
-    const auto bytes = take(sizeof(T));
-    return read_bits<T>(bytes.data());
-  }
-
-  std::span<const u8> take(size_t count) noexcept {
-    AURORA_ASSERT(count <= remaining(), "FIFO read overrun: need {} bytes at offset {}, have {}", count, mPos,
-                  remaining());
-    const auto bytes = mData.subspan(mPos, count);
-    mPos += count;
-    return bytes;
-  }
-
-  void skip(size_t count) noexcept {
-    AURORA_ASSERT(count <= remaining(), "FIFO read overrun: need {} bytes at offset {}, have {}", count, mPos,
-                  remaining());
-    mPos += count;
-  }
-
-  std::string read_string() noexcept {
-    const auto len = read<uint16_t>();
-    const auto bytes = take(len);
-    return {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
-  }
-
-private:
-  std::span<const u8> mData;
-  size_t mPos = 0;
-};
 
 // smstrikers-port: u32, since a strip, fan or quad draw of a u16 vertex count can need more than 65,535 indices.
 u32 prepare_idx_buffer(ByteBuffer& buf, GXPrimitive prim, u16 vtxStart, u16 vtxCount) noexcept {
@@ -182,6 +140,7 @@ constexpr size_t MaxFogRangeLuts = 32;
 std::vector<FogRangeLutEntry> sFogRangeLuts;
 
 struct DrawCache {
+  uint64_t targetLayoutKey = 0;
   PipelineConfig config{};
   ShaderInfo shaderInfo{};
   gfx::PipelineRef pipelineRef{};
@@ -198,7 +157,7 @@ struct DrawCache {
 };
 DrawCache sDrawCache;
 
-// smstrikers-port: both results depend only on the config, so each config is analysed and looked up once.
+// smstrikers-port: config, target layout and blocking mode decide both results, so each is analysed and looked up once.
 struct PipelineMemo {
   ShaderInfo shaderInfo;
   gfx::PipelineRef pipelineRef;
@@ -320,14 +279,14 @@ u8 line_mode_for_prim(GXPrimitive prim) noexcept {
 }
 } // namespace
 
-static void handle_draw(u8 cmd, Reader& reader) noexcept;
-static void handle_aurora(Reader& reader) noexcept;
+static void handle_draw(u8 cmd, ByteReader& reader) noexcept;
+static void handle_aurora(ByteReader& reader) noexcept;
 // smstrikers-port: see report_prim_desync.
-[[noreturn]] static void report_prim_desync(u8 cmd, const Reader& reader, uint64_t streamPos) noexcept;
+[[noreturn]] static void report_prim_desync(u8 cmd, const ByteReader& reader, uint64_t streamPos) noexcept;
 
 ProcessResult process(const u8* data, u32 size, uint64_t streamPos) noexcept {
   ZoneScoped;
-  Reader reader{{data, size}};
+  ByteReader reader{{data, size}};
 
   // smstrikers-port: offsets are chunk-relative, so the trace is too.
   sCmdTraceCount = 0;
@@ -401,7 +360,10 @@ ProcessResult process(const u8* data, u32 size, uint64_t streamPos) noexcept {
     }
 
     case CP_CMD_INVAL_VTX: {
-      // Invalidate vertex cache
+      for (auto& array : g_gxState.arrays) {
+        array.cachedRange = {};
+      }
+      g_gxState.dirty |= DirtyImmediates;
       break;
     }
 
@@ -454,7 +416,7 @@ ProcessResult process(const u8* data, u32 size, uint64_t streamPos) noexcept {
   return {size, false};
 }
 
-[[noreturn]] static void handle_draw_overrun(size_t totalVtxBytes, const Reader& reader) noexcept {
+[[noreturn]] static void handle_draw_overrun(size_t totalVtxBytes, const ByteReader& reader) noexcept {
   // Hex dump around the draw command for debugging
   const size_t pos = reader.offset();
   const size_t size = reader.size();
@@ -502,7 +464,7 @@ static u32 calc_vtx_size(GXVtxFmt fmt) noexcept {
 // smstrikers-port: where the rejected byte sits inside the display list it came
 // from. Mid-payload means the reader desynced, and the offset over the vertex
 // count is the stride the data really had. Diagnostic only, on an aborting path.
-[[noreturn]] static void report_prim_desync(const u8 cmd, const Reader& reader, const uint64_t streamPos) noexcept {
+[[noreturn]] static void report_prim_desync(const u8 cmd, const ByteReader& reader, const uint64_t streamPos) noexcept {
   const u8* data = reader.data();
   const size_t size = reader.size();
   const size_t pos = reader.offset() - 1; // the rejected byte itself
@@ -644,22 +606,27 @@ static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Rang
   }
 
   const u8 lineMode = line_mode_for_prim(prim);
+  const auto targetLayoutKey = gfx::get_render_target_layout().key;
   const bool pipelineValid = cache.hasPipeline && (state.dirty & DirtyPipeline) == 0 && cache.fmt == fmt &&
-                             cache.lineMode == lineMode && cache.config.msaaSamples == gfx::get_sample_count();
+                             cache.lineMode == lineMode && cache.targetLayoutKey == targetLayoutKey;
   if (!pipelineValid) {
     const bool hadPipeline = cache.hasPipeline;
     const auto prevSampledTextures = cache.shaderInfo.sampledTextures;
     const auto prevSampledIndTextures = cache.shaderInfo.sampledIndTextures;
     populate_pipeline_config(cache.config, prim, fmt);
-    const HashType memoKey = xxh3_hash(cache.config);
+    const HashType memoKey = xxh3_hash(cache.config, targetLayoutKey ^ static_cast<HashType>(g_gxState.drawsBlocking));
     if (const auto it = sPipelineMemo.find(memoKey); it != sPipelineMemo.end()) {
       cache.shaderInfo = it->second.shaderInfo;
       cache.pipelineRef = it->second.pipelineRef;
     } else {
       cache.shaderInfo = build_shader_info(cache.config.shaderConfig);
+#ifndef NDEBUG
+      validate_shader_config(cache.config.shaderConfig, cache.shaderInfo, g_gxState.numTexGens);
+#endif
       cache.pipelineRef = gfx::pipeline_ref(cache.config);
       sPipelineMemo.emplace(memoKey, PipelineMemo{cache.shaderInfo, cache.pipelineRef});
     }
+    cache.targetLayoutKey = targetLayoutKey;
     cache.fmt = fmt;
     cache.lineMode = lineMode;
     cache.hasPipeline = true;
@@ -712,6 +679,7 @@ static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Rang
   cache.lastDrawFmt = fmt;
   gfx::push_draw_command(DrawData{
       .pipeline = cache.pipelineRef,
+      .bindGroups = cache.bindGroups,
       .vertRange = vertRange,
       .idxRange = idxRange,
       .uniformRange = cache.uniformRange,
@@ -719,7 +687,6 @@ static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Rang
       .vtxCount = vtxCount,
       .indexCount = numIndices,
       .instanceCount = instanceCount,
-      .bindGroups = cache.bindGroups,
       .dstAlpha = state.dstAlpha,
   });
 }
@@ -798,7 +765,7 @@ static void diag_check_indices(const uint8_t* verts, u32 vtxCount, GXVtxFmt fmt,
   }
 }
 
-static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, Reader& reader) noexcept {
+static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, ByteReader& reader) noexcept {
   ZoneScoped;
   u32 vtxSize;
   if (g_gxState.lastVtxFmt == fmt)
@@ -866,13 +833,13 @@ static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, Reader& read
   handle_draw_unmerged(prim, fmt, vtxCount, vertRange);
 }
 
-static void handle_draw(u8 cmd, Reader& reader) noexcept {
+static void handle_draw(u8 cmd, ByteReader& reader) noexcept {
   const auto fmt = static_cast<GXVtxFmt>(cmd & CP_VAT_MASK);
   const auto prim = static_cast<GXPrimitive>(cmd & CP_OPCODE_MASK);
   draw_prim(prim, fmt, reader.read<u16>(), reader);
 }
 
-void handle_aurora(Reader& reader) noexcept {
+void handle_aurora(ByteReader& reader) noexcept {
   ZoneScoped;
   const u16 subCmd = reader.read<u16>();
 
@@ -996,6 +963,12 @@ void handle_aurora(Reader& reader) noexcept {
       g_gxState.clamp = clamp;
       g_gxState.dirty |= DirtyPipeline;
     }
+  } else if (subCmd == GX_AURORA_SET_DRAWS_BLOCKING) {
+    const bool blocking = reader.read<u8>() != 0;
+    if (g_gxState.drawsBlocking != blocking) {
+      g_gxState.drawsBlocking = blocking;
+      g_gxState.dirty |= DirtyPipeline;
+    }
   } else if (subCmd == GX_AURORA_LOAD_COPY_SRC) {
     const s32 left = reader.read<s32>();
     const s32 top = reader.read<s32>();
@@ -1010,8 +983,10 @@ void handle_aurora(Reader& reader) noexcept {
     g_gxState.texCopyDstWide = true;
   } else if (subCmd == GX_AURORA_LOAD_COPY_DEST) {
     g_gxState.texCopyDest = reinterpret_cast<const void*>(reader.read<u64>());
-  } else if (subCmd == GX_AURORA_REQUEST_DEPTH_SNAPSHOT) {
-    gfx::depth_peek::request_snapshot();
+  } else if (subCmd == GX_AURORA_READBACK_CAPTURE_PEEKS) {
+    readback::handle_capture_peeks(reader);
+  } else if (subCmd == GX_AURORA_READBACK_CAPTURE_COPIES) {
+    readback::handle_capture_copies(reader);
   } else if (subCmd == GX_AURORA_BEGIN_OFFSCREEN) {
     const u32 width = reader.read<u32>();
     const u32 height = reader.read<u32>();

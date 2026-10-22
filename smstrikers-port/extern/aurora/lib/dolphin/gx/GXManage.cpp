@@ -165,7 +165,7 @@ GXFifoObj* GXInit(void* base, u32 size) {
   GXSetCullMode(GX_CULL_BACK);
   GXSetClipMode(GX_CLIP_ENABLE);
   GXSetScissor(0, 0, rmode->fbWidth, rmode->efbHeight);
-  // GXSetScissorBoxOffset(0, 0);
+  GXSetScissorBoxOffset(0, 0);
 
   GXSetNumChans(0);
   GXSetChanCtrl(GX_COLOR0A0, GX_DISABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHT_NULL, GX_DF_NONE, GX_AF_NONE);
@@ -256,7 +256,7 @@ GXFifoObj* GXInit(void* base, u32 size) {
   // GXPokeDither(GX_FALSE);
   // GXPokeBlendMode(GX_BM_NONE, GX_BL_ZERO, GX_BL_ONE, GX_LO_SET);
   // GXPokeAlphaMode(GX_ALWAYS, 0);
-  // GXPokeAlphaRead(GX_READ_FF);
+  GXPokeAlphaRead(GX_READ_FF);
   // GXPokeDstAlpha(GX_DISABLE, 0);
   // GXPokeZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
 
@@ -276,6 +276,12 @@ void GXSetDrawDone() {
 }
 
 GXDrawDoneCallback GXSetDrawDoneCallback(GXDrawDoneCallback cb) { return aurora::gx::fifo::set_draw_done_callback(cb); }
+
+void GXSetDrawSync(u16 token) {}
+
+u16 GXReadDrawSync() { return 0; }
+
+void GXSetMisc(GXMiscToken token, u32 val) {}
 
 void GXFlush() {
   if (__gx->dirtyState) {

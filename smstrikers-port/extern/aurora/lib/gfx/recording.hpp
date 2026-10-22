@@ -3,6 +3,7 @@
 #include "types.hpp"
 
 #include <cstddef>
+#include <memory>
 #include <string>
 
 namespace aurora::gfx::detail {
@@ -20,12 +21,23 @@ void shutdown_recording();
 void increment_merged_draw_count() noexcept;
 
 namespace testing {
+struct OffscreenCacheStats {
+  uint64_t bytes;
+  size_t entries;
+};
 void suppress_render_worker(bool suppress) noexcept;
 void seed_offscreen_cache(uint32_t width, uint32_t height, wgpu::TextureFormat colorFormat,
                           wgpu::TextureFormat depthFormat);
-}
+OffscreenCacheStats offscreen_cache_stats() noexcept;
+bool is_offscreen_cached(uint32_t width, uint32_t height, wgpu::TextureFormat colorFormat,
+                         wgpu::TextureFormat depthFormat);
+} // namespace testing
 
 } // namespace aurora::gfx::detail
+
+namespace aurora::gfx::readback {
+struct Job;
+}
 
 namespace aurora::gfx {
 struct ColorPassDescriptor {
@@ -56,10 +68,8 @@ void end_color_pass();
 void queue_texture_copy(wgpu::TexelCopyTextureInfo src, wgpu::TexelCopyTextureInfo dst, wgpu::Extent3D size);
 void begin_offscreen(uint32_t width, uint32_t height);
 void end_offscreen();
-uint32_t get_sample_count() noexcept;
+bool has_normal_attachment() noexcept;
 RenderTargetLayout get_render_target_layout() noexcept;
-void clear_caches() noexcept;
-
 namespace tex_palette_conv {
 struct ConvRequest;
 }
@@ -99,11 +109,21 @@ template <typename PipelineConfig>
 PipelineRef pipeline_ref(const PipelineConfig& config);
 
 void resolve_pass_into(TextureHandle texture, ClipRect rect, bool clearColor, bool clearAlpha, bool clearDepth,
-                       Vec4<float> clearColorValue, float clearDepthValue, GXTexFmt resolveFormat = GX_TF_RGBA8);
+                       Vec4<float> clearColorValue, float clearDepthValue, GXTexFmt resolveFormat,
+                       GXPixelFmt sourceFormat);
 uint32_t align_uniform(uint32_t value);
 Vec2<uint32_t> get_render_target_size() noexcept;
 void set_viewport(const Viewport& viewport) noexcept;
 void set_scissor(const ClipRect& scissor) noexcept;
 void push_debug_group(std::string label);
 void insert_debug_marker(std::string label);
+
+struct ReadbackCapture {
+  bool active = false;
+  bool offscreen = false;
+  uint32_t width = 0;
+  uint32_t height = 0;
+};
+ReadbackCapture readback_capture() noexcept;
+bool push_readback_op(std::shared_ptr<readback::Job> job, bool efbSource);
 } // namespace aurora::gfx
