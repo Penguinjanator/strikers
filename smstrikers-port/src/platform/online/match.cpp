@@ -1170,12 +1170,11 @@ void Session::WriteReport()
     text.clear();
     append(text, "strikers-desync 1\n");
     append(text, "version %s\n", m_id.version);
-    append(text, "build %08x protocol %u platform %s family %u data %08x\n",
-                 (unsigned)m_id.build, (unsigned)ONLINE_PROTOCOL_VERSION,
-                 PortOnlinePlatformName(m_id.platform), (unsigned)m_id.binaryFamily,
-                 (unsigned)m_id.dataFamily);
+    append(text, "build %08x protocol %u platform %s family %u data %08x\n", (unsigned)m_id.build,
+           (unsigned)ONLINE_PROTOCOL_VERSION, PortOnlinePlatformName(m_id.platform),
+           (unsigned)m_id.binaryFamily, (unsigned)m_id.dataFamily);
     append(text, "self %d serial %u machines %x\n", m_self, (unsigned)m_serial,
-                 (unsigned)m_lock.Machines());
+           (unsigned)m_lock.Machines());
     uint8_t desc[ONLINE_DESC_BYTES];
     PortOnlineDescEncode(&m_desc, desc);
     append(text, "desc ");
@@ -1184,8 +1183,7 @@ void Session::WriteReport()
     append(text, "component %s\n", m_desyncComponent[0] != '\0' ? m_desyncComponent : "-");
     for (int m = 0; m < ONLINE_MAX_MACHINES; m++)
         if (m_lock.InMatch(m))
-            append(text, "hash-at-first %d %016llx\n", m,
-                         (unsigned long long)m_desyncHashes[m]);
+            append(text, "hash-at-first %d %016llx\n", m, (unsigned long long)m_desyncHashes[m]);
     for (size_t i = 0; i < m_events.size(); i++)
         append(text, "event %s\n", m_events[i].text);
     // Every machine's records from tick 0, a run of equal records on one line.
@@ -1199,8 +1197,7 @@ void Session::WriteReport()
         {
             const uint8_t* rec = m_lock.Record(m, t);
             uint32_t run = 1;
-            while (t + run < have &&
-                   std::memcmp(m_lock.Record(m, t + run), rec, kRecordSize) == 0)
+            while (t + run < have && std::memcmp(m_lock.Record(m, t + run), rec, kRecordSize) == 0)
                 run++;
             append(text, "input %d %u %u ", m, (unsigned)t, (unsigned)run);
             hex(text, rec, kRecordSize);
@@ -1241,7 +1238,7 @@ void Session::WriteReport()
                                        ? named->names[k]
                                        : NULL;
                 append(text, " %s=%016llx", name != NULL ? name : "?",
-                             (unsigned long long)c->hash[k]);
+                       (unsigned long long)c->hash[k]);
             }
             append(text, "\n");
         }

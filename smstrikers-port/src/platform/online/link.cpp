@@ -904,7 +904,8 @@ void Session::JoinTimers(uint64_t now)
     uint8_t out[kHelloSize];
     EncodeHello(h, out);
     // An IPv4-only socket, or a device with no IPv6 route, fails the send at once.
-    if (m_game != NULL && m_game->Send(m_join.host, out, sizeof out) != 0 && m_join.host.family == 6)
+    if (m_game != NULL && m_game->Send(m_join.host, out, sizeof out) != 0 &&
+        m_join.host.family == 6)
         Fail(ONLINE_ERR_UNREACHABLE,
              "This device couldn't send to that IPv6 address. Enter the room's IPv4 address.");
 }
@@ -1069,7 +1070,8 @@ uint64_t Session::NextWakeUs()
     }
     if (m_goReceived && m_phase == ONLINE_PHASE_LOADING && m_startUs < wake)
         wake = m_startUs;
-    if (m_barrier.active && m_barrier.resumeKnown && m_barrier.resumeUs > now && m_barrier.resumeUs < wake)
+    if (m_barrier.active && m_barrier.resumeKnown && m_barrier.resumeUs > now &&
+        m_barrier.resumeUs < wake)
         wake = m_barrier.resumeUs;
     return wake < now ? now : wake;
 }

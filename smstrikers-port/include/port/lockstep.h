@@ -37,7 +37,10 @@ void PortSimTickEnd(void);
 // Tick loop: FixedUpdateTask::Run in task state 2 under g_simLockstep; dt is the task delta.
 void PortLockstepRunTicks(float dt);
 
-enum { PORT_INPUT_BUTTONS = 0x1F7F };
+enum
+{
+    PORT_INPUT_BUTTONS = 0x1F7F
+};
 
 static inline signed char PortSimQuantizeStick(signed char value)
 {
@@ -77,7 +80,7 @@ typedef struct PortSimMatchSettings
     unsigned int seed;   // the gameplay stream's seed at BeginGame
     int bowserRepeat;
     int pureGame;
-    int pauseAllowed;    // online: Start in the tick input pauses every machine
+    int pauseAllowed;   // online: Start in the tick input pauses every machine
 } PortSimMatchSettings;
 
 // RNG: the session's settings for the next BeginGame; NULL goes back to STRIKERS_SEED and the ini.
@@ -158,12 +161,8 @@ int PortSimOnline(void);
 class PortRngCosmetic
 {
   public:
-    PortRngCosmetic() : mScope(PortRngSetScope(PORT_RNG_COSMETIC))
-    {}
-    ~PortRngCosmetic()
-    {
-        PortRngSetScope(mScope);
-    }
+    PortRngCosmetic() : mScope(PortRngSetScope(PORT_RNG_COSMETIC)) {}
+    ~PortRngCosmetic() { PortRngSetScope(mScope); }
 
   private:
     int mScope;

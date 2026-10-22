@@ -32,7 +32,6 @@ extern PowerupBase* g_pPowerups[25];
 namespace
 {
 
-
 uint32_t float_bits(float x)
 {
     uint32_t bits;
@@ -55,19 +54,28 @@ uint32_t canonical_float_bits(float x)
 struct Hasher
 {
     uint64_t h = 0xcbf29ce484222325ull;
-    void word(uint32_t v) { h ^= v; h *= 0x100000001b3ull; }
+    void word(uint32_t v)
+    {
+        h ^= v;
+        h *= 0x100000001b3ull;
+    }
     void u32(uint32_t v) { word(v); }
     void i(int v) { word((uint32_t)v); }
     void b(bool v) { word(v ? 1u : 0u); }
     void fs(const float* p, int count)
     {
-        for (int k = 0; k < count; k++) word(canonical_float_bits(p[k]));
+        for (int k = 0; k < count; k++)
+            word(canonical_float_bits(p[k]));
     }
     void f(float x) { fs(&x, 1); }
     void v3(const nlVector3& v) { fs(v.e, 3); }
     void q(const nlQuaternion& v) { fs(v.e, 4); }
     void timer(const Timer& t) { u32(t.m_uPackedTime); }
-    void h64(uint64_t v) { word((uint32_t)v); word((uint32_t)(v >> 32)); }
+    void h64(uint64_t v)
+    {
+        word((uint32_t)v);
+        word((uint32_t)(v >> 32));
+    }
     uint64_t done()
     {
         uint64_t z = h;

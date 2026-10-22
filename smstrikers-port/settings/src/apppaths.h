@@ -39,6 +39,9 @@ void keepAppSettings(bool portable);
 // Moves `from` into user/ and cache/ under `root`, leaving behind any file already there.
 bool moveToPortable(const QString& from, const QString& root, QString* error);
 
+// `path` as user/... relative to the game folder if it was inside `from`; otherwise unchanged.
+QString movedPath(const QString& path, const QString& from);
+
 // mods/<kind> under `root` (the archive root or the user folder), matching the game's PortModsFolder.
 QString modsFolder(const QString& root, const QString& kind);
 

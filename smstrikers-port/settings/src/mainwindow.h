@@ -125,7 +125,7 @@ private:
     void updateTexturePacks();
     QString userFolder() const;
     void updatePortableState();
-    void offerPortableMove();
+    bool offerPortableMove();
     // A path from the file as the game reads it: relative to the folder Play starts it in.
     static QString gamePath(const QString& path);
     void openFolder(const QString& path);

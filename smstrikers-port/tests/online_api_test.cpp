@@ -44,7 +44,8 @@ int g_failures;
     } while (0)
 
 const std::chrono::steady_clock::time_point g_start = std::chrono::steady_clock::now();
-std::string g_ini = std::string(ONLINE_TEST_OUT) + "/api-strikers-" + std::to_string(getpid()) + ".ini";
+std::string g_ini =
+    std::string(ONLINE_TEST_OUT) + "/api-strikers-" + std::to_string(getpid()) + ".ini";
 
 uint64_t NowUs()
 {
@@ -184,7 +185,6 @@ class UdpEnv : public SessionEnv
     NetAddr m_addr;
 };
 
-
 std::string ReadFile(const std::string& path)
 {
     std::string text;
@@ -272,7 +272,6 @@ void TestOffline()
     CHECK(PortOnlineGetState()->phase == ONLINE_PHASE_IDLE &&
           PortOnlineGetState()->error == ONLINE_ERR_NONE);
 }
-
 
 // This machine's addresses for the room's address screen: best first, none loopback or link-local.
 void TestLanAddresses()

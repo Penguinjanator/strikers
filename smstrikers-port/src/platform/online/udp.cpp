@@ -145,9 +145,7 @@ bool set_nonblocking(PortSocket s)
 class UdpPipe : public NetPipe
 {
   public:
-    UdpPipe(PortSocket s, int family)
-        : m_socket(s), m_family(family)
-    {}
+    UdpPipe(PortSocket s, int family) : m_socket(s), m_family(family) {}
     ~UdpPipe() override { close_socket(m_socket); }
 
     int Send(const NetAddr& to, const uint8_t* data, size_t size) override

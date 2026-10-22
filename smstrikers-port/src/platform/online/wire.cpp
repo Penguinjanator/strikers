@@ -662,9 +662,9 @@ bool DecodeMessageBody(uint8_t kind, const uint8_t* p, size_t n, Message* out)
         out->u.go.delayTicks = p[8];
         return out->u.go.startInUs <= kMaxStartInUs && is_delay(p[8]) && all_zero(p + 9, 3);
     case MSG_SELECT:
-        out->u.select = {Get32(p), p[4], p[5], p[6], p[7], p[8]};
-        return p[4] >= ONLINE_SELECT_BEGIN && p[4] <= ONLINE_SELECT_OPTIONS &&
-               p[5] < 2 && p[6] <= 8 && p[7] < 4 && p[8] <= 3;
+        out->u.select = { Get32(p), p[4], p[5], p[6], p[7], p[8] };
+        return p[4] >= ONLINE_SELECT_BEGIN && p[4] <= ONLINE_SELECT_OPTIONS && p[5] < 2 &&
+               p[6] <= 8 && p[7] < 4 && p[8] <= 3;
     case MSG_SKIP:
         out->u.skip.matchSerial = Get32(p);
         out->u.skip.presentation = Get32(p + 4);

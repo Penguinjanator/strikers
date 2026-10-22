@@ -657,8 +657,8 @@ int main(int argc, char** argv)
               QStringLiteral("the move succeeds"), failed);
         check(readAll(root.filePath(QStringLiteral("user/USA/MemoryCardA.USA.raw"))) == "card",
               QStringLiteral("saves go to user/"));
-        check(readAll(root.filePath(QStringLiteral("cache/pipeline_cache.db"))) == "p"
-                  && readAll(root.filePath(QStringLiteral("cache/dawn_cache.db-wal"))) == "d",
+        check(readAll(root.filePath(QStringLiteral("cache/pipeline_cache.db"))) == "p" &&
+                  readAll(root.filePath(QStringLiteral("cache/dawn_cache.db-wal"))) == "d",
               QStringLiteral("the shader caches go to cache/"));
         check(!QFileInfo::exists(root.filePath(QStringLiteral("user/pipeline_cache.db"))),
               QStringLiteral("... and not to user/"));
@@ -670,6 +670,17 @@ int main(int argc, char** argv)
               QStringLiteral("a moved folder is gone from the old place"));
         check(readAll(from.filePath(QStringLiteral("imgui.ini"))) == "ui",
               QStringLiteral("a file that would overwrite stays in the old place"));
+
+        const QString old = QStringLiteral("/home/me/.local/share/Super Mario Strikers");
+        check(AppPaths::movedPath(old + QStringLiteral("/Game Data/G4QE01/files"), old) ==
+                  QStringLiteral("user/Game Data/G4QE01/files"),
+              QStringLiteral("a path into the moved folder follows it, relative"));
+        check(AppPaths::movedPath(QStringLiteral("/games/files"), old) ==
+                  QStringLiteral("/games/files"),
+              QStringLiteral("a path elsewhere is left alone"));
+        check(AppPaths::movedPath(old + QStringLiteral(" 2/files"), old) ==
+                  old + QStringLiteral(" 2/files"),
+              QStringLiteral("a sibling folder with the same prefix is left alone"));
     }
 
     QTextStream out(stdout);

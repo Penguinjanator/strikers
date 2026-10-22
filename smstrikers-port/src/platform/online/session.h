@@ -428,7 +428,7 @@ class Session
         char text[ONLINE_ADDRESS_MAX];
     } m_join;
 
-    uint32_t m_nextSeed;      // a seed SetDesc carried, for the next Start only
+    uint32_t m_nextSeed;   // a seed SetDesc carried, for the next Start only
 
     std::vector<Link*> m_links;
     std::vector<Farewell> m_farewells;

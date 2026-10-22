@@ -1396,26 +1396,30 @@ bool MainWindow::saveTo(const QString& path, QString* error)
     if (!m_ini.save(path, error))
         return false;
     const bool portable = m_portableBox != nullptr && m_portableBox->isChecked();
-    if (portable && !wasPortable)
-        offerPortableMove();
+    if (portable && !wasPortable && offerPortableMove())
+    {
+        collectFromUi();
+        if (!m_ini.save(path, error))
+            return false;
+    }
     AppPaths::keepAppSettings(portable);
     return true;
 }
 
-void MainWindow::offerPortableMove()
+bool MainWindow::offerPortableMove()
 {
     const QString from = AppPaths::userFolder();
     const QString to = AppPaths::portableUserFolder();
-    if (m_ini.has(QStringLiteral("USER_DIR")) || QFileInfo::exists(to)
-        || QDir(from).isEmpty(QDir::AllEntries | QDir::NoDotAndDotDot))
-        return;
+    if (m_ini.has(QStringLiteral("USER_DIR")) || QFileInfo::exists(to) ||
+        QDir(from).isEmpty(QDir::AllEntries | QDir::NoDotAndDotDot))
+        return false;
 
     const auto answer = QMessageBox::question(
         this, tr("Portable"),
         tr("Move your saves, controls and shader cache into the game folder?\n\n%1")
             .arg(QDir::toNativeSeparators(from)));
     if (answer != QMessageBox::Yes)
-        return;
+        return false;
 
     // Fallbacks off, or macOS lists the global domain's keys too.
     QSettings system;
@@ -1430,10 +1434,19 @@ void MainWindow::offerPortableMove()
     {
         QMessageBox::warning(this, tr("Portable"),
                              tr("Could not move %1. Whatever moved is in the game folder, and the "
-                                "rest is where it was.").arg(failed));
-        return;
+                                "rest is where it was.")
+                                 .arg(failed));
     }
 
+    // Paths into the moved folder follow it, relative so the game folder stays movable.
+    for (const char* key : { "data", "textures", "texture_dump" })
+    {
+        const QString k = QString::fromLatin1(key);
+        const QString was = valueByKey(k);
+        const QString now = AppPaths::movedPath(gamePath(was), from);
+        if (!was.isEmpty() && now != gamePath(was) && QFileInfo::exists(gamePath(now)))
+            setValueByKey(k, now);
+    }
     AppPaths::keepAppSettings(true);
     QSettings portable;
     for (auto it = own.constBegin(); it != own.constEnd(); ++it)
@@ -1441,6 +1454,7 @@ void MainWindow::offerPortableMove()
     portable.sync();
     AppPaths::keepAppSettings(false);
     QSettings().clear();
+    return true;
 }
 
 void MainWindow::onSave()

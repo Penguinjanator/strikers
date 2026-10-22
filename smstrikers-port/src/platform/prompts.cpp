@@ -6,7 +6,10 @@ extern "C" void PortPromptsFontLoaded(nlFont*) {}
 extern "C" void PortPromptsFontUnloading(nlFont*) {}
 extern "C" void PortPromptsEvent(const SDL_Event*) {}
 extern "C" void PortPromptsFrame() {}
-extern "C" const unsigned char* PortPromptsMenuImage(unsigned, unsigned*, unsigned*) { return nullptr; }
+extern "C" const unsigned char* PortPromptsMenuImage(unsigned, unsigned*, unsigned*)
+{
+    return nullptr;
+}
 extern "C" void PortPromptsLegendsLoaded() {}
 extern "C" void PortPromptsLegendReloaded(unsigned long) {}
 extern "C" void PortPromptsLegendsUnloading() {}
@@ -51,7 +54,8 @@ const unsigned kControls[Count] = { PAD_BUTTON_A, PAD_BUTTON_B,  PAD_BUTTON_X,
 const char kGlyphs[Count] = { '@', '~', '|', '+', '*', '^' };
 
 const int kLegendCount = 6;
-const unsigned long kLegends[kLegendCount] = { 0xecce7182, 0x288d277b, 0x12fa669a, 0xd9104663, 0x3c4b529a, 0x627747b2 };
+const unsigned long kLegends[kLegendCount] = { 0xecce7182, 0x288d277b, 0x12fa669a,
+                                               0xd9104663, 0x3c4b529a, 0x627747b2 };
 const Control kLegendControls[kLegendCount] = { A, B, Y, B, A, Y };
 
 struct FontState
@@ -547,7 +551,8 @@ void update()
 
 }   // namespace
 
-extern "C" const unsigned char* PortPromptsMenuImage(unsigned button, unsigned* width, unsigned* height)
+extern "C" const unsigned char* PortPromptsMenuImage(unsigned button, unsigned* width,
+                                                     unsigned* height)
 {
     Icon icon = {};
     bool found = false;
@@ -578,9 +583,11 @@ extern "C" const unsigned char* PortPromptsMenuImage(unsigned button, unsigned* 
                 }
             if (s_override == Auto || padFamily(s_activePort) == in.family)
                 for (int i = 0; i < 4; ++i)
-                    in.labels[i] = loneJoyCon(s_activePort) ? Unknown
-                        : labelFor(SDL_GetGamepadButtonLabel(padForPort(s_activePort),
-                                                           static_cast<SDL_GamepadButton>(i)));
+                    in.labels[i] =
+                        loneJoyCon(s_activePort)
+                            ? Unknown
+                            : labelFor(SDL_GetGamepadButtonLabel(
+                                  padForPort(s_activePort), static_cast<SDL_GamepadButton>(i)));
         }
         char keyName[128] = {};
         if (in.family == Keyboard)
@@ -592,8 +599,10 @@ extern "C" const unsigned char* PortPromptsMenuImage(unsigned button, unsigned* 
                 if (keys[i].padButton == button && keys[i].scancode > 0)
                 {
                     const auto sc = static_cast<SDL_Scancode>(keys[i].scancode);
-                    const char* name = SDL_GetKeyName(SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false));
-                    snprintf(keyName, sizeof keyName, "%s", name && *name ? name : SDL_GetScancodeName(sc));
+                    const char* name =
+                        SDL_GetKeyName(SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false));
+                    snprintf(keyName, sizeof keyName, "%s",
+                             name && *name ? name : SDL_GetScancodeName(sc));
                     in.keys[A] = keyName;
                     break;
                 }

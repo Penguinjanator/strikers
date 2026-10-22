@@ -91,7 +91,6 @@ struct ResolveJob
     NetAddr addr;
 };
 
-
 class GameEnv : public online::SessionEnv
 {
   public:
@@ -119,7 +118,6 @@ class GameEnv : public online::SessionEnv
     }
 
     void ClosePipe(NetPipe* pipe) override { online::UdpClose(pipe); }
-
 
     uint16_t PipePort(NetPipe* pipe) override { return online::UdpLocalPort(pipe); }
 

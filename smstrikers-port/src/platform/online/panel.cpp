@@ -24,7 +24,13 @@
 
 #include <aurora/imgui.h>
 // Declared here: aurora's gfx.hpp needs WebGPU headers the game target does not have.
-namespace aurora { namespace gfx { void synchronize(); } }
+namespace aurora
+{
+namespace gfx
+{
+void synchronize();
+}
+}   // namespace aurora
 #include <dolphin/pad.h>
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_scancode.h>
@@ -495,7 +501,6 @@ const char* format(const char* f, ...)
     return out;
 }
 
-
 const char* captain_name(int team)
 {
     return team >= 0 && team < 9 ? text((Text)(T_CAPTAIN_FIRST + team)) : "?";
@@ -717,8 +722,8 @@ float px() { return ImGui::GetFontSize(); }
 
 void slant_panel(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 color, float cut)
 {
-    const ImVec2 points[] = {ImVec2(a.x + cut, a.y), ImVec2(b.x, a.y),
-                            ImVec2(b.x - cut, b.y), ImVec2(a.x, b.y)};
+    const ImVec2 points[] = { ImVec2(a.x + cut, a.y), ImVec2(b.x, a.y), ImVec2(b.x - cut, b.y),
+                              ImVec2(a.x, b.y) };
     dl->AddConvexPolyFilled(points, 4, color);
 }
 
@@ -726,12 +731,12 @@ void focus_ring(ImVec2 a, ImVec2 b)
 {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float p = px();
-    const ImVec2 points[] = {ImVec2(a.x + p * .45f, a.y), ImVec2(b.x, a.y),
-                            ImVec2(b.x - p * .45f, b.y), ImVec2(a.x, b.y)};
+    const ImVec2 points[] = { ImVec2(a.x + p * .45f, a.y), ImVec2(b.x, a.y),
+                              ImVec2(b.x - p * .45f, b.y), ImVec2(a.x, b.y) };
     dl->AddPolyline(points, 4, col(kGold), ImDrawFlags_Closed, p * .08f);
     const float y = (a.y + b.y) * .5f;
-    dl->AddTriangleFilled(ImVec2(a.x + p * .22f, y - p * .22f),
-                          ImVec2(a.x + p * .50f, y), ImVec2(a.x + p * .22f, y + p * .22f), col(kGold));
+    dl->AddTriangleFilled(ImVec2(a.x + p * .22f, y - p * .22f), ImVec2(a.x + p * .50f, y),
+                          ImVec2(a.x + p * .22f, y + p * .22f), col(kGold));
 }
 
 void text_at(ImDrawList* dl, ImFont* font, ImVec2 pos, const ImVec4& c, const char* s,
@@ -740,7 +745,8 @@ void text_at(ImDrawList* dl, ImFont* font, ImVec2 pos, const ImVec4& c, const ch
     dl->AddText(font, font->FontSize * font->Scale, pos, col(c, alpha), s);
 }
 
-void title_at(ImDrawList* dl, ImFont* font, ImVec2 pos, const ImVec4& color, const char* value, float available = 0.0f)
+void title_at(ImDrawList* dl, ImFont* font, ImVec2 pos, const ImVec4& color, const char* value,
+              float available = 0.0f)
 {
     char title[256];
     text_upper(value, title, sizeof title);
@@ -748,7 +754,8 @@ void title_at(ImDrawList* dl, ImFont* font, ImVec2 pos, const ImVec4& color, con
     if (available > 0.0f)
     {
         const float width = font->CalcTextSizeA(size, 1e9f, 0.0f, title).x + size * .25f;
-        if (width > available) size *= available / width;
+        if (width > available)
+            size *= available / width;
     }
     auto draw = [&](float x, float y, ImU32 ink) {
         const int first = dl->VtxBuffer.Size;
@@ -759,7 +766,8 @@ void title_at(ImDrawList* dl, ImFont* font, ImVec2 pos, const ImVec4& color, con
     const float edge = size * .055f;
     for (int y = -1; y <= 1; ++y)
         for (int x = -1; x <= 1; ++x)
-            if (x || y) draw(x * edge, y * edge + edge, IM_COL32(0, 0, 0, 230));
+            if (x || y)
+                draw(x * edge, y * edge + edge, IM_COL32(0, 0, 0, 230));
     draw(0, 0, col(color));
     draw(size * .025f, 0, col(color));
 }
@@ -871,7 +879,8 @@ const ImGuiWindowFlags kScreenFlags =
     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
     ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoScrollWithMouse;
 
-void begin_screen(const char* id, const char* title, const char* context, bool busy = false, float rows = 26.0f)
+void begin_screen(const char* id, const char* title, const char* context, bool busy = false,
+                  float rows = 26.0f)
 {
     const ImGuiIO& io = ImGui::GetIO();
     const float p = px();
@@ -893,12 +902,12 @@ void begin_screen(const char* id, const char* title, const char* context, bool b
     const ImVec2 wp = ImGui::GetWindowPos();
     const float headH = p * 3.1f;
     dl->PushClipRect(wp, ImVec2(wp.x + size.x, wp.y + size.y), false);
-    dl->AddRectFilledMultiColor(wp, ImVec2(wp.x + size.x, wp.y + headH),
-                                col(kButtonActive), col(kButton), col(kButton), col(kRaised));
+    dl->AddRectFilledMultiColor(wp, ImVec2(wp.x + size.x, wp.y + headH), col(kButtonActive),
+                                col(kButton), col(kButton), col(kRaised));
     slant_panel(dl, ImVec2(wp.x - p * .35f, wp.y + p * .35f),
-                 ImVec2(wp.x + size.x * .72f, wp.y + headH - p * .25f), col(kInk), p * .7f);
-    dl->AddLine(ImVec2(wp.x, wp.y + headH), ImVec2(wp.x + size.x, wp.y + headH),
-                col(kHome, .65f), p * .08f);
+                ImVec2(wp.x + size.x * .72f, wp.y + headH - p * .25f), col(kInk), p * .7f);
+    dl->AddLine(ImVec2(wp.x, wp.y + headH), ImVec2(wp.x + size.x, wp.y + headH), col(kHome, .65f),
+                p * .08f);
     ImFont* head = s_fonts->head;
     const ImVec2 ts = text_size(head, title);
     const float pad = ImGui::GetStyle().WindowPadding.x;
@@ -916,11 +925,12 @@ void begin_screen(const char* id, const char* title, const char* context, bool b
         const float width = ImMin(cs.x, size.x * .30f);
         const float scale = cs.x > 0 ? width / cs.x : 1.0f;
         dl->AddText(body, body->FontSize * body->Scale * scale,
-                    ImVec2(right - width, wp.y + (headH - cs.y * scale) * .5f), col(kMuted), context);
+                    ImVec2(right - width, wp.y + (headH - cs.y * scale) * .5f), col(kMuted),
+                    context);
         right -= width + p;
-
     }
-    title_at(dl, head, ImVec2(wp.x + pad, wp.y + (headH - ts.y) * .5f), kText, title, right - wp.x - pad);
+    title_at(dl, head, ImVec2(wp.x + pad, wp.y + (headH - ts.y) * .5f), kText, title,
+             right - wp.x - pad);
     dl->PopClipRect();
     ImGui::SetCursorPosY(headH + p * 0.7f);
     ImGui::BeginChild("body", ImVec2(0.0f, -p * 2.6f), ImGuiChildFlags_NavFlattened);
@@ -994,21 +1004,25 @@ bool row(const char* id, const char* label, const char* sub = nullptr, bool enab
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float alpha = enabled ? 1.0f : 0.7f;
     ImVec4 bg = active ? kButtonActive : (hovered || focused) ? kButtonHover : kButton;
-    if (accent && enabled && !(hovered || focused)) bg = kButtonHover;
+    if (accent && enabled && !(hovered || focused))
+        bg = kButtonHover;
     slant_panel(dl, a, b, col(bg, alpha), p * .45f);
     const float x = a.x + p * 1.0f;
     if (sub != nullptr)
     {
-        title_at(dl, font, ImVec2(x, a.y + p * .3f), focused && enabled ? kGold : kText, label, wrapWidth);
+        title_at(dl, font, ImVec2(x, a.y + p * .3f), focused && enabled ? kGold : kText, label,
+                 wrapWidth);
         dl->AddText(font, lh, ImVec2(x, a.y + p * .35f + lh),
-                    col(accent ? kText : kMuted, alpha * (accent ? .8f : 1.0f)), sub, nullptr, wrapWidth);
+                    col(accent ? kText : kMuted, alpha * (accent ? .8f : 1.0f)), sub, nullptr,
+                    wrapWidth);
     }
     else
     {
         if (std::strcmp(id, "recent") == 0)
             text_at(dl, font, ImVec2(x, a.y + (h - lh) * .5f), kText, label, alpha);
         else
-            title_at(dl, font, ImVec2(x, a.y + (h - lh) * .5f), focused && enabled ? kGold : kText, label, wrapWidth);
+            title_at(dl, font, ImVec2(x, a.y + (h - lh) * .5f), focused && enabled ? kGold : kText,
+                     label, wrapWidth);
     }
     if (right != nullptr)
     {
@@ -1267,7 +1281,6 @@ void draw_home(const OnlineState& st)
 
     ImGui::Dummy(ImVec2(0.0f, px() * 0.3f));
 
-
     const Hint hints[] = { { PAD_BUTTON_A, T_HINT_SELECT }, { PAD_BUTTON_B, T_CLOSE } };
     end_screen(hints, 2);
 
@@ -1275,7 +1288,7 @@ void draw_home(const OnlineState& st)
         s_homeChoice = choice;
     switch (action)
     {
-    case HOME_CREATE:      PortOnlineHost(0, nullptr); break;
+    case HOME_CREATE: PortOnlineHost(0, nullptr); break;
     case HOME_NEARBY:
         s_idleScreen = SCR_NEARBY;
         s_nearbyAskedAt = -100.0;
@@ -1301,7 +1314,8 @@ void draw_join(const OnlineState&)
     const int maxLen = kAddressLen;
     const bool wheel = !PANEL_HAS_TYPING || s_lastInputPad;
     s_padOwned = wheel;
-    if (wheel) wheel_input(w, kAddressChars, maxLen);
+    if (wheel)
+        wheel_input(w, kAddressChars, maxLen);
 
     begin_screen("##online.join", text(T_JOIN_ADDRESS), nullptr, false, 17.0f);
     if (wheel)
@@ -1317,8 +1331,7 @@ void draw_join(const OnlineState&)
         join = text_field("##address", w, maxLen, ImGuiInputTextFlags_CharsNoBlank);
 #endif
     ImGui::Dummy(ImVec2(0.0f, px() * 0.3f));
-    const float bw =
-        (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
+    const float bw = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(px() * 0.8f, px() * 0.55f));
     if (ImGui::Button(text(T_JOIN), ImVec2(bw, 0.0f)))
         join = true;
@@ -1334,7 +1347,8 @@ void draw_join(const OnlineState&)
     if (!wheel)
     {
         ImGui::SameLine();
-        if (ImGui::Button(text(T_PASTE), ImVec2(bw, 0.0f))) paste_into(w, maxLen);
+        if (ImGui::Button(text(T_PASTE), ImVec2(bw, 0.0f)))
+            paste_into(w, maxLen);
     }
 #endif
     ImGui::PopStyleVar();
@@ -1434,13 +1448,14 @@ void draw_settings(const OnlineState& st)
                 changed = true;
             }
         }
-        if (spin_row("stats", text(T_SHOW_STATS), text(st.settings.showStats ? T_ON : T_OFF), true) !=
-            0)
+        if (spin_row("stats", text(T_SHOW_STATS), text(st.settings.showStats ? T_ON : T_OFF),
+                     true) != 0)
         {
             next.showStats = st.settings.showStats ? 0 : 1;
             changed = true;
         }
-        if (row("port", text(T_ROOM_PORT), nullptr, true, format("%u", (unsigned)st.settings.hostPort)))
+        if (row("port", text(T_ROOM_PORT), nullptr, true,
+                format("%u", (unsigned)st.settings.hostPort)))
         {
             wheel_set(s_port, format("%u", (unsigned)st.settings.hostPort), kPortLen);
             s_portError = 0;
@@ -1475,8 +1490,7 @@ EditField edit_field(Screen field)
     {
     case SCR_EDIT_PORT:
         return { &s_port, kDigitChars, kPortLen, "##online.port", T_ROOM_PORT, T_COUNT };
-    default:
-        return { &s_name, kNameChars, ONLINE_NAME_MAX, "##online.name", T_NICKNAME, T_COUNT };
+    default: return { &s_name, kNameChars, ONLINE_NAME_MAX, "##online.name", T_NICKNAME, T_COUNT };
     }
 }
 
@@ -1638,7 +1652,8 @@ void machine_card(const OnlineState& st, int index)
     else if (m.connected)
     {
         check_mark(dl, ImVec2(x0 + p * 0.5f, y1 + lineH * 0.5f), p * 0.8f, col(kGreen));
-        text_at(dl, font, ImVec2(x0 + p * 1.2f, y1 + (lineH - lh) * 0.5f), kGreen, text(T_CONNECTED));
+        text_at(dl, font, ImVec2(x0 + p * 1.2f, y1 + (lineH - lh) * 0.5f), kGreen,
+                text(T_CONNECTED));
     }
     else
     {
@@ -1702,10 +1717,7 @@ bool other_pad_connected(const OnlineState& st)
     return false;
 }
 
-const char* room_where(const OnlineState& st)
-{
-    return st.roomAddress;
-}
+const char* room_where(const OnlineState& st) { return st.roomAddress; }
 
 void draw_room(const OnlineState& st)
 {
@@ -1730,10 +1742,13 @@ void draw_room(const OnlineState& st)
                     for (int h = 0; h < st.machines[m].humanCount; ++h)
                     {
                         const OnlineHuman& human = st.machines[m].humans[h];
-                        if (human.side != side) continue;
+                        if (human.side != side)
+                            continue;
                         ++players;
                         ImGui::PushID(human.slot);
-                        const char* name = format("%s%s", human.name, st.machines[m].isSelf ? format(" %s", text(T_YOU)) : "");
+                        const char* name =
+                            format("%s%s", human.name,
+                                   st.machines[m].isSelf ? format(" %s", text(T_YOU)) : "");
                         if (host)
                         {
                             if (spin_row("side", name, side_name(side), true))
@@ -1746,7 +1761,8 @@ void draw_room(const OnlineState& st)
                             ImGui::TextWrapped("%s", name);
                         ImGui::PopID();
                     }
-            if (!players) muted_text(text(T_CPU));
+            if (!players)
+                muted_text(text(T_CPU));
             ImGui::PopID();
         }
         ImGui::EndTable();
@@ -1758,7 +1774,8 @@ void draw_room(const OnlineState& st)
         d.pauseAllowed = !d.pauseAllowed;
         changed = true;
     }
-    if (changed) PortOnlineSetDesc(&d);
+    if (changed)
+        PortOnlineSetDesc(&d);
     if (st.desync == ONLINE_DESYNC_ENDED)
         ImGui::TextWrapped("%s", text(T_DESYNC_ENDED));
     if (host)
@@ -1774,22 +1791,31 @@ void draw_room(const OnlineState& st)
     }
     else
         ImGui::TextWrapped("%s", format(text(T_CHOOSE_TEAMS_WAIT), machine_name(st, st.host)));
-    if (row("invite", text(T_INVITE))) s_roomScreen = SCR_ADDRESS;
-    if (!canSelect) ImGui::SetItemDefaultFocus();
+    if (row("invite", text(T_INVITE)))
+        s_roomScreen = SCR_ADDRESS;
+    if (!canSelect)
+        ImGui::SetItemDefaultFocus();
     if (me && me->humanCount < ONLINE_MAX_LOCAL_HUMANS)
     {
-        const char* sub = ImGui::GetTime() < s_addWaitUntil
-            ? text(other_pad_connected(st) ? T_ADD_PLAYER_WAIT : T_ADD_PLAYER_NO_PAD)
-            : nullptr;
-        if (row("add", text(T_ADD_PLAYER), sub)) s_addWaitUntil = ImGui::GetTime() + 15.0;
+        const char* sub =
+            ImGui::GetTime() < s_addWaitUntil
+                ? text(other_pad_connected(st) ? T_ADD_PLAYER_WAIT : T_ADD_PLAYER_NO_PAD)
+                : nullptr;
+        if (row("add", text(T_ADD_PLAYER), sub))
+            s_addWaitUntil = ImGui::GetTime() + 15.0;
     }
-    if (row("details", text(T_CONNECTION_DETAILS))) s_roomScreen = SCR_SETUP;
-    if (row("leave", text(T_LEAVE))) s_leaveAsked = true;
-    const Hint hints[] = {{PAD_BUTTON_A, T_HINT_SELECT}, {PAD_BUTTON_B, T_HINT_LEAVE}};
+    if (row("details", text(T_CONNECTION_DETAILS)))
+        s_roomScreen = SCR_SETUP;
+    if (row("leave", text(T_LEAVE)))
+        s_leaveAsked = true;
+    const Hint hints[] = { { PAD_BUTTON_A, T_HINT_SELECT }, { PAD_BUTTON_B, T_HINT_LEAVE } };
     end_screen(hints, 2);
-    if (pad_pressed(PAD_BUTTON_Y)) s_roomScreen = SCR_ADDRESS;
-    if (pad_pressed(PAD_BUTTON_START)) s_addWaitUntil = ImGui::GetTime() + 15.0;
-    if (back_pressed()) s_leaveAsked = true;
+    if (pad_pressed(PAD_BUTTON_Y))
+        s_roomScreen = SCR_ADDRESS;
+    if (pad_pressed(PAD_BUTTON_START))
+        s_addWaitUntil = ImGui::GetTime() + 15.0;
+    if (back_pressed())
+        s_leaveAsked = true;
 }
 
 // A second person on this machine joins with A on their own pad and leaves with B.
@@ -1823,15 +1849,17 @@ void draw_setup(const OnlineState& st)
 {
     begin_screen("##online.details", text(T_CONNECTION_DETAILS), nullptr);
     for (int i = 0; i < ONLINE_MAX_MACHINES; ++i)
-        if (st.machines[i].present) machine_card(st, i);
+        if (st.machines[i].present)
+            machine_card(st, i);
     muted_text(format(text(st.delayAuto ? T_INPUT_DELAY_AUTO : T_INPUT_DELAY), st.delayMs));
     muted_text(format(text(T_BUILD_LINE),
                       text(port_region() == PORT_REGION_JAPAN ? T_DATA_JAPAN : T_DATA_USA_EUROPE),
                       STRIKERS_VERSION_STR));
     const bool done = row("done", text(T_DONE));
-    const Hint hints[] = {{PAD_BUTTON_B, T_HINT_BACK}};
+    const Hint hints[] = { { PAD_BUTTON_B, T_HINT_BACK } };
     end_screen(hints, 1);
-    if (done || back_pressed()) s_roomScreen = SCR_ROOM;
+    if (done || back_pressed())
+        s_roomScreen = SCR_ROOM;
 }
 
 void draw_address(const OnlineState& st)
@@ -2258,8 +2286,7 @@ void draw_match_status(const OnlineState& st)
                           ImVec2(0.5f, 0.5f)))
         {
             ImGui::PushFont(s_fonts->head);
-            ImGui::TextUnformatted(
-                text(T_DESYNC_ENDED));
+            ImGui::TextUnformatted(text(T_DESYNC_ENDED));
             ImGui::PopFont();
             if (st.desyncReport[0] != '\0')
             {
@@ -2294,7 +2321,8 @@ void selection_band(ImVec2 a, ImVec2 b, const char* value, const ImVec4& ink)
     const float pad = px() * .35f;
     const float width = b.x - a.x - 2 * pad;
     const float height = b.y - a.y - 2 * pad;
-    if (width <= 0 || height <= 0) return;
+    if (width <= 0 || height <= 0)
+        return;
     float size = font->FontSize * font->Scale;
     ImVec2 measured = font->CalcTextSizeA(size, 1e9f, width, value);
     while (measured.y > height || measured.x > width)
@@ -2305,8 +2333,8 @@ void selection_band(ImVec2 a, ImVec2 b, const char* value, const ImVec4& ink)
     dl->PushTextureID(font->ContainerAtlas->TexID);
     dl->AddRectFilled(a, b, col(kInk, .94f));
     dl->PushClipRect(a, b, true);
-    dl->AddText(font, size, ImVec2(a.x + pad, a.y + (b.y - a.y - measured.y) * .5f),
-                col(ink), value, nullptr, width);
+    dl->AddText(font, size, ImVec2(a.x + pad, a.y + (b.y - a.y - measured.y) * .5f), col(ink),
+                value, nullptr, width);
     dl->PopClipRect();
     dl->PopTextureID();
 }
@@ -2332,18 +2360,22 @@ void draw_selection(const OnlineState& st)
                     for (int h = 0; h < st.machines[m].humanCount; ++h)
                     {
                         const OnlineHuman& person = st.machines[m].humans[h];
-                        if (person.side != side) continue;
+                        if (person.side != side)
+                            continue;
                         local = local || st.machines[m].isSelf;
                         const size_t used = std::strlen(names);
-                        std::snprintf(names + used, sizeof names - used, "%s%s", used ? " + " : "", person.name);
+                        std::snprintf(names + used, sizeof names - used, "%s%s", used ? " + " : "",
+                                      person.name);
                     }
             const int phase = st.selection.phase[side];
-            const char* status = text(phase == 3 ? T_READY : phase == 2 ? T_CHOOSING_SIDEKICK : T_CHOOSING_CAPTAIN);
+            const char* status = text(phase == 3   ? T_READY
+                                      : phase == 2 ? T_CHOOSING_SIDEKICK
+                                                   : T_CHOOSING_CAPTAIN);
             const char* label = format("%s%s: %s", names[0] ? names : text(T_CPU_HOST),
                                        local ? format(" %s", text(T_YOU)) : "", status);
             selection_band(ImVec2(screen.x * (side ? .515f : .10f), screen.y * .274f),
-                           ImVec2(screen.x * (side ? .90f : .485f), screen.y * .325f),
-                           label, side ? kRed : kHome);
+                           ImVec2(screen.x * (side ? .90f : .485f), screen.y * .325f), label,
+                           side ? kRed : kHome);
         }
         if (st.selection.optionsOpen)
             selection_band(ImVec2(screen.x * .12f, screen.y * .13f),
@@ -2352,12 +2384,15 @@ void draw_selection(const OnlineState& st)
     }
     if (st.selection.stage == 2)
     {
-        const char* stage = st.self == st.host ? text(T_STAGE_STADIUM) :
-                           format(text(T_SELECTING_STADIUM), machine_name(st, st.host));
-        const char* help = text(st.self == st.host && !PortOnlineGameStadiumUnlocked()
-                               ? T_STADIUM_LOCKED : T_SHARED_BACK);
+        const char* stage = st.self == st.host
+                                ? text(T_STAGE_STADIUM)
+                                : format(text(T_SELECTING_STADIUM), machine_name(st, st.host));
+        const char* help =
+            text(st.self == st.host && !PortOnlineGameStadiumUnlocked() ? T_STADIUM_LOCKED
+                                                                        : T_SHARED_BACK);
         selection_band(ImVec2(screen.x * .12f, screen.y * .755f),
-                       ImVec2(screen.x * .88f, screen.y * .828f), format("%s\n%s", stage, help), kText);
+                       ImVec2(screen.x * .88f, screen.y * .828f), format("%s\n%s", stage, help),
+                       kText);
     }
 }
 
@@ -2495,8 +2530,8 @@ extern "C" void PortOnlinePanelPrepare(void)
 {
     if (ImGui::GetCurrentContext() == nullptr)
         return;
-    const unsigned buttons[] = {PAD_BUTTON_A, PAD_BUTTON_B, PAD_BUTTON_X, PAD_BUTTON_Y,
-                                PAD_TRIGGER_L, PAD_TRIGGER_R, PAD_TRIGGER_Z, PAD_BUTTON_START};
+    const unsigned buttons[] = { PAD_BUTTON_A,  PAD_BUTTON_B,  PAD_BUTTON_X,  PAD_BUTTON_Y,
+                                 PAD_TRIGGER_L, PAD_TRIGGER_R, PAD_TRIGGER_Z, PAD_BUTTON_START };
     for (unsigned button : buttons)
     {
         unsigned w = 0, h = 0;
@@ -2553,7 +2588,8 @@ extern "C" void PortOnlinePanelDraw(void)
     ImGui::GetStyle() = s_style;
     ImGui::PushFont(s_fonts->body);
     draw_match_status(st);
-    if (PortOnlineGameSelecting()) draw_selection(st);
+    if (PortOnlineGameSelecting())
+        draw_selection(st);
     draw_toasts();
     if (PortOnlineGameSelecting())
         set_open(false);
@@ -2563,14 +2599,16 @@ extern "C" void PortOnlinePanelDraw(void)
         ImDrawList* background = ImGui::GetBackgroundDrawList();
         const ImVec2 size = ImGui::GetIO().DisplaySize;
         const ImVec4 field(0.13f, .32f, .43f, 1);
-        background->AddRectFilledMultiColor(ImVec2(0, 0), size, col(kRaised), col(field), col(kRaised), col(field));
+        background->AddRectFilledMultiColor(ImVec2(0, 0), size, col(kRaised), col(field),
+                                            col(kRaised), col(field));
         const ImVec2 origin(size.x * .52f, size.y * .48f);
         for (int ray = 0; ray < 28; ++ray)
         {
             const float angle = (float)ray * 6.2831853f / 28;
             const float reach = size.x + size.y;
             const ImVec2 a(origin.x + std::cos(angle) * reach, origin.y + std::sin(angle) * reach);
-            const ImVec2 b(origin.x + std::cos(angle + .018f) * reach, origin.y + std::sin(angle + .018f) * reach);
+            const ImVec2 b(origin.x + std::cos(angle + .018f) * reach,
+                           origin.y + std::sin(angle + .018f) * reach);
             background->AddTriangleFilled(origin, a, b, col(kHome, .07f));
         }
         background->AddRectFilled(ImVec2(0, 0), ImVec2(size.x, size.y * .075f), col(kRaised));

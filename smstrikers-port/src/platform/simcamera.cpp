@@ -186,7 +186,11 @@ void turn(s8& x, s8& y, float s, float c)
 
 extern "C" void PortSimCameraBeginMatch(void)
 {
-    if (!g_simLockstep) { s_camera = NULL; return; }
+    if (!g_simLockstep)
+    {
+        s_camera = NULL;
+        return;
+    }
 
     std::memset(s_storage, 0, sizeof s_storage);
     s_camera = new (s_storage) GameplayCamera();

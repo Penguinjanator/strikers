@@ -206,20 +206,20 @@ int main()
 
     // Every string exists and takes the arguments its entry says, so a translation can be checked
     // the same way.
-    for (const char* language : {"en", "de", "fr", "es"})
+    for (const char* language : { "en", "de", "fr", "es" })
     {
-    text_language(language);
-    for (int i = 0; i < T_COUNT; i++)
-    {
-        const char* s = text((Text)i);
-        char name[48];
-        snprintf(name, sizeof name, "text %d present", i);
-        check(s[0] != '\0', name);
-        char got[16];
-        conversions(s, got, sizeof got);
-        snprintf(name, sizeof name, "text %d arguments", i);
-        check(strcmp(got, text_args((Text)i)) == 0, name);
-    }
+        text_language(language);
+        for (int i = 0; i < T_COUNT; i++)
+        {
+            const char* s = text((Text)i);
+            char name[48];
+            snprintf(name, sizeof name, "text %d present", i);
+            check(s[0] != '\0', name);
+            char got[16];
+            conversions(s, got, sizeof got);
+            snprintf(name, sizeof name, "text %d arguments", i);
+            check(strcmp(got, text_args((Text)i)) == 0, name);
+        }
     }
     check(text(T_COUNT)[0] == '\0', "out-of-range text is empty");
 
@@ -227,22 +227,26 @@ int main()
     check(strcmp(text(T_CANCEL), "Annuler") == 0, "French settings terminology");
     unsigned short native[128];
     text_utf16(T_CHANGE_TEAM, native, 128, true);
-    check(native[0] == 'C' && native[10] == 0xC9, "native button label preserves translated accents");
+    check(native[0] == 'C' && native[10] == 0xC9,
+          "native button label preserves translated accents");
     char upper[128];
     text_upper("équipe Straße œuf", upper, sizeof upper);
-    check(strcmp(upper, "ÉQUIPE STRASSE ŒUF") == 0, "accented headings remain valid uppercase UTF-8");
-    char small[2] = {'x', 'x'};
+    check(strcmp(upper, "ÉQUIPE STRASSE ŒUF") == 0,
+          "accented headings remain valid uppercase UTF-8");
+    char small[2] = { 'x', 'x' };
     text_upper("é", small, sizeof small);
     check(small[0] == 0, "truncation preserves UTF-8 character boundaries");
-    const unsigned short stadium[] = {'S', 0xE9, 0xD83C, 0xDFDF, 0};
+    const unsigned short stadium[] = { 'S', 0xE9, 0xD83C, 0xDFDF, 0 };
     text_native(T_STADIUM_FIRST, stadium);
     text_utf16(T_STADIUM_FIRST, native, 128);
-    check(memcmp(stadium, native, sizeof stadium) == 0, "native names round trip including surrogate pairs");
+    check(memcmp(stadium, native, sizeof stadium) == 0,
+          "native names round trip including surrogate pairs");
     text_utf16(T_STADIUM_FIRST, native, 4);
     check(native[2] == 0, "UTF-16 truncation preserves surrogate pairs");
     text_language("unsupported");
     check(strcmp(text(T_CANCEL), "Cancel") == 0, "unsupported language uses English");
-    check(strcmp(text(T_STADIUM_FIRST), "Pipeline Central") == 0, "language change clears native names");
+    check(strcmp(text(T_STADIUM_FIRST), "Pipeline Central") == 0,
+          "language change clears native names");
 
     printf("online_panel: %d cases\n", cases);
     return 0;

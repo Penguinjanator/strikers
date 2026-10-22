@@ -118,10 +118,20 @@ static int env_name(const char* key, char* out, size_t size)
     return 0;
 }
 
+// A relative path in the file is taken from the game folder, as the settings app reads it.
+static int is_path_key(const char* name)
+{
+    return strcmp(name, "STRIKERS_DATA") == 0 || strcmp(name, "STRIKERS_TEXTURES") == 0 ||
+           strcmp(name, "STRIKERS_TEXTURE_DUMP") == 0 || strcmp(name, "STRIKERS_USER_DIR") == 0 ||
+           strcmp(name, "STRIKERS_CACHE_DIR") == 0;
+}
+
 static int load_file(const char* path)
 {
     FILE* f = fopen(path, "rb");
     char line[1024];
+    char dir[1024];
+    char full[2048];
     int applied = 0;
 
     if (f == NULL)
@@ -163,6 +173,13 @@ static int load_file(const char* path)
             continue;
         if (env_name(key, name, sizeof name) != 0)
             continue;
+        if (is_path_key(name) && val[0] != '\0' && val[0] != '/' && val[0] != '\\' &&
+            val[1] != ':' && strcmp(val, "0") != 0 && strcmp(val, "1") != 0 &&
+            port_executable_dir(dir, sizeof dir) == 0)
+        {
+            snprintf(full, sizeof full, "%s/%s", dir, val);
+            val = full;
+        }
         if (port_setenv_default(name, val) == 0)
             applied++;
     }

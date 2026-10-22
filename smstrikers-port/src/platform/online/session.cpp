@@ -23,8 +23,8 @@ const char* region_text(int region) { return region == 1 ? "Japanese" : "USA/Eur
 }   // namespace
 
 Session::Session(SessionEnv* env, const Identity& identity, const SessionConfig& config)
-    : m_env(env), m_id(identity), m_config(config), m_game(NULL), m_discovery(NULL),
-      m_search(NULL), m_payload(new Payload)
+    : m_env(env), m_id(identity), m_config(config), m_game(NULL), m_discovery(NULL), m_search(NULL),
+      m_payload(new Payload)
 {
     std::memset(m_roomOthers, 0, sizeof m_roomOthers);
     m_roomOtherCount = 0;
@@ -535,7 +535,8 @@ int Session::Host(uint16_t port, const char* nickname)
     while (m_roomId == 0)
         if (!m_env->Random(&m_roomId, sizeof m_roomId))
         {
-            Fail(ONLINE_ERR_NETWORK, "This system's random source failed, so online play cannot start.");
+            Fail(ONLINE_ERR_NETWORK,
+                 "This system's random source failed, so online play cannot start.");
             return 0;
         }
 
@@ -609,7 +610,8 @@ int Session::Join(const char* address, const char* nickname)
     if (!m_env->Random(m_join.key.secret, sizeof m_join.key.secret) ||
         !m_env->Random(m_join.nonce, sizeof m_join.nonce))
     {
-        Fail(ONLINE_ERR_NETWORK, "This system's random source failed, so online play cannot start.");
+        Fail(ONLINE_ERR_NETWORK,
+             "This system's random source failed, so online play cannot start.");
         return 0;
     }
     KeyPairFromSecret(&m_join.key);
@@ -779,8 +781,8 @@ int Session::Select(int op, int side, int team, int sidekick, int phase)
         m_phase != ONLINE_PHASE_ROOM || m_starting)
         return 0;
     Message m = {};
-    m.u.select = {m_selection.epoch, (uint8_t)op, (uint8_t)side, (uint8_t)team,
-                  (uint8_t)sidekick, (uint8_t)phase};
+    m.u.select = { m_selection.epoch, (uint8_t)op,       (uint8_t)side,
+                   (uint8_t)team,     (uint8_t)sidekick, (uint8_t)phase };
     if (IsHost())
         return ApplySelect(m_self, m.u.select);
     if (op != ONLINE_SELECT_CANCEL && op != ONLINE_SELECT_BACK &&
@@ -805,9 +807,7 @@ int Session::ApplySelect(int from, const MsgSelect& select)
         m_selection.stage = 1;
         m_selection.phase[0] = m_selection.phase[1] = 1;
         break;
-    case ONLINE_SELECT_CANCEL:
-        m_selection.stage = 0;
-        break;
+    case ONLINE_SELECT_CANCEL: m_selection.stage = 0; break;
     case ONLINE_SELECT_TEAM:
     {
         const int side = select.side;
@@ -1391,8 +1391,7 @@ void Session::HandleMessage(Link& link, const Message& m, uint64_t now, uint64_t
             ApplySelect(from, m.u.select);
         return;
     case MSG_SKIP:
-        if (!m_lock.InMatch(from) || m_lock.Dropped(from) ||
-            m.u.skip.matchSerial != m_serial)
+        if (!m_lock.InMatch(from) || m_lock.Dropped(from) || m.u.skip.matchSerial != m_serial)
             return;
         PresentationSkip(m.u.skip.presentation, true);
         return;

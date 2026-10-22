@@ -214,11 +214,11 @@ std::vector<Message> SampleMessages()
     }
     m = {};
     m.kind = MSG_SKIP;
-    m.u.skip = {3, 1502};
+    m.u.skip = { 3, 1502 };
     out.push_back(m);
     m = {};
     m.kind = MSG_SELECT;
-    m.u.select = {4, ONLINE_SELECT_TEAM, 1, 2, 1, 3};
+    m.u.select = { 4, ONLINE_SELECT_TEAM, 1, 2, 1, 3 };
     out.push_back(m);
     return out;
 }
@@ -304,7 +304,7 @@ void TestMessages()
     CHECK(DecodeMessageBody(MSG_SKIP, body, n, &out));
     extra = {};
     extra.kind = MSG_SELECT;
-    extra.u.select = {1, ONLINE_SELECT_TEAM, 1, 8, 3, 3};
+    extra.u.select = { 1, ONLINE_SELECT_TEAM, 1, 8, 3, 3 };
     n = EncodeMessageBody(extra, body);
     CHECK(DecodeMessageBody(MSG_SELECT, body, n, &out));
     for (unsigned offset = 4; offset < 9; ++offset)
@@ -319,7 +319,8 @@ void TestMessages()
     n = EncodeMessageBody(extra, body);
     CHECK(DecodeMessageBody(MSG_SELECT, body, n, &out));
     n = EncodeMessageBody(all[3], body);
-    CHECK(DecodeMessageBody(MSG_ROOM_STATE, body, n, &out) && out.u.roomState.selection.optionsOpen == 1);
+    CHECK(DecodeMessageBody(MSG_ROOM_STATE, body, n, &out) &&
+          out.u.roomState.selection.optionsOpen == 1);
     body[275] = 2;
     CHECK(!DecodeMessageBody(MSG_ROOM_STATE, body, n, &out));
 
@@ -478,13 +479,13 @@ void TestGoldenBytes()
     std::strcpy(join.u.join.nickname, "Host");
     join.u.join.humanCount = 1;
     std::strcpy(join.u.join.human[0], "Alex");
-    const uint8_t expectedJoin[82] = {
-        0x03, 0x00, 0x03, 0x02, 0x78, 0x56, 0x34, 0x12,
-        0xEF, 0xCD, 0xAB, 0x90, 0x00, 0x00, 0x00, 0x00,
-        '1', '.', '6', '.', '0', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        'H', 'o', 's', 't', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        1, 0, 'A', 'l', 'e', 'x', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-    };
+    const uint8_t expectedJoin[82] = { 0x03, 0x00, 0x03, 0x02, 0x78, 0x56, 0x34, 0x12, 0xEF, 0xCD,
+                                       0xAB, 0x90, 0x00, 0x00, 0x00, 0x00, '1',  '.',  '6',  '.',
+                                       '0',  0,    0,    0,    0,    0,    0,    0,    0,    0,
+                                       0,    0,    'H',  'o',  's',  't',  0,    0,    0,    0,
+                                       0,    0,    0,    0,    0,    0,    0,    0,    1,    0,
+                                       'A',  'l',  'e',  'x',  0,    0,    0,    0,    0,    0,
+                                       0,    0,    0,    0,    0,    0 };
     uint8_t bytes[kMaxMessageBody];
     CHECK(EncodeMessageBody(join, bytes) == sizeof expectedJoin);
     CHECK(std::memcmp(bytes, expectedJoin, sizeof expectedJoin) == 0);
@@ -495,20 +496,19 @@ void TestGoldenBytes()
     record[16] = 1;
     ChunkWriter writer(bytes, sizeof bytes);
     CHECK(writer.Input(0x12345678, 2, 0x10203040, 1, record));
-    const uint8_t expectedInput[] = {
-        0x03, 0x1B, 0x00, 0x78, 0x56, 0x34, 0x12, 0x02, 0x01,
-        0x40, 0x30, 0x20, 0x10,
-        0x00, 0x01, 0x02, 0xFC, 0x64, 0x9C, 0x12, 0x34,
-        0, 0, 0, 0, 0, 0, 0, 0, 1
-    };
+    const uint8_t expectedInput[] = { 0x03, 0x1B, 0x00, 0x78, 0x56, 0x34, 0x12, 0x02, 0x01, 0x40,
+                                      0x30, 0x20, 0x10, 0x00, 0x01, 0x02, 0xFC, 0x64, 0x9C, 0x12,
+                                      0x34, 0,    0,    0,    0,    0,    0,    0,    0,    1 };
     CHECK(writer.Size() == sizeof expectedInput);
     CHECK(std::memcmp(bytes, expectedInput, sizeof expectedInput) == 0);
 }
 
 void TestRecords()
 {
-    CHECK(PortSimQuantizeStick(0) == 0 && PortSimQuantizeStick(2) == 0 && PortSimQuantizeStick(-2) == 0);
-    CHECK(PortSimQuantizeStick(3) == 2 && PortSimQuantizeStick(-3) == -4 && PortSimQuantizeStick(127) == 126);
+    CHECK(PortSimQuantizeStick(0) == 0 && PortSimQuantizeStick(2) == 0 &&
+          PortSimQuantizeStick(-2) == 0);
+    CHECK(PortSimQuantizeStick(3) == 2 && PortSimQuantizeStick(-3) == -4 &&
+          PortSimQuantizeStick(127) == 126);
     CHECK(PortSimQuantizeStick(-128) == -128);
     for (int v = -128; v < 128; v++)
         CHECK((PortSimQuantizeStick((int8_t)v) & 1) == 0);
@@ -774,11 +774,10 @@ void TestRobustness()
             n = 0;
             while (n + 3 < kMaxPayload && r32() % 6 != 0)
             {
-                const uint8_t kinds[] = { CH_TIMING,    CH_RELACK, CH_INPUT,
-                                          CH_INPUT_ACK, CH_HASH,   CH_COMPONENTS,
-                                          CH_BYE,       MSG_JOIN,  MSG_ROOM_STATE,
-                                          MSG_DESC,     MSG_GO,    MSG_RESUME,
-                                          MSG_SKIP, MSG_SELECT };
+                const uint8_t kinds[] = { CH_TIMING,      CH_RELACK,     CH_INPUT, CH_INPUT_ACK,
+                                          CH_HASH,        CH_COMPONENTS, CH_BYE,   MSG_JOIN,
+                                          MSG_ROOM_STATE, MSG_DESC,      MSG_GO,   MSG_RESUME,
+                                          MSG_SKIP,       MSG_SELECT };
                 const uint8_t kind = kinds[r32() % sizeof kinds];
                 size_t len = r32() % 64;
                 if (kind == CH_INPUT)

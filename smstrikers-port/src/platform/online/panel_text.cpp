@@ -240,28 +240,37 @@ char s_native[T_COUNT - T_CAPTAIN_FIRST][256];
 unsigned decode(const char*& p)
 {
     const unsigned lead = (unsigned char)*p++;
-    if (lead < 128) return lead;
-    int bytes = lead >= 0xF0 && lead <= 0xF4 ? 3 : lead >= 0xE0 && lead <= 0xEF ? 2 : lead >= 0xC2 && lead <= 0xDF ? 1 : 0;
-    if (!bytes) return 0xFFFD;
+    if (lead < 128)
+        return lead;
+    int bytes = lead >= 0xF0 && lead <= 0xF4   ? 3
+                : lead >= 0xE0 && lead <= 0xEF ? 2
+                : lead >= 0xC2 && lead <= 0xDF ? 1
+                                               : 0;
+    if (!bytes)
+        return 0xFFFD;
     unsigned cp = lead & ((1u << (6 - bytes)) - 1);
     for (int i = 0; i < bytes; ++i)
     {
-        if (((unsigned char)*p & 0xC0) != 0x80) return 0xFFFD;
+        if (((unsigned char)*p & 0xC0) != 0x80)
+            return 0xFFFD;
         cp = (cp << 6) | ((unsigned char)*p++ & 63);
     }
-    const unsigned minimum[] = {0, 128, 2048, 65536};
+    const unsigned minimum[] = { 0, 128, 2048, 65536 };
     return cp < minimum[bytes] || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? 0xFFFD : cp;
 }
 
 bool encode(unsigned cp, char*& out, char* end)
 {
     unsigned n = cp < 128 ? 1 : cp < 2048 ? 2 : cp < 65536 ? 3 : 4;
-    if ((unsigned)(end - out) <= n) return false;
-    if (n == 1) *out++ = (char)cp;
+    if ((unsigned)(end - out) <= n)
+        return false;
+    if (n == 1)
+        *out++ = (char)cp;
     else
     {
         *out++ = (char)((n == 2 ? 0xC0 : n == 3 ? 0xE0 : 0xF0) | (cp >> (6 * (n - 1))));
-        for (unsigned i = n - 1; i > 0; --i) *out++ = (char)(0x80 | ((cp >> (6 * (i - 1))) & 63));
+        for (unsigned i = n - 1; i > 0; --i)
+            *out++ = (char)(0x80 | ((cp >> (6 * (i - 1))) & 63));
     }
     return true;
 }
@@ -277,7 +286,8 @@ struct Table
         for (const Entry& e : kEnglish)
             if (e.id >= 0 && e.id < T_COUNT)
                 rows[e.id] = &e;
-        for (const Translation& t : kTranslations) translations[t.id] = &t;
+        for (const Translation& t : kTranslations)
+            translations[t.id] = &t;
     }
 };
 
@@ -287,77 +297,104 @@ const Table& table()
     return value;
 }
 
-const Entry* row(Text id)
-{
-    return id >= 0 && id < T_COUNT ? table().rows[id] : nullptr;
-}
+const Entry* row(Text id) { return id >= 0 && id < T_COUNT ? table().rows[id] : nullptr; }
 
 }   // namespace
 
 const char* text(Text id)
 {
     const Entry* e = row(id);
-    if (!e) return "";
-    if (id >= T_CAPTAIN_FIRST && s_native[id - T_CAPTAIN_FIRST][0]) return s_native[id - T_CAPTAIN_FIRST];
+    if (!e)
+        return "";
+    if (id >= T_CAPTAIN_FIRST && s_native[id - T_CAPTAIN_FIRST][0])
+        return s_native[id - T_CAPTAIN_FIRST];
     const Translation* translated = table().translations[id];
     return s_language >= 0 && translated ? translated->values[s_language] : e->english;
 }
 
 void text_language(const char* tag)
 {
-    const int language = tag && std::strncmp(tag, "de", 2) == 0 ? 0 :
-                         tag && std::strncmp(tag, "fr", 2) == 0 ? 1 :
-                         tag && std::strncmp(tag, "es", 2) == 0 ? 2 : -1;
-    if (language != s_language) std::memset(s_native, 0, sizeof s_native);
+    const int language = tag && std::strncmp(tag, "de", 2) == 0   ? 0
+                         : tag && std::strncmp(tag, "fr", 2) == 0 ? 1
+                         : tag && std::strncmp(tag, "es", 2) == 0 ? 2
+                                                                  : -1;
+    if (language != s_language)
+        std::memset(s_native, 0, sizeof s_native);
     s_language = language;
 }
 
 void text_native(Text id, const unsigned short* value)
 {
-    if (id < T_CAPTAIN_FIRST || id >= T_COUNT) return;
+    if (id < T_CAPTAIN_FIRST || id >= T_COUNT)
+        return;
     char* out = s_native[id - T_CAPTAIN_FIRST];
-    if (!value) { *out = 0; return; }
+    if (!value)
+    {
+        *out = 0;
+        return;
+    }
     char* end = out + sizeof s_native[0];
     while (*value)
     {
         unsigned cp = *value++;
         if (cp >= 0xD800 && cp <= 0xDBFF && *value >= 0xDC00 && *value <= 0xDFFF)
             cp = 0x10000 + ((cp - 0xD800) << 10) + (*value++ - 0xDC00);
-        else if (cp >= 0xD800 && cp <= 0xDFFF) cp = 0xFFFD;
-        if (!encode(cp, out, end)) break;
+        else if (cp >= 0xD800 && cp <= 0xDFFF)
+            cp = 0xFFFD;
+        if (!encode(cp, out, end))
+            break;
     }
     *out = 0;
 }
 
 void text_utf16(Text id, unsigned short* out, unsigned capacity, bool uppercase)
 {
-    if (!capacity) return;
+    if (!capacity)
+        return;
     char title[1024];
-    if (uppercase) text_upper(text(id), title, sizeof title);
+    if (uppercase)
+        text_upper(text(id), title, sizeof title);
     const char* p = uppercase ? title : text(id);
     unsigned used = 0;
     while (*p)
     {
         unsigned cp = decode(p);
-        if (used + (cp > 65535 ? 2 : 1) >= capacity) break;
-        if (cp > 65535) { cp -= 65536; out[used++] = 0xD800 + (cp >> 10); out[used++] = 0xDC00 + (cp & 1023); }
-        else out[used++] = (unsigned short)cp;
+        if (used + (cp > 65535 ? 2 : 1) >= capacity)
+            break;
+        if (cp > 65535)
+        {
+            cp -= 65536;
+            out[used++] = 0xD800 + (cp >> 10);
+            out[used++] = 0xDC00 + (cp & 1023);
+        }
+        else
+            out[used++] = (unsigned short)cp;
     }
     out[used] = 0;
 }
 
 void text_upper(const char* value, char* out, unsigned capacity)
 {
-    if (!capacity) return;
+    if (!capacity)
+        return;
     char* end = out + capacity;
     while (*value)
     {
         unsigned cp = decode(value);
-        if ((cp >= 'a' && cp <= 'z') || (cp >= 0xE0 && cp <= 0xFE && cp != 0xF7)) cp -= 32;
-        else if (cp == 0x153) cp = 0x152;
-        else if (cp == 0xFF) cp = 0x178;
-        else if (cp == 0xDF) { if (!encode('S', out, end)) break; cp = 'S'; }
-        if (!encode(cp, out, end)) break;
+        if ((cp >= 'a' && cp <= 'z') || (cp >= 0xE0 && cp <= 0xFE && cp != 0xF7))
+            cp -= 32;
+        else if (cp == 0x153)
+            cp = 0x152;
+        else if (cp == 0xFF)
+            cp = 0x178;
+        else if (cp == 0xDF)
+        {
+            if (!encode('S', out, end))
+                break;
+            cp = 'S';
+        }
+        if (!encode(cp, out, end))
+            break;
     }
     *out = 0;
 }

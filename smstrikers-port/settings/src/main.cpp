@@ -288,7 +288,8 @@ int languages()
             QCoreApplication::installTranslator(&t);
         const QString sample = MainWindow::tr("Display");
         const QString online = QCoreApplication::translate("Online", "Create room");
-        const bool translated = sample != QLatin1String("Display") && online != QLatin1String("Create room");
+        const bool translated =
+            sample != QLatin1String("Display") && online != QLatin1String("Create room");
         if (loaded)
             QCoreApplication::removeTranslator(&t);
 

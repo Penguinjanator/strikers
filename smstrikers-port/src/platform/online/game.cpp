@@ -73,9 +73,12 @@ const unsigned short* localized_name(unsigned long hash)
     {
         const unsigned mid = first + (last - first) / 2;
         const auto& entry = loc->m_LookupTable[mid];
-        if (entry.hash == hash) return loc->m_FirstString + entry.StringOffset;
-        if (entry.hash < hash) first = mid + 1;
-        else last = mid;
+        if (entry.hash == hash)
+            return loc->m_FirstString + entry.StringOffset;
+        if (entry.hash < hash)
+            first = mid + 1;
+        else
+            last = mid;
     }
     return nullptr;
 }
@@ -84,27 +87,35 @@ void refresh_language()
 {
     using namespace online_panel;
     const nlLocalization* loc = g_pLocalization;
-    if (!loc || !loc->m_pFile || !loc->m_LookupTable || !loc->m_FirstString) return;
+    if (!loc || !loc->m_pFile || !loc->m_LookupTable || !loc->m_FirstString)
+        return;
     static const LOCHeader* loaded = nullptr;
     static int language = -1;
-    if (loaded == loc->m_pFile && language == loc->m_CurrentLanguage) return;
+    if (loaded == loc->m_pFile && language == loc->m_CurrentLanguage)
+        return;
     loaded = loc->m_pFile;
     language = loc->m_CurrentLanguage;
-    text_language(language == nlLocalization::LangGerman ? "de" :
-                  language == nlLocalization::LangFrench ? "fr" :
-                  language == nlLocalization::LangSpanish ? "es" : "en");
+    text_language(language == nlLocalization::LangGerman    ? "de"
+                  : language == nlLocalization::LangFrench  ? "fr"
+                  : language == nlLocalization::LangSpanish ? "es"
+                                                            : "en");
     s_captainButtonMode = -1;
-    for (int i = T_CAPTAIN_FIRST; i < T_COUNT; ++i) text_native((Text)i, nullptr);
+    for (int i = T_CAPTAIN_FIRST; i < T_COUNT; ++i)
+        text_native((Text)i, nullptr);
     // The panel font has no Japanese glyphs, so the game's own names stay English there.
-    if (language == nlLocalization::LangJapanese) return;
+    if (language == nlLocalization::LangJapanese)
+        return;
     for (int i = 0; i < 9; ++i)
-        text_native((Text)(T_CAPTAIN_FIRST + i), localized_name(GetLOCCharacterName((eTeamID)i, false, false)));
+        text_native((Text)(T_CAPTAIN_FIRST + i),
+                    localized_name(GetLOCCharacterName((eTeamID)i, false, false)));
     for (int i = 0; i < 4; ++i)
-        text_native((Text)(T_SIDEKICK_FIRST + i), localized_name(GetLOCSidekickName((eSidekickID)i)));
+        text_native((Text)(T_SIDEKICK_FIRST + i),
+                    localized_name(GetLOCSidekickName((eSidekickID)i)));
     for (int i = 0; i < 7; ++i)
         text_native((Text)(T_STADIUM_FIRST + i), localized_name(GetStadiumStringID((eStadiumID)i)));
     for (int i = 0; i < 5; ++i)
-        text_native((Text)(T_SKILL_FIRST + i), localized_name(GetLOCDifficultyName((GameplaySettings::eSkillLevel)i)));
+        text_native((Text)(T_SKILL_FIRST + i),
+                    localized_name(GetLOCDifficultyName((GameplaySettings::eSkillLevel)i)));
 }
 
 int selection_port(int side)
@@ -237,6 +248,10 @@ bool match_phase(int phase)
 
 void follow(const OnlineState& st)
 {
+    // Each room numbers its matches from 1 again.
+    if (st.phase == ONLINE_PHASE_IDLE || st.phase == ONLINE_PHASE_HOSTING ||
+        st.phase == ONLINE_PHASE_JOINING || st.phase == ONLINE_PHASE_ERROR)
+        s_serial = 0;
     const bool agreed = st.phase == ONLINE_PHASE_LOADING && st.matchSerial != s_serial;
     // Called off, over, or followed by a rematch, which loads afresh.
     if (s_stage != STAGE_NONE && s_stage != STAGE_LEAVE && (!match_phase(st.phase) || agreed))
@@ -393,7 +408,8 @@ extern "C" int PortOnlineGameSelectionSide(int port)
     if (!s_selectOpen || !s_captains)
         return -1;
     for (int side = 0; side < 2; side++)
-        if (selection_port(side) == port && s_captains->mComponentState[side].mCurrentPhase != PHASE_READY)
+        if (selection_port(side) == port &&
+            s_captains->mComponentState[side].mCurrentPhase != PHASE_READY)
             return side;
     for (int side = 1; side >= 0; side--)
         if (selection_port(side) == port)
@@ -427,7 +443,8 @@ void PortOnlineGameCaptainsCreated(ChooseCaptainsSceneV2* scene)
     g.PowerUps = st.desc.powerUps;
     g.Shoot2Score = st.desc.shoot2Score;
     g.BowserAttackEnabled = st.desc.bowser;
-    scene->mButtons.SetState(st.self == st.host ? ButtonComponent::BS_A_AND_B_AND_Y : ButtonComponent::BS_A_AND_B);
+    scene->mButtons.SetState(st.self == st.host ? ButtonComponent::BS_A_AND_B_AND_Y
+                                                : ButtonComponent::BS_A_AND_B);
 }
 
 int PortOnlineGameCaptainsUpdate(ChooseCaptainsSceneV2* scene, float dt)
@@ -438,7 +455,8 @@ int PortOnlineGameCaptainsUpdate(ChooseCaptainsSceneV2* scene, float dt)
     IChooseCaptain& c = scene->mChooseCaptain;
     s_captains = &c;
     const GameSceneManager* fe = GameSceneManager::Instance();
-    if (!fe->mCurrentStackDepth || fe->m_sceneStack[fe->mCurrentStackDepth - 1] != SCENE_CHOOSE_CAPTAINS)
+    if (!fe->mCurrentStackDepth ||
+        fe->m_sceneStack[fe->mCurrentStackDepth - 1] != SCENE_CHOOSE_CAPTAINS)
     {
         c.UpdateAsyncImages();
         return 1;
@@ -467,7 +485,8 @@ int PortOnlineGameCaptainsUpdate(ChooseCaptainsSceneV2* scene, float dt)
         if (phase != c.mComponentState[side].mCurrentPhase || changed)
         {
             c.mCaptainGridComponents[side]->MoveHighlightToTarget((eTeamID)st.desc.team[side]);
-            c.mSidekickGridComponents[side]->MoveHighlightToTarget((eSidekickID)st.desc.sidekick[side]);
+            c.mSidekickGridComponents[side]->MoveHighlightToTarget(
+                (eSidekickID)st.desc.sidekick[side]);
             const eTeamID otherCursor = c.mCaptainGridComponents[side ^ 1]->GetSelectedItem();
             c.mComponentState[side].SetCurrentPhase((IChooseCaptain::ComponentState::Phase)phase);
             // The retail ready transition writes team IDs into both grids' icon-ID cursors.
@@ -477,7 +496,8 @@ int PortOnlineGameCaptainsUpdate(ChooseCaptainsSceneV2* scene, float dt)
             {
                 c.mCaptainGridComponents[grid]->SetAllItemsActive();
                 if (c.mComponentState[grid ^ 1].mCurrentPhase >= PHASE_CHOOSING_SIDEKICK)
-                    c.mCaptainGridComponents[grid]->SetValid((eTeamID)c.mHomeAwayTeam[grid ^ 1], false);
+                    c.mCaptainGridComponents[grid]->SetValid((eTeamID)c.mHomeAwayTeam[grid ^ 1],
+                                                             false);
                 c.mCaptainGridComponents[grid]->UpdateSuperTeamIconState();
             }
         }
@@ -486,18 +506,21 @@ int PortOnlineGameCaptainsUpdate(ChooseCaptainsSceneV2* scene, float dt)
     for (int side = 0; side < 2; ++side)
         if (selection_port(side) >= 0 && c.mComponentState[side].mCurrentPhase != PHASE_READY)
             ready = false;
-    const int mode = ready ? ButtonComponent::BS_B_ONLY :
-        st.self == st.host ? ButtonComponent::BS_A_AND_B_AND_Y : ButtonComponent::BS_A_AND_B;
+    const int mode = ready                ? ButtonComponent::BS_B_ONLY
+                     : st.self == st.host ? ButtonComponent::BS_A_AND_B_AND_Y
+                                          : ButtonComponent::BS_A_AND_B;
     if (s_captainButtonMode != mode)
     {
         scene->mButtons.SetState((ButtonComponent::ButtonState)mode);
         static unsigned short label[128];
-        online_panel::text_utf16(ready ? online_panel::T_CHANGE_TEAM : online_panel::T_HINT_BACK, label, 128, true);
+        online_panel::text_utf16(ready ? online_panel::T_CHANGE_TEAM : online_panel::T_HINT_BACK,
+                                 label, 128, true);
         scene->mButtons.mButtonLabels[0]->SetString(label);
         scene->mButtons.mAlreadyCentred = false;
         s_captainButtonMode = mode;
     }
-    if (!ready && st.self == st.host && g_pFEInput->JustPressed(FE_ALL_PADS, PAD_BUTTON_Y, false, NULL))
+    if (!ready && st.self == st.host &&
+        g_pFEInput->JustPressed(FE_ALL_PADS, PAD_BUTTON_Y, false, NULL))
     {
         PortOnlineSelect(ONLINE_SELECT_OPTIONS, 0, 0, 0, 1);
         GameSceneManager::Instance()->Push(SCENE_QUICK_GAMEPLAY_OPTIONS, SCREEN_FORWARD, false);
@@ -513,8 +536,12 @@ int PortOnlineGameCaptainsUpdate(ChooseCaptainsSceneV2* scene, float dt)
         if (selection_port(side) < 0)
             continue;
         const int phase = c.mComponentState[side].mCurrentPhase;
-        const int team = phase == PHASE_CHOOSING_CAPTAIN ? c.mCaptainGridComponents[side]->GetSelectedItem() : c.mHomeAwayTeam[side];
-        const int sk = phase == PHASE_CHOOSING_SIDEKICK ? c.mSidekickGridComponents[side]->GetSelectedItem() : c.mHomeAwaySidekicks[side];
+        const int team = phase == PHASE_CHOOSING_CAPTAIN
+                             ? c.mCaptainGridComponents[side]->GetSelectedItem()
+                             : c.mHomeAwayTeam[side];
+        const int sk = phase == PHASE_CHOOSING_SIDEKICK
+                           ? c.mSidekickGridComponents[side]->GetSelectedItem()
+                           : c.mHomeAwaySidekicks[side];
         if (phase != s_sentPhase[side] || team != s_sentTeam[side] || sk != s_sentSidekick[side])
             if (PortOnlineSelect(ONLINE_SELECT_TEAM, side, team, sk, phase))
             {
@@ -547,12 +574,13 @@ extern "C" int PortOnlineGameOptionsOpen(void)
 {
     const GameSceneManager* fe = GameSceneManager::Instance();
     return s_selectOpen && fe && fe->mCurrentStackDepth &&
-        fe->m_sceneStack[fe->mCurrentStackDepth - 1] == SCENE_QUICK_GAMEPLAY_OPTIONS;
+           fe->m_sceneStack[fe->mCurrentStackDepth - 1] == SCENE_QUICK_GAMEPLAY_OPTIONS;
 }
 
 void PortOnlineGameStadiumButtons(ButtonComponent* buttons, bool unlocked)
 {
-    if (!s_selectOpen) return;
+    if (!s_selectOpen)
+        return;
     s_stadiumUnlocked = unlocked;
     const OnlineState& st = *PortOnlineGetState();
     const bool canStart = unlocked && st.self == st.host;

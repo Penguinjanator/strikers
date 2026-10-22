@@ -48,9 +48,9 @@ int main()
     PortOnlineDescDefault(&d);
     check(PortOnlineDescCheck(&d) == NULL, "default is valid");
 
-    check(rejects([](OnlineMatchDesc* x) { x->protocol = ONLINE_PROTOCOL_VERSION + 1; },
-                  "protocol"),
-          "protocol");
+    check(
+        rejects([](OnlineMatchDesc* x) { x->protocol = ONLINE_PROTOCOL_VERSION + 1; }, "protocol"),
+        "protocol");
     check(rejects([](OnlineMatchDesc* x) { x->gameTime = 121; }, "gameTime"), "gameTime 121");
     check(rejects([](OnlineMatchDesc* x) { x->gameTime = 0; }, "gameTime"), "gameTime 0");
     check(check_field([](OnlineMatchDesc* x) { x->gameTime = 900; }) == NULL, "gameTime 900");
@@ -91,11 +91,9 @@ int main()
     check(rejects([](OnlineMatchDesc* x) { x->cheats = 0x10; }, "cheats"), "cheats");
     check(rejects([](OnlineMatchDesc* x) { x->shoot2Score = 2; }, "shoot2Score"), "shoot2Score");
     check(rejects([](OnlineMatchDesc* x) { x->bowser = 3; }, "bowser"), "bowser");
-    check(rejects([](OnlineMatchDesc* x) { x->bowserRepeat = 2; }, "bowserRepeat"),
-          "bowserRepeat");
+    check(rejects([](OnlineMatchDesc* x) { x->bowserRepeat = 2; }, "bowserRepeat"), "bowserRepeat");
     check(rejects([](OnlineMatchDesc* x) { x->pureGame = 2; }, "pureGame"), "pureGame");
-    check(rejects([](OnlineMatchDesc* x) { x->pauseAllowed = 2; }, "pauseAllowed"),
-          "pauseAllowed");
+    check(rejects([](OnlineMatchDesc* x) { x->pauseAllowed = 2; }, "pauseAllowed"), "pauseAllowed");
     check(rejects([](OnlineMatchDesc* x) { x->reserved[18] = 1; }, "reserved"), "reserved");
 
     // Round trip and byte offsets.
@@ -179,18 +177,26 @@ int main()
     char name[ONLINE_NAME_MAX + 1];
     check(PortOnlineCleanName(name, "  Toad  ") == 4 && strcmp(name, "Toad") == 0, "trim");
     check(PortOnlineCleanName(name, NULL) == 0 && name[0] == '\0', "null name");
-    check(PortOnlineCleanName(name, "a\tb\x7F" "c") == 3 && strcmp(name, "abc") == 0,
+    check(PortOnlineCleanName(name, "a\tb\x7F"
+                                    "c") == 3 &&
+              strcmp(name, "abc") == 0,
           "control characters dropped");
-    check(PortOnlineCleanName(name, "abcdefghijklmnopqrstuvwxyz") == 16
-              && strcmp(name, "abcdefghijklmnop") == 0,
+    check(PortOnlineCleanName(name, "abcdefghijklmnopqrstuvwxyz") == 16 &&
+              strcmp(name, "abcdefghijklmnop") == 0,
           "cut at 16 bytes");
     // 15 ASCII bytes then a two-byte character: the character does not fit and is dropped whole.
     check(PortOnlineCleanName(name, "abcdefghijklmno\xC3\xA9") == 15, "no split character");
     check(PortOnlineCleanName(name, "\xC3\xA9t\xC3\xA9") == 5, "UTF-8 kept");
-    check(PortOnlineCleanName(name, "a\xC0\xAF" "b") == 2 && strcmp(name, "ab") == 0,
+    check(PortOnlineCleanName(name, "a\xC0\xAF"
+                                    "b") == 2 &&
+              strcmp(name, "ab") == 0,
           "overlong dropped");
-    check(PortOnlineCleanName(name, "a\xED\xA0\x80" "b") == 2, "surrogate dropped");
-    check(PortOnlineCleanName(name, "a\xC2\x85" "b") == 2, "C1 control dropped");
+    check(PortOnlineCleanName(name, "a\xED\xA0\x80"
+                                    "b") == 2,
+          "surrogate dropped");
+    check(PortOnlineCleanName(name, "a\xC2\x85"
+                                    "b") == 2,
+          "C1 control dropped");
     check(PortOnlineCleanName(name, "a\xE2\x82") == 1, "truncated sequence dropped");
     check(PortOnlineCleanName(name, "\xF0\x9F\x98\x80") == 4, "four-byte character kept");
 

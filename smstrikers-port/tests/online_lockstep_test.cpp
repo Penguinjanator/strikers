@@ -888,7 +888,12 @@ void TestSetupMismatch()
         }
         m.Send(NULL, 0);
     };
-    CHECK(w.RunUntil([&] { answer(); return a->State().canStart != 0; }, 5));
+    CHECK(w.RunUntil(
+        [&] {
+            answer();
+            return a->State().canStart != 0;
+        },
+        5));
     const uint32_t na = a->State().noticeSerial;
     refused = true;
     CHECK(a->session.Start());
@@ -1079,8 +1084,8 @@ void TestUnjoinedLinks()
         bytes += (size_t)n;
         count++;
     }
-    std::printf("forged source: %zu bytes from it, %d datagrams and %zu bytes back to it\n",
-                forged, count, bytes);
+    std::printf("forged source: %zu bytes from it, %d datagrams and %zu bytes back to it\n", forged,
+                count, bytes);
     CHECK(bytes <= 3 * forged);
 }
 
@@ -1141,13 +1146,19 @@ void TestHostLostOfFour()
     }
     CHECK(ConnectThree(w, a, b, c));
     CHECK(d->session.Join("10.0.0.1:41210", "Dee"));
-    CHECK(w.RunUntil([&] {
-        return a->State().machineCount == 4 && b->State().machineCount == 4 &&
-               c->State().machineCount == 4 && d->State().machineCount == 4;
-    }, 10));
+    CHECK(w.RunUntil(
+        [&] {
+            return a->State().machineCount == 4 && b->State().machineCount == 4 &&
+                   c->State().machineCount == 4 && d->State().machineCount == 4;
+        },
+        10));
     CHECK(StartMatch(w, a, { b, c, d }));
     CHECK(w.RunUntil(
-        [&] { return a->game.tick >= 600 && b->game.tick >= 600 && c->game.tick >= 600 && d->game.tick >= 600; }, 60));
+        [&] {
+            return a->game.tick >= 600 && b->game.tick >= 600 && c->game.tick >= 600 &&
+                   d->game.tick >= 600;
+        },
+        60));
     w.net.silenced.push_back(a->ip);
     a->paused = true;
     const uint32_t tb = b->game.tick;
@@ -1157,13 +1168,17 @@ void TestHostLostOfFour()
     std::printf("host of four silent: guests at %u and %u, 8 s later %u and %u\n", tb, tc,
                 b->game.tick, c->game.tick);
     CHECK(b->game.tick > tb + 50 && c->game.tick > tc + 50 && d->game.tick > td + 50);
-    CHECK(b->session.SlotKind(0) == ONLINE_SLOT_CPU && b->session.SlotKind(2) == ONLINE_SLOT_CPU && b->session.SlotKind(3) == ONLINE_SLOT_CPU);
-    CHECK(c->session.SlotKind(0) == ONLINE_SLOT_CPU && c->session.SlotKind(1) == ONLINE_SLOT_CPU && c->session.SlotKind(3) == ONLINE_SLOT_CPU);
+    CHECK(b->session.SlotKind(0) == ONLINE_SLOT_CPU && b->session.SlotKind(2) == ONLINE_SLOT_CPU &&
+          b->session.SlotKind(3) == ONLINE_SLOT_CPU);
+    CHECK(c->session.SlotKind(0) == ONLINE_SLOT_CPU && c->session.SlotKind(1) == ONLINE_SLOT_CPU &&
+          c->session.SlotKind(3) == ONLINE_SLOT_CPU);
     CHECK(d->session.SlotKind(0) == ONLINE_SLOT_CPU && d->session.SlotKind(1) == ONLINE_SLOT_CPU &&
           d->session.SlotKind(2) == ONLINE_SLOT_CPU);
-    CHECK(w.RunUntil([&] {
-        return !b->game.results.empty() && !c->game.results.empty() && !d->game.results.empty();
-    }, 120));
+    CHECK(w.RunUntil(
+        [&] {
+            return !b->game.results.empty() && !c->game.results.empty() && !d->game.results.empty();
+        },
+        120));
 }
 
 // With no system randomness nobody hosts or joins, and a host refuses a guest's HELLO.
@@ -1215,7 +1230,8 @@ void TestUnacknowledged()
         m.Send(NULL, 0);
         w.RunFor(0.02);
     }
-    std::printf("unacknowledged guest: %d machines after the queue filled\n", a->State().machineCount);
+    std::printf("unacknowledged guest: %d machines after the queue filled\n",
+                a->State().machineCount);
     CHECK(a->State().machineCount == 1);
 }
 
@@ -1238,19 +1254,22 @@ void TestRematchAfterDrop()
     CHECK(w.RunUntil([&] { return c->game.tick >= 100; }, 60));
     w.net.silenced.push_back(c->ip);
     c->paused = true;
-    CHECK(w.RunUntil([&] {
-        return a->session.SlotKind(2) == ONLINE_SLOT_CPU &&
-               b->session.SlotKind(2) == ONLINE_SLOT_CPU;
-    }, 20));
-    CHECK(w.RunUntil([&] {
-        return a->State().phase == ONLINE_PHASE_POST_MATCH &&
-               b->State().phase == ONLINE_PHASE_POST_MATCH;
-    }, 120));
+    CHECK(w.RunUntil(
+        [&] {
+            return a->session.SlotKind(2) == ONLINE_SLOT_CPU &&
+                   b->session.SlotKind(2) == ONLINE_SLOT_CPU;
+        },
+        20));
+    CHECK(w.RunUntil(
+        [&] {
+            return a->State().phase == ONLINE_PHASE_POST_MATCH &&
+                   b->State().phase == ONLINE_PHASE_POST_MATCH;
+        },
+        120));
     CHECK(a->session.Vote(-1, ONLINE_VOTE_REMATCH));
     CHECK(b->session.Vote(-1, ONLINE_VOTE_REMATCH));
-    CHECK(w.RunUntil([&] {
-        return a->game.results.size() == 2 && b->game.results.size() == 2;
-    }, 120));
+    CHECK(w.RunUntil([&] { return a->game.results.size() == 2 && b->game.results.size() == 2; },
+                     120));
     CHECK(a->State().machineCount == 2 && b->State().machineCount == 2);
 }
 
@@ -1429,8 +1448,7 @@ void TestFrozen()
     w.onFrame = nullptr;
     CHECK(w.RunUntil(
         [&] {
-            return !a->game.results.empty() && !b->game.results.empty() &&
-                   !c->game.results.empty();
+            return !a->game.results.empty() && !b->game.results.empty() && !c->game.results.empty();
         },
         60));
     bool falling = !countdown.empty();
@@ -1462,8 +1480,8 @@ void TestFrozen()
     w.RunFor(8);
     CHECK(a->game.tick <= 3);
     c->framesPaused = false;
-    CHECK(w.RunUntil(
-        [&] { return a->game.results.size() == 2 && c->game.results.size() == 2; }, 60));
+    CHECK(
+        w.RunUntil([&] { return a->game.results.size() == 2 && c->game.results.size() == 2; }, 60));
     CHECK(!Dropped(a, na));
     if (a->game.results.size() == 2 && c->game.results.size() == 2)
         CHECK(a->game.results[1].state == c->game.results[1].state);
@@ -1516,9 +1534,13 @@ void TestSharedSkip()
     Identity id = TestIdentity();
     Machine* a = w.Add(0x0A000001, 0, 60, 1, id, "shared-skip");
     Machine* b = w.Add(0x0A000002, 0, 60, 1, id, "shared-skip");
-    for (Machine* m : {a, b}) { m->game.matchTicks = 1800; m->game.goalOdds = 0; }
+    for (Machine* m : { a, b })
+    {
+        m->game.matchTicks = 1800;
+        m->game.goalOdds = 0;
+    }
     CHECK(Connect(w, a, b));
-    CHECK(StartMatch(w, a, {b}));
+    CHECK(StartMatch(w, a, { b }));
     CHECK(w.RunUntil([&] { return a->game.tick >= 300 && b->game.tick >= 300; }, 60));
     w.net.params.loss = 0.15;
     w.net.params.duplicate = 0.1;
@@ -1553,16 +1575,19 @@ void TestRetailSelection()
     CHECK(a->session.Select(ONLINE_SELECT_OPTIONS, 0, 0, 0, 1));
     CHECK(a->session.Select(ONLINE_SELECT_TEAM, 0, 4, 2, 3));
     CHECK(b->session.Select(ONLINE_SELECT_TEAM, 1, 2, 1, 3));
-    CHECK(w.RunUntil([&] { return a->State().selection.phase[1] == 3 && b->State().selection.optionsOpen; }, 5));
+    CHECK(w.RunUntil(
+        [&] { return a->State().selection.phase[1] == 3 && b->State().selection.optionsOpen; }, 5));
     CHECK(a->State().selection.stage == 1);
     CHECK(!b->session.Select(ONLINE_SELECT_OPTIONS, 0, 0, 0, 0));
     CHECK(a->session.Select(ONLINE_SELECT_OPTIONS, 0, 0, 0, 0));
     CHECK(w.RunUntil([&] { return b->State().selection.stage == 2; }, 5));
     CHECK(b->State().desc.team[0] == 4 && b->State().desc.sidekick[0] == 2);
     CHECK(b->session.Select(ONLINE_SELECT_BACK, 0, 0, 0, 0));
-    CHECK(w.RunUntil([&] { return b->State().selection.stage == 1 && b->State().selection.epoch != epoch; }, 5));
+    CHECK(w.RunUntil(
+        [&] { return b->State().selection.stage == 1 && b->State().selection.epoch != epoch; }, 5));
     CHECK(b->session.Select(ONLINE_SELECT_CANCEL, 0, 0, 0, 0));
-    CHECK(w.RunUntil([&] { return a->State().selection.stage == 0 && b->State().selection.stage == 0; }, 5));
+    CHECK(w.RunUntil(
+        [&] { return a->State().selection.stage == 0 && b->State().selection.stage == 0; }, 5));
     CHECK(a->session.Select(ONLINE_SELECT_BEGIN, 0, 0, 0, 0));
     CHECK(w.RunUntil([&] { return b->State().selection.stage == 1; }, 5));
     CHECK(a->session.Select(ONLINE_SELECT_TEAM, 0, 4, 2, 3));
@@ -1572,7 +1597,11 @@ void TestRetailSelection()
     d.stadium = 4;
     CHECK(a->session.SetDesc(d));
     CHECK(a->session.Select(ONLINE_SELECT_FINISH, 0, 0, 0, 0));
-    CHECK(w.RunUntil([&] { return a->State().phase == ONLINE_PHASE_MATCH && b->State().phase == ONLINE_PHASE_MATCH; }, 30));
+    CHECK(w.RunUntil(
+        [&] {
+            return a->State().phase == ONLINE_PHASE_MATCH && b->State().phase == ONLINE_PHASE_MATCH;
+        },
+        30));
     CHECK(b->State().desc.stadium == 4 && b->State().desc.team[0] == 4);
 }
 

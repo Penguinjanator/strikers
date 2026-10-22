@@ -90,8 +90,8 @@ extern "C" void PortOnlineDescDefault(OnlineMatchDesc* desc)
         desc->padSide[i] = -1;
         desc->slotMachine[i] = -1;
     }
-    desc->stadium = 1;       // STAD_PEACH_TOAD_STADIUM
-    desc->skill = 2;         // PROFESSIONAL
+    desc->stadium = 1;   // STAD_PEACH_TOAD_STADIUM
+    desc->skill = 2;     // PROFESSIONAL
     desc->powerUps = 1;
     desc->powerupMask = 0xFF;
     desc->shoot2Score = 1;
@@ -187,7 +187,7 @@ extern "C" void PortOnlineDescEncode(const OnlineMatchDesc* d, uint8_t out[ONLIN
 }
 
 extern "C" const char* PortOnlineDescDecode(const uint8_t in[ONLINE_DESC_BYTES],
-                                       OnlineMatchDesc* out)
+                                            OnlineMatchDesc* out)
 {
     OnlineMatchDesc d;
     d.protocol = get16(in + 0);

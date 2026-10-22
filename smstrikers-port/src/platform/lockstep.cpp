@@ -33,7 +33,6 @@
 #include <cstring>
 #include <vector>
 
-
 extern void AIEventHandler(Event*, void*);
 extern float g_fFixedUpdateTick;
 extern float g_fSimulationTick;
@@ -61,10 +60,7 @@ extern "C" unsigned int PortSimMatch(void) { return s_match; }
 
 extern "C" int PortSimInTick(void) { return s_inTick; }
 
-extern "C" void PortSimTickBegin(void)
-{
-    s_inTick = 1;
-}
+extern "C" void PortSimTickBegin(void) { s_inTick = 1; }
 
 extern "C" void PortSimTickEnd(void)
 {
@@ -184,7 +180,8 @@ extern "C" void PortLockstepRunTicks(float dt)
     while (s_dueNs >= tick)
     {
         const bool may = s_online ? online_may_run(s_tick) : PortSimMayRunTick(s_tick) != 0;
-        if (!may || !(s_online ? PortOnlineTickInput(s_tick, s_pads) : PortSimLocalInput(s_tick, s_pads)))
+        if (!may ||
+            !(s_online ? PortOnlineTickInput(s_tick, s_pads) : PortSimLocalInput(s_tick, s_pads)))
         {
             // Held ticks build no backlog; the picture stays on the newest tick.
             s_dueNs = tick;
@@ -619,7 +616,6 @@ const char* const kComponents[] = { "ball",  "c0",   "c1",  "c2",  "c3",   "c4",
 const int kComponentCount = (int)(sizeof kComponents / sizeof kComponents[0]);
 const unsigned int kComponentEvery = 50;
 
-
 bool online_may_run(unsigned int k)
 {
     if (!PortOnlineMayRunTick(k))
@@ -686,7 +682,8 @@ void online_pause_check(unsigned int k)
         s_lastTickButtons[s] = s_pads[s].button;
         if (!edge || !s_settings.pauseAllowed || !inPlay || s_barrier != PORT_BARRIER_NONE)
             continue;
-        const int side = nlSingleton<GameInfoManager>::Instance()->GetPlayingSide((unsigned short)s);
+        const int side =
+            nlSingleton<GameInfoManager>::Instance()->GetPlayingSide((unsigned short)s);
         if (side < 0 || side > 1 || s_pausesLeft[side] == 0)
             continue;
         s_pausesLeft[side]--;
@@ -738,10 +735,7 @@ void online_tick_end(unsigned int k)
 }
 }   // namespace
 
-extern "C" void PortSimSetOnline(int online)
-{
-    s_online = online != 0;
-}
+extern "C" void PortSimSetOnline(int online) { s_online = online != 0; }
 
 extern "C" int PortSimOnline(void) { return s_online; }
 
