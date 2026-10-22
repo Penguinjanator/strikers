@@ -2,6 +2,7 @@
 #include "NL/nlWare.h"
 #include "dolphin/os.h"
 #include "port/endian.h"
+#include "port/lockstep.h"
 extern "C" unsigned long port_cam_swap(void*, unsigned long);
 #include "NL/vmath.h"
 #include "Game/ReplayManager.h"
@@ -239,6 +240,8 @@ bool Nis::SelectRandomCamera(cAnimCamera& camera)
         return false;
     }
 
+    // PORT: every machine shows the same angle.
+    PortRngPresentation portRngPresentation;
     int randomIndex = nlRandom(mNumCameras, &nlDefaultSeed);
     SelectCamera(camera, randomIndex);
     return true;

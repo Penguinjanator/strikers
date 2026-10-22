@@ -3495,7 +3495,8 @@ eTeamID GameInfoManager::FindWinningTeam()
  */
 bool GameInfoManager::IsKongaUnlocked() const
 {
-    return CheckUnlockStatus(isKongaUnlocked, mUserInfo.mTrophies[0], 0);
+    // PORT: online rooms offer every stadium; the save is not changed.
+    return PortOnlineGameStadiumOpen(CheckUnlockStatus(isKongaUnlocked, mUserInfo.mTrophies[0], 0));
 }
 
 /**
@@ -3503,7 +3504,7 @@ bool GameInfoManager::IsKongaUnlocked() const
  */
 bool GameInfoManager::IsYoshiUnlocked() const
 {
-    return CheckUnlockStatus(isYoshiUnlocked, mUserInfo.mTrophies[0], 1);
+    return PortOnlineGameStadiumOpen(CheckUnlockStatus(isYoshiUnlocked, mUserInfo.mTrophies[0], 1));
 }
 
 /**
@@ -3511,7 +3512,7 @@ bool GameInfoManager::IsYoshiUnlocked() const
  */
 bool GameInfoManager::IsForbiddenUnlocked() const
 {
-    return CheckUnlockStatus(isForbiddenUnlocked, mUserInfo.mTrophies[0], 2);
+    return PortOnlineGameStadiumOpen(CheckUnlockStatus(isForbiddenUnlocked, mUserInfo.mTrophies[0], 2));
 }
 
 /**
@@ -3519,7 +3520,7 @@ bool GameInfoManager::IsForbiddenUnlocked() const
  */
 bool GameInfoManager::IsSuperStadiumUnlocked() const
 {
-    return CheckUnlockStatus(isSuperStadUnlocked, mUserInfo.mTrophies[0], 3);
+    return PortOnlineGameStadiumOpen(CheckUnlockStatus(isSuperStadUnlocked, mUserInfo.mTrophies[0], 3));
 }
 
 /**

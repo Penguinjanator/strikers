@@ -2387,9 +2387,7 @@ void draw_selection(const OnlineState& st)
         const char* stage = st.self == st.host
                                 ? text(T_STAGE_STADIUM)
                                 : format(text(T_SELECTING_STADIUM), machine_name(st, st.host));
-        const char* help =
-            text(st.self == st.host && !PortOnlineGameStadiumUnlocked() ? T_STADIUM_LOCKED
-                                                                        : T_SHARED_BACK);
+        const char* help = text(T_SHARED_BACK);
         selection_band(ImVec2(screen.x * .12f, screen.y * .755f),
                        ImVec2(screen.x * .88f, screen.y * .828f), format("%s\n%s", stage, help),
                        kText);

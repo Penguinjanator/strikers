@@ -235,6 +235,7 @@ thread_local int s_rngScope = PORT_RNG_COSMETIC;
 
 unsigned int s_cosmeticSeed;
 bool s_cosmeticSeeded;
+unsigned int s_presentationSeed;
 
 PortSimMatchSettings s_settings;
 bool s_sessionSettings;
@@ -283,6 +284,8 @@ extern "C" unsigned int* PortRngStream(void)
 {
     if (s_rngScope == PORT_RNG_SIM)
         return &nlDefaultSeed;
+    if (s_rngScope == PORT_RNG_PRESENTATION)
+        return &s_presentationSeed;
     return cosmetic_stream();
 }
 
@@ -455,6 +458,7 @@ extern "C" void PortSimBarrierArm(int kind)
         s_freeze = next_tick();
         OSReport("[lockstep] end freezes t=%u\n", s_freeze);
     }
+    nlSetRandomSeed(mix32(s_settings.seed ^ mix32(PortSimPresentationId())), &s_presentationSeed);
 }
 
 extern "C" int PortSimMayRunTick(unsigned int tick)

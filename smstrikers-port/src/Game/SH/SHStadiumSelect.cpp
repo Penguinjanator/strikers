@@ -316,13 +316,16 @@ void StadiumSelectSceneV2::Update(float fDeltaT)
         m_pTicker->Update(fDeltaT);
         bool rightPressed = g_pFEInput->IsAutoPressed(FE_ALL_PADS, 0xC, true, NULL);
         bool leftPressed = g_pFEInput->IsAutoPressed(FE_ALL_PADS, 0xB, true, NULL);
-        // PORT: guests follow the host's stadium cursor without generating menu input.
+        // PORT: guests follow the host's stadium the short way round, without menu input.
         const OnlineState& online = *PortOnlineGetState();
         const bool remote = PortOnlineGameSelecting() && online.self != online.host;
         if (remote)
         {
-            rightPressed = GetSelectedStadium() != online.desc.stadium;
-            leftPressed = false;
+            int ahead = 0;
+            while (StadiumEntries[(mStadiumIndex + ahead) % 7].mStadiumID != online.desc.stadium)
+                ahead++;
+            rightPressed = ahead != 0 && ahead <= 3;
+            leftPressed = ahead > 3;
         }
 
         if (rightPressed || leftPressed)

@@ -59,7 +59,8 @@ void PortSimSetTimeScale(float scale);
 enum
 {
     PORT_RNG_COSMETIC = 0,
-    PORT_RNG_SIM = 1
+    PORT_RNG_SIM = 1,
+    PORT_RNG_PRESENTATION = 2   // reseeded from the match seed at each barrier
 };
 
 // RNG: the current scope; the lockstep tick and its barrier actions run in PORT_RNG_SIM.
@@ -163,6 +164,17 @@ class PortRngCosmetic
   public:
     PortRngCosmetic() : mScope(PortRngSetScope(PORT_RNG_COSMETIC)) {}
     ~PortRngCosmetic() { PortRngSetScope(mScope); }
+
+  private:
+    int mScope;
+};
+
+// RNG: a cutscene, camera or replay pick, which every machine must make the same.
+class PortRngPresentation
+{
+  public:
+    PortRngPresentation() : mScope(PortRngSetScope(PORT_RNG_PRESENTATION)) {}
+    ~PortRngPresentation() { PortRngSetScope(mScope); }
 
   private:
     int mScope;

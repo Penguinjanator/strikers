@@ -741,8 +741,8 @@ void NisPlayer::Load(const char* nisType, NisTarget target, NisUseStadiumOffset 
         return;
     }
 
-    // PORT: which cutscene plays is presentation, and BeginGame reaches this, so it takes the cosmetic stream.
-    PortRngCosmetic portRngCosmetic;
+    // PORT: every machine plays the same cutscene.
+    PortRngPresentation portRngPresentation;
     NisHeader& nisHeader = *availableNis[nlRandom(numAvailableNis, &nlDefaultSeed)];
 
     for (int i = 0; i < 4; i++)

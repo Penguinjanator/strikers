@@ -1003,6 +1003,8 @@ void Presentation::EventHandler(Event* event)
                 mGoalQuality = HIGHLIGHT_QUALITY_GOAL_DECREASE_DIFF;
             }
 
+            // PORT: every machine plays the same celebration.
+            const int portRngScope = PortRngSetScope(PORT_RNG_PRESENTATION);
             if (!inSuddenDeath && !takeTheLead && !tiesTheGame)
             {
                 if (nlRandom(100, &nlDefaultSeed) < 80)
@@ -1033,6 +1035,7 @@ void Presentation::EventHandler(Event* event)
                     }
                 }
             }
+            PortRngSetScope(portRngScope);
 
             if (!tiesTheGame)
             {

@@ -64,6 +64,8 @@ IChooseCaptain* s_captains;
 int s_captainButtonMode = -1;
 bool s_stadiumUnlocked;
 int s_sentTeam[2], s_sentSidekick[2], s_sentPhase[2];
+// A remote side's ready artwork waits for its images' previous load to finish.
+bool s_artworkOwed[2];
 
 const unsigned short* localized_name(unsigned long hash)
 {
@@ -168,18 +170,18 @@ void selection_frame(const OnlineState& st)
 // A cold pipeline cache can take this long; past it the match starts and the rest compile in play.
 const unsigned long long kPipelineWaitNs = 60000000000ull;
 
-// The front end at rest on the title or the main menu, the screens a match loads from.
-bool at_menu(void)
+bool resting_on(SceneList scene)
 {
     const nlTaskManager* t = nlTaskManager::m_pInstance;
     if (t == NULL || t->m_CurrState != 4 || t->m_PendingState != t->m_CurrState)
         return false;
     const GameSceneManager* fe = nlSingleton<GameSceneManager>::Instance();
-    if (fe == NULL || fe->mCurrentStackDepth == 0)
-        return false;
-    const SceneList top = fe->m_sceneStack[fe->mCurrentStackDepth - 1];
-    return top == SCENE_TITLE || top == SCENE_MAIN_MENU;
+    return fe != NULL && fe->mCurrentStackDepth != 0 &&
+           fe->m_sceneStack[fe->mCurrentStackDepth - 1] == scene;
 }
+
+// A match loads from the title or the main menu.
+bool at_menu(void) { return resting_on(SCENE_TITLE) || resting_on(SCENE_MAIN_MENU); }
 
 // Out of the match running here, through the pause menu's forfeit path.
 void leave_match(void)
@@ -379,6 +381,55 @@ void slot_pads(void)
     s_slotPads = PadStatus::s_Current;
 }
 
+static_assert(ONLINE_MAX_STADIUMS == MAX_STADIUMS, "the descriptor's stadium follows eStadiumID");
+
+// The name, logo and artwork for a side's picks, as entering its phase shows them.
+void refresh_selection(IChooseCaptain& c, int side, int phase)
+{
+    const eTeamID team = (eTeamID)c.mHomeAwayTeam[side];
+    const eSidekickID sidekick = (eSidekickID)c.mHomeAwaySidekicks[side];
+    IChooseCaptain::NameComponent& name = c.mNameComponents[side];
+    name.SetCaptainName(GetLOCCharacterName(team, false, phase == PHASE_CHOOSING_CAPTAIN));
+    name.SetCaptainLogo(GetTeamName(team));
+    if (phase == PHASE_CHOOSING_CAPTAIN)
+        return;
+    name.SetSidekickName(GetLOCSidekickName(sidekick));
+    s_artworkOwed[side] = phase == PHASE_READY;
+}
+
+// The ready captain's three images; an image still loading drops a new request.
+void load_ready_artwork(IChooseCaptain& c, int side)
+{
+    for (int i = 0; i < 3; i++)
+        if (c.mAsyncImage[side][i]->mLoadState == LS_ISSUED_LOAD)
+            return;
+    s_artworkOwed[side] = false;
+    const eTeamID team = (eTeamID)c.mHomeAwayTeam[side];
+    const CaptainSidekickFilename::Type types[3] = { CaptainSidekickFilename::TYPE_CAPTAIN,
+                                                     CaptainSidekickFilename::TYPE_CAPTAIN_OUTLINE,
+                                                     CaptainSidekickFilename::TYPE_CAPTAIN_FLASH };
+    for (int i = 0; i < 3; i++)
+    {
+        char file[0x80];
+        CaptainSidekickFilename::Build(types[i], file, sizeof file, team, side);
+        c.mAsyncImage[side][i]->QueueLoad(file, false);
+    }
+    c.mDidSwapCaptains[side] = false;
+    c.StartSidekickMiniHead(side, (eSidekickID)c.mHomeAwaySidekicks[side]);
+}
+
+// A grid shows its highlight again from its Update, which only a side with a local pad runs.
+template <typename T> void reveal_highlight(IGridComponent<T>* grid)
+{
+    if (!grid->mHighliteVisibilityAtAnimEnd)
+        return;
+    const TLSlide* slide = grid->mParentComponent->GetActiveSlide();
+    if (slide != NULL && slide->m_time < slide->m_start + slide->m_duration)
+        return;
+    grid->mHighliteVisibilityAtAnimEnd = false;
+    grid->mHighliteComponent->m_bVisible = true;
+}
+
 }   // namespace
 
 extern "C" void PortOnlineGameInit(void)
@@ -423,6 +474,7 @@ void PortOnlineGameCaptainsCreated(ChooseCaptainsSceneV2* scene)
         return;
     s_captains = &scene->mChooseCaptain;
     s_captainButtonMode = -1;
+    s_artworkOwed[0] = s_artworkOwed[1] = false;
     const OnlineState& st = *PortOnlineGetState();
     for (int side = 0; side < 2; side++)
     {
@@ -482,13 +534,14 @@ int PortOnlineGameCaptainsUpdate(ChooseCaptainsSceneV2* scene, float dt)
                              c.mHomeAwaySidekicks[side] != st.desc.sidekick[side];
         c.mHomeAwayTeam[side] = st.desc.team[side];
         c.mHomeAwaySidekicks[side] = st.desc.sidekick[side];
-        if (phase != c.mComponentState[side].mCurrentPhase || changed)
+        if (phase != c.mComponentState[side].mCurrentPhase)
         {
             c.mCaptainGridComponents[side]->MoveHighlightToTarget((eTeamID)st.desc.team[side]);
             c.mSidekickGridComponents[side]->MoveHighlightToTarget(
                 (eSidekickID)st.desc.sidekick[side]);
             const eTeamID otherCursor = c.mCaptainGridComponents[side ^ 1]->GetSelectedItem();
             c.mComponentState[side].SetCurrentPhase((IChooseCaptain::ComponentState::Phase)phase);
+            s_artworkOwed[side] = false;
             // The retail ready transition writes team IDs into both grids' icon-ID cursors.
             c.mCaptainGridComponents[side]->MoveHighlightToTarget((eTeamID)st.desc.team[side]);
             c.mCaptainGridComponents[side ^ 1]->MoveHighlightToTarget(otherCursor);
@@ -501,6 +554,21 @@ int PortOnlineGameCaptainsUpdate(ChooseCaptainsSceneV2* scene, float dt)
                 c.mCaptainGridComponents[grid]->UpdateSuperTeamIconState();
             }
         }
+        else if (changed)
+        {
+            // Entering the phase again would replay the grid's IN slide.
+            const eTeamID team = (eTeamID)st.desc.team[side];
+            const eSidekickID sidekick = (eSidekickID)st.desc.sidekick[side];
+            c.mCaptainGridComponents[side]->MoveHighlightToTarget(team);
+            c.mSidekickGridComponents[side]->MoveHighlightToTarget(sidekick);
+            refresh_selection(c, side, phase);
+        }
+        if (s_artworkOwed[side])
+            load_ready_artwork(c, side);
+        if (phase == PHASE_CHOOSING_CAPTAIN)
+            reveal_highlight(c.mCaptainGridComponents[side]);
+        else if (phase == PHASE_CHOOSING_SIDEKICK)
+            reveal_highlight(c.mSidekickGridComponents[side]);
     }
     bool ready = true;
     for (int side = 0; side < 2; ++side)
@@ -570,6 +638,7 @@ extern "C" void PortOnlineGameSaveOptions(void)
 }
 
 extern "C" int PortOnlineGameStadiumUnlocked(void) { return s_stadiumUnlocked; }
+extern "C" int PortOnlineGameStadiumOpen(int own) { return s_selectOpen ? 1 : own; }
 extern "C" int PortOnlineGameOptionsOpen(void)
 {
     const GameSceneManager* fe = GameSceneManager::Instance();

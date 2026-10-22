@@ -7,6 +7,7 @@
 #include "NL/nlDebug.h"
 #include "NL/nlFormat.h"
 #include "NL/nlTask.h"
+#include "port/lockstep.h"
 
 struct GoalScoredDataExt
 {
@@ -276,6 +277,8 @@ BasicString<char, Detail::TempStringAllocator> ReplayChoreo::CalcAutoReplayScrip
         return BasicString<char, Detail::TempStringAllocator>("MID_CENTER_OWN_GOAL_0");
     }
 
+    // PORT: every machine replays from the same camera.
+    PortRngPresentation portRngPresentation;
     int pick = nlRandom(mNumScripts[zoneDepth][zoneInWidth][replayType], &nlDefaultSeed);
     if (cameraPick > -1)
     {

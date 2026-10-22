@@ -126,7 +126,7 @@ extern "C" const char* PortOnlineDescCheck(const OnlineMatchDesc* d)
         if (d->slotMachine[i] >= 0 && ++per_machine[d->slotMachine[i]] > ONLINE_MAX_LOCAL_HUMANS)
             return "slotMachine";
     }
-    if (d->stadium < 0 || d->stadium > 6)
+    if (d->stadium < 0 || d->stadium >= ONLINE_MAX_STADIUMS)
         return "stadium";
     if (d->skill > 4)
         return "skill";

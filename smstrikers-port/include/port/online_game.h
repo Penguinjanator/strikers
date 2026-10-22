@@ -24,6 +24,8 @@ int PortOnlineGameSelectStadium(int stadium);
 int PortOnlineGameSelectionBack(void);
 void PortOnlineGameSaveOptions(void);
 int PortOnlineGameStadiumUnlocked(void);
+// Every stadium while an online room selects; otherwise `own`, the save's unlock.
+int PortOnlineGameStadiumOpen(int own);
 int PortOnlineGameOptionsOpen(void);
 
 #ifdef __cplusplus
