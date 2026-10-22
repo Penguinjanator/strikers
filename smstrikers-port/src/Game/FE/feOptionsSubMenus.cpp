@@ -970,7 +970,8 @@ OptionsVisualMenuV2::OptionsVisualMenuV2(FEPresentation* pres, ButtonComponent::
 
     TLSlide* currentSlide = pres->GetActiveSlide();
 
-    for (int i = 0; i < 3; i++)
+    // PORT: the display aspect follows the window, so the widescreen row is hidden.
+    for (int i = 0; i < 2; i++)
     {
         TLInstance* instance = FEFinder<TLInstance, 4>::Find<TLSlide>(
             currentSlide,
@@ -1022,10 +1023,15 @@ OptionsVisualMenuV2::OptionsVisualMenuV2(FEPresentation* pres, ButtonComponent::
         currentSlide,
         InlineHasher(nlStringLowerHash("Layer")),
         InlineHasher(nlStringLowerHash("ASPECT")));
+    if (compinstance != NULL)
+        compinstance->m_bVisible = false;
 
-    BuildSubMenuList(2, compinstance, true, mSettings.mIsWidescreen ? 1 : 0);
-    compinstance->m_bVisible = true;
-    mMenuItems.GetMenuItem(2)->GetType()->m_bVisible = true;
+    TLInstance* aspectItem = FEFinder<TLInstance, 4>::Find<TLSlide>(
+        currentSlide,
+        InlineHasher(nlStringLowerHash("Layer")),
+        InlineHasher(nlStringLowerHash(MENU_ITEMS[2])));
+    if (aspectItem != NULL)
+        aspectItem->m_bVisible = false;
 
     ColourAllText(SubMenuHighliteColour, mMenuItems.GetActiveItemIndex());
 
@@ -1119,17 +1125,6 @@ void OptionsVisualMenuV2::Save()
         val = -1;
     }
     mSettings.mCameraZoomLevel = (float)val / 10.0f;
-
-    list = (SlideMenuList*)mSlideMenuLists[2];
-    if (list != NULL)
-    {
-        val = list->GetMenuItem()->GetType()->GetUserEnumType();
-    }
-    else
-    {
-        val = -1;
-    }
-    mSettings.mIsWidescreen = (val != 0);
 }
 
 /**
