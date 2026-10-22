@@ -87,7 +87,6 @@ The main distinctions are:
 - Online panel font: Roboto Medium by Google, under the Apache 2.0 licence.
 - Switch build: NVK from [mesa-switch](https://github.com/danfromtico/mesa-switch) (MIT, see 'NOTICE-NVK.md'); [libnx](https://github.com/switchbrew/libnx) (ISC); devkitPro's SDL2 (zlib), Mesa EGL/OpenGL ES and libdrm_nouveau (MIT); [sdl3on2](https://github.com/new-coke/sdl3on2) (zlib); [dawn-switch](https://github.com/new-coke/dawn-switch) (BSD 3-Clause).
 - Settings app: [Qt 6](https://www.qt.io), under the LGPL 3.0.
-- Movies: [FFmpeg](https://ffmpeg.org)'s libavcodec, built with only the THP decoder and linked statically, under the LGPL 2.1.
 - FreeType: portions of this software are copyright The FreeType Project (www.freetype.org). All rights reserved.
 - Other third-party material and dependencies: these retain their applicable licences, and each archive includes their notices.
 

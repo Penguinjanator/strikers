@@ -60,30 +60,9 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install -y ninja llvm
 
-      - name: Install MSYS2 for ffmpeg's configure (Windows)
-        if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MSYS
-          update: false
-          install: make diffutils tar xz curl
-          path-type: inherit
-
-      - name: Build ffmpeg (Windows)
-        if: runner.os == 'Windows'
-        working-directory: smstrikers-port
-        shell: msys2 {0}
-        run: ./tools/build-ffmpeg.sh
-
       - name: Install toolchain (macOS)
         if: runner.os == 'macOS'
         run: brew install ninja
-
-      # Homebrew's ffmpeg is GPL and pulls in x264 and x265; this is the LGPL THP-only decoder the other platforms ship.
-      - name: Build ffmpeg (macOS)
-        if: runner.os == 'macOS'
-        working-directory: smstrikers-port
-        run: ./tools/build-ffmpeg.sh
 
       - name: Install Qt (settings app)
         if: runner.os != 'Linux'
@@ -140,10 +119,6 @@ jobs:
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: docker exec build ./tools/install-linux-deps.sh
-
-      - name: Build ffmpeg (Linux)
-        if: runner.os == 'Linux'
-        run: docker exec build ./tools/build-ffmpeg.sh
 
       - name: Configure (Linux)
         if: runner.os == 'Linux'
@@ -239,9 +214,6 @@ jobs:
       - name: Fetch Dawn
         run: docker exec build ./tools/fetch-switch-deps.sh
 
-      - name: Build ffmpeg
-        run: docker exec build ./tools/build-ffmpeg.sh --switch
-
       - name: Configure
         run: |
           docker exec -e CMAKE_TOOLCHAIN_FILE="$PWD/tools/toolchain-switch.cmake" build \
@@ -280,23 +252,6 @@ jobs:
           merge-multiple: true
           skip-decompress: true
 
-      - uses: actions/checkout@v7
-        with:
-          path: source
-          sparse-checkout: smstrikers-port/tools/build-ffmpeg.sh
-          sparse-checkout-cone-mode: false
-
-      # The LGPL source of the FFmpeg linked into every archive, at the version build-ffmpeg.sh pins.
-      - name: Attach FFmpeg's source
-        run: |
-          set -eu
-          script=source/smstrikers-port/tools/build-ffmpeg.sh
-          version=$(sed -n 's/^VERSION=//p' "$script")
-          sha=$(sed -n 's/^WANT_SHA="\([0-9a-f]*\)"$/\1/p' "$script")
-          test -n "$version" && test -n "$sha"
-          curl -fsSL --retry 3 -o "artifacts/ffmpeg-$version.tar.xz" "https://ffmpeg.org/releases/ffmpeg-$version.tar.xz"
-          echo "$sha  artifacts/ffmpeg-$version.tar.xz" | sha256sum -c -
-
       - name: Verify archives and write checksums
         working-directory: artifacts
         run: |
@@ -304,7 +259,7 @@ jobs:
           for archive in strikers-macos-arm64.tar.gz strikers-linux-x86_64.tar.gz strikers-linux-arm64.tar.gz strikers-windows-x86_64.zip strikers-switch.zip; do
             test -s "$archive"
           done
-          sha256sum *.tar.gz *.zip *.tar.xz > SHA256SUMS
+          sha256sum *.tar.gz *.zip > SHA256SUMS
 
       - uses: softprops/action-gh-release@v3
         with:
@@ -327,7 +282,5 @@ jobs:
             from the album.
             Linux builds need glibc 2.35 or newer: Ubuntu 22.04, Debian 12,
             Fedora 36, current SteamOS, or anything later.
-            The ffmpeg tarball is the LGPL source of the movie decoder
-            linked into every build.
             Verify downloads against SHA256SUMS. Test the packaged builds
             before publishing this draft.

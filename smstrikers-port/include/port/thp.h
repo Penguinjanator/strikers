@@ -10,8 +10,9 @@
 extern "C" {
 #endif
 
-s32 port_thp_video_decode(const void* frame, u32 size, void* tileY, void* tileU,
-                          void* tileV);
+int port_thp_open(void);
+s32 port_thp_video_decode(const void* frame, void* tileY, void* tileU, void* tileV);
+u32 port_thp_audio_decode(s16* audioBuffer, u8* audioFrame, s32 flag);
 int port_thp_frame_due(float frameRate);
 void port_thp_frame_shown(void);
 

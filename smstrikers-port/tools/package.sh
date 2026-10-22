@@ -111,8 +111,8 @@ if [ "$WINDOWS" = "1" ]; then
     fi
 fi
 
-# A macOS build against Homebrew's libavcodec links it by absolute path, which the audit below
-# refuses; this copies the closure beside the executable and rewrites the load commands.
+# A macOS build against a Homebrew library links it by absolute path, which the audit below refuses;
+# this copies the closure beside the executable and rewrites the load commands.
 ./tools/bundle-dylibs.sh "$OUT/$(basename "$BIN")" "$OUT"
 
 cp strikers.ini.example "$OUT/"
@@ -144,18 +144,6 @@ LINKED_LICENSES="LICENSE-APACHE-2.0.txt LICENSE-DAWN.txt LICENSE-FMT.txt LICENSE
 for _l in $LINKED_LICENSES; do
     cp "licenses/$_l" "$OUT/"
 done
-
-FFMPEG_SHIPPED=0
-for _lib in "$OUT"/av*.[Dd][Ll][Ll] "$OUT"/libav*.dylib "$OUT"/libav*.so*; do
-    if [ -f "$_lib" ]; then FFMPEG_SHIPPED=1; fi
-done
-if grep -qE '^STRIKERS_FFMPEG_AVCODEC:FILEPATH=.*\.(a|lib)$' "$BUILD/CMakeCache.txt" 2>/dev/null; then
-    FFMPEG_SHIPPED=1
-fi
-if [ "$FFMPEG_SHIPPED" = 1 ]; then
-    cp LICENSE-LGPL-2.1.txt "$OUT/"
-    echo "==> included LICENSE-LGPL-2.1.txt (FFmpeg libraries are in this archive)"
-fi
 
 # The pipeline cache seed is optional: a build without one pays more on its first run.
 if [ -f "$BUILD/initial_pipeline_cache.db" ]; then
@@ -243,9 +231,6 @@ fi
 NEEDED_FILES="$(basename "$BIN") strikers.ini.example $BENCHMARK input-prompts/LICENSE-Kenney.txt
               LICENSE-BSD.TXT LICENSE-CC0.txt LICENSE-GPL-2.0.txt LICENSE-MUSYX.txt
               LICENSE-AURORA.txt LICENSE-BOREALIS.txt $LINKED_LICENSES $QT_LICENSES"
-if [ "$FFMPEG_SHIPPED" = 1 ]; then
-    NEEDED_FILES="$NEEDED_FILES LICENSE-LGPL-2.1.txt"
-fi
 if [ -n "$SETTINGS_ARTEFACT" ]; then
     NEEDED_FILES="$NEEDED_FILES $SETTINGS_ARTEFACT"
 fi

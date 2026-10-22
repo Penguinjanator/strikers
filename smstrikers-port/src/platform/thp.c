@@ -1,4 +1,4 @@
-// THP video: the low-level decoder the SDK provided and the decomp does not.
+// THP movies: pacing, and audio in the port mixer's channel order; Aurora decodes the video.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,11 +9,7 @@
 #include "port/determinism.h"
 #include "port/host.h"
 
-#ifdef STRIKERS_FFMPEG
-#include <libavcodec/avcodec.h>
-#include <libavutil/frame.h>
-#include <libavutil/pixfmt.h>
-#endif
+s32 THPVideoDecode(const void* file, void* tileY, void* tileU, void* tileV, void* work);
 
 u32 OSGetTick(void);
 
@@ -109,283 +105,25 @@ static int port_thp_movies_disabled(void)
     return v != NULL && v[0] != '\0' && v[0] != '0';
 }
 
-#ifdef STRIKERS_FFMPEG
-
-static AVCodecContext* s_vctx;
-static AVPacket* s_pkt;
-static AVFrame* s_frame;
-static unsigned char* s_padded;
-static size_t s_paddedCap;
-static int s_reported;
-
-// GX I8: 8x4 tiles, 32 bytes each, tiles left to right then top to bottom, and within a tile four
-// rows of eight bytes.
-static void tile_i8(unsigned char* dst, const unsigned char* src, int srcStride,
-                    int width, int height)
+int port_thp_open(void)
 {
-    int y, x, yy;
-    for (y = 0; y < height; y += 4)
-    {
-        for (x = 0; x < width; x += 8)
-        {
-            for (yy = 0; yy < 4; yy++, dst += 8)
-            {
-                memcpy(dst, src + (size_t)(y + yy) * (size_t)srcStride + (size_t)x, 8);
-            }
-        }
-    }
-}
-
-// The frame as it sits in the read buffer has no decoder padding after it, and libavcodec's
-// bitstream readers are allowed to read AV_INPUT_BUFFER_PADDING_SIZE bytes past the end of a
-// packet.
-static int copy_padded(const void* frame, size_t size)
-{
-    size_t need = size + AV_INPUT_BUFFER_PADDING_SIZE;
-    if (need > s_paddedCap)
-    {
-        unsigned char* p = (unsigned char*)realloc(s_padded, need);
-        if (p == NULL)
-        {
-            return 0;
-        }
-        s_padded = p;
-        s_paddedCap = need;
-    }
-    memcpy(s_padded, frame, size);
-    memset(s_padded + size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
-    return 1;
-}
-
-static void report_once(const char* what)
-{
-    if (!s_reported)
-    {
-        s_reported = 1;
-        fprintf(stderr, "[port] THP video: %s; the movie will be skipped.\n", what);
-    }
-}
-
-static s32 decode_into(const void* frame, u32 size, void* tileY, void* tileU, void* tileV)
-{
-    const unsigned char* p = (const unsigned char*)frame;
-    int cw, ch;
-    int rc;
-
-    if (s_vctx == NULL || p == NULL)
-    {
-        return -1;
-    }
-
-    // Every THP video record is a whole JPEG. Refusing anything that does not start SOI keeps a
-    // mis-parsed container from being handed to the decoder as if it were a picture.
-    if (p[0] != 0xFF || p[1] != 0xD8)
-    {
-        report_once("frame does not start with a JPEG SOI marker");
-        return -1;
-    }
-
-    if (size == 0)
-    {
-        // No size from the caller (the SDK-shaped entry point): find the end of the JPEG.
-        u32 scan;
-        const u32 cap = 1u << 20;
-        for (scan = 2; scan + 1 < cap; scan++)
-        {
-            if (p[scan] == 0xFF && p[scan + 1] == 0xD9)
-            {
-                size = scan + 2;
-                break;
-            }
-        }
-        if (size == 0)
-        {
-            report_once("no JPEG EOI within 1 MB of the frame");
-            return -1;
-        }
-    }
-
-    if (!copy_padded(frame, size))
-    {
-        return -1;
-    }
-
-    s_pkt->data = s_padded;
-    s_pkt->size = (int)size;
-    rc = avcodec_send_packet(s_vctx, s_pkt);
-    s_pkt->data = NULL;
-    s_pkt->size = 0;
-    if (rc < 0)
-    {
-        report_once("libavcodec rejected the frame");
-        return -1;
-    }
-
-    rc = avcodec_receive_frame(s_vctx, s_frame);
-    if (rc < 0)
-    {
-        report_once("libavcodec produced no picture for the frame");
-        return -1;
-    }
-
-    if (s_frame->format != AV_PIX_FMT_YUVJ420P && s_frame->format != AV_PIX_FMT_YUV420P)
-    {
-        report_once("decoded frame is not 4:2:0 planar");
-        av_frame_unref(s_frame);
-        return -1;
-    }
-
-    // GCTextureSize computes an I8 texture as width*height with no rounding, so the destinations
-    // are exactly that big: a plane whose width is not a multiple of 8 or whose height is not a
-    // multiple of 4 would be written past its end.
-    cw = (s_frame->width + 1) / 2;
-    ch = (s_frame->height + 1) / 2;
-    if ((s_frame->width & 7) || (s_frame->height & 3) || (cw & 7) || (ch & 3))
-    {
-        report_once("frame size does not tile into GX I8 8x4 blocks");
-        av_frame_unref(s_frame);
-        return -1;
-    }
-
-    if (tileY != NULL)
-    {
-        tile_i8((unsigned char*)tileY, s_frame->data[0], s_frame->linesize[0],
-                s_frame->width, s_frame->height);
-    }
-    if (tileU != NULL)
-    {
-        tile_i8((unsigned char*)tileU, s_frame->data[1], s_frame->linesize[1], cw, ch);
-    }
-    if (tileV != NULL)
-    {
-        tile_i8((unsigned char*)tileV, s_frame->data[2], s_frame->linesize[2], cw, ch);
-    }
-
-    av_frame_unref(s_frame);
-    return 0;
-}
-
-BOOL THPInit(void)
-{
-    const AVCodec* codec;
-
     port_thp_pace_reset();
-
-    if (port_thp_movies_disabled())
-    {
-        return FALSE;
-    }
-
-    if (s_vctx != NULL)
-    {
-        // One decoder for the process. THP frames are all intra, so nothing carries over between
-        // movies, but the reference frame the decoder holds does; flush it so a new movie starts
-        // from nothing.
-        avcodec_flush_buffers(s_vctx);
-        s_reported = 0;
-        return TRUE;
-    }
-
-    codec = avcodec_find_decoder(AV_CODEC_ID_THP);
-    if (codec == NULL)
-    {
-        fprintf(stderr, "[port] THP video: this libavcodec has no `thp` decoder; "
-                        "movies are skipped.\n");
-        return FALSE;
-    }
-
-    s_vctx = avcodec_alloc_context3(codec);
-    s_pkt = av_packet_alloc();
-    s_frame = av_frame_alloc();
-    if (s_vctx == NULL || s_pkt == NULL || s_frame == NULL)
-    {
-        fprintf(stderr, "[port] THP video: out of memory opening the decoder.\n");
-        return FALSE;
-    }
-
-    // One thread on purpose: THPSimple's contract is one picture per call, and a frame-threaded
-    // decoder answers the first sends with "not yet", which this file cannot tell from a failed
-    // frame.
-    s_vctx->thread_count = 1;
-
-    if (avcodec_open2(s_vctx, codec, NULL) < 0)
-    {
-        fprintf(stderr, "[port] THP video: avcodec_open2 failed; movies are skipped.\n");
-        avcodec_free_context(&s_vctx);
-        return FALSE;
-    }
-
-    s_reported = 0;
-    return TRUE;
+    return !port_thp_movies_disabled();
 }
 
-// The size-carrying entry point. THPSimple knows the component's length from the frame record it
-// just parsed, and passing it is strictly better than having this file scan for the end of the JPEG
-// in a buffer whose bounds it cannot see.
-s32 port_thp_video_decode(const void* frame, u32 size, void* tileY, void* tileU, void* tileV)
+s32 port_thp_video_decode(const void* frame, void* tileY, void* tileU, void* tileV)
 {
-    return decode_into(frame, size, tileY, tileU, tileV);
-}
+    static int reported;
+    s32 rc;
 
-// The SDK's shape, kept because dolphin/thp/THPVideoDecode.h declares it.
-s32 THPVideoDecode(void* file, void* tileY, void* tileU, void* tileV, void* work)
-{
-    (void)work;
-    return decode_into(file, 0, tileY, tileU, tileV);
-}
-
-#else // !STRIKERS_FFMPEG
-
-// Built without ffmpeg. Reporting failure is deliberate rather than lazy: src/Game/Sys/movie.cpp
-// already handles a movie that will not open, so a truthful "no decoder" answer makes the game skip
-// its movies and carry on.
-
-static void port_thp_report_once(void)
-{
-    static int reported = 0;
-    if (!reported)
+    rc = THPVideoDecode(frame, tileY, tileU, tileV, NULL);
+    if (rc != 0 && !reported)
     {
         reported = 1;
-        fprintf(stderr,
-                "[port] THP video decoding was not built in (no ffmpeg); movies "
-                "are skipped. See src/platform/thp.c.\n");
+        fprintf(stderr, "[port] THP video: decoder error %d; the movie will be skipped.\n", (int)rc);
     }
+    return rc == 0 ? 0 : -1;
 }
-
-BOOL THPInit(void)
-{
-    port_thp_pace_reset();
-    if (!port_thp_movies_disabled())
-    {
-        // Nothing to complain about when they were switched off on purpose.
-        port_thp_report_once();
-    }
-    return FALSE;
-}
-
-s32 port_thp_video_decode(const void* frame, u32 size, void* tileY, void* tileU, void* tileV)
-{
-    (void)frame;
-    (void)size;
-    (void)tileY;
-    (void)tileU;
-    (void)tileV;
-    port_thp_report_once();
-    return -1;
-}
-
-s32 THPVideoDecode(void* file, void* tileY, void* tileU, void* tileV, void* work)
-{
-    (void)file;
-    (void)tileY;
-    (void)tileU;
-    (void)tileV;
-    (void)work;
-    port_thp_report_once();
-    return -1;
-}
-
-#endif // STRIKERS_FFMPEG
 
 // Audio: Nintendo DSP-ADPCM, two channels, one record per video frame.
 
@@ -458,7 +196,7 @@ static void decode_adpcm_channel(s16* dst, int step, const u8* nibbles,
     }
 }
 
-u32 THPAudioDecode(s16* audioBuffer, u8* audioFrame, s32 flag)
+u32 port_thp_audio_decode(s16* audioBuffer, u8* audioFrame, s32 flag)
 {
     u32 offsetNextChannel;
     u32 sampleSize;

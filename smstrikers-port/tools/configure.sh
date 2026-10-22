@@ -23,13 +23,14 @@ if [ -z "${CMAKE_TOOLCHAIN_FILE:-}" ]; then
     esac
 fi
 
-# Hermetic dependencies, and this is the whole of why: Aurora asks find_package for libpng,
-# Freetype, zstd, SQLite3, abseil and fmt before it builds its own, and a CI runner has Homebrew, so
-# it found them and linked them by absolute path.
+# Hermetic dependencies, and this is the whole of why: Aurora asks find_package and then pkg-config
+# for libpng, Freetype, zstd, SQLite3, abseil and fmt before it builds its own, and a CI runner has
+# Homebrew, so it found them and linked them by absolute path.
 set -- -S . -B "$BUILD" -G "$GENERATOR" \
     -DCMAKE_BUILD_TYPE="$TYPE" \
     -DSTRIKERS_AURORA=ON \
     -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON \
     -DCMAKE_DISABLE_FIND_PACKAGE_PNG=ON \
     -DCMAKE_DISABLE_FIND_PACKAGE_Freetype=ON \
     -DCMAKE_DISABLE_FIND_PACKAGE_zstd=ON \

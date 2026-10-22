@@ -139,7 +139,7 @@ Linux)
             echo "    BAD   $line"; BAD=1 ;;
         *"${HOME:-/nonexistent}"*|*/usr/local/*|*/opt/*|*linuxbrew*|*build-aur*)
             echo "    BAD   $line"; BAD=1 ;;
-        *libzstd*|*libpng*|*libfreetype*|*libsqlite3*|*libavcodec*|*libavutil*)
+        *libzstd*|*libpng*|*libfreetype*|*libsqlite3*)
             # Rejected wherever they live when the executable links them itself; libz is a system
             # copy by design.
             if grep -Fxq "$(printf '%s' "$line" | awk '{print $1}')" "$NEEDED"; then
@@ -228,7 +228,7 @@ $SEARCH
 EOF
 
     # An exported static library interposes on a driver's own copy; _Z is expected with a shared libstdc++.
-    PREFIXES='SDL_|png_|FT_|sqlite3_|av_|avcodec_|ff_|inflate|deflate|ZSTD_'
+    PREFIXES='SDL_|png_|FT_|sqlite3_|inflate|deflate|ZSTD_'
     if [ "$SHARED_CXX" = 0 ]; then PREFIXES="$PREFIXES|_Z"; fi
     EXPORTS=$(readelf --dyn-syms -W "$BIN" 2>/dev/null |
         awk '$7 != "UND" && ($5 == "GLOBAL" || $5 == "WEAK") { print $8 }' |

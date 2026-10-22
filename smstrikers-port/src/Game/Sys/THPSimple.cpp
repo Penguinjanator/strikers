@@ -228,7 +228,8 @@ extern "C" int THPSimpleInit(long audioSystem)
     memset(&SimpleControl, 0, sizeof(SimpleControl));
     LCEnable();
 
-    if (!THPInit())
+    // PORT: the movies-off switches and the pacing reset, ahead of Aurora's THPInit.
+    if (!port_thp_open() || !THPInit())
     {
         return 0;
     }
@@ -679,10 +680,9 @@ extern "C" int THPSimpleLoadStop()
     return 0;
 }
 
-// PORT: the port's decoder takes the component's length, see the rewrite in tools/vendor.py.
-static inline int VideoDecode(unsigned char* videoFrame, u32 videoSize)
+static inline int VideoDecode(unsigned char* videoFrame)
 {
-    long ret = port_thp_video_decode(videoFrame, videoSize,
+    long ret = port_thp_video_decode(videoFrame,
         ((THPSimpleControlWork*)&SimpleControl)->textureSet.mYTexture,
         ((THPSimpleControlWork*)&SimpleControl)->textureSet.mUTexture,
         ((THPSimpleControlWork*)&SimpleControl)->textureSet.mVTexture);
@@ -741,13 +741,14 @@ extern "C" long THPSimpleDecode(long audioTrack)
                     switch (((THPSimpleControlWork*)&SimpleControl)->compInfo.mFrameComp[i])
                     {
                     case 0:
-                        if (!VideoDecode(ptr, port_be32(compSizePtr)))
+                        if (!VideoDecode(ptr))
                         {
                             return 1;
                         }
                         break;
                     case 1:
-                        sample = THPAudioDecode(
+                        // PORT: left first, as the port's mixer interleaves; the SDK's decoder puts right first.
+                        sample = port_thp_audio_decode(
                             ((THPSimpleControlWork*)&SimpleControl)->audioBuffer[((THPSimpleControlWork*)&SimpleControl)->audioDecodeIndex].mBuffer,
                             ptr + port_be32(compSizePtr) * audioTrack,
                             0);
@@ -777,7 +778,7 @@ extern "C" long THPSimpleDecode(long audioTrack)
                 switch (((THPSimpleControlWork*)&SimpleControl)->compInfo.mFrameComp[i])
                 {
                 case 0:
-                    if (!VideoDecode(ptr, port_be32(compSizePtr)))
+                    if (!VideoDecode(ptr))
                     {
                         OSReport("[port] movie: video frame %u failed to decode; ending\n",
                                  (unsigned)((THPSimpleControlWork*)&SimpleControl)->totalReadFrame);

@@ -55,7 +55,7 @@ SDK = re.compile(
     rf"^{UNDERSCORE}(?:"
     r"GX[A-Z]|PAD[A-Z]|DVD[A-Z]|CARD[A-Z]|"          # Aurora
     r"snd[A-Z]|SND[A-Z]|mus[A-Z]|sal[A-Z]|"          # MusyX
-    r"THP[A-Z]|"                                     # FFmpeg-backed
+    r"THP[A-Z]|"                                     # Aurora
     r"DSP[A-Z]|AX[A-Z]|MIX[A-Z]|SYN[A-Z]|SEQ[A-Z]|"  # audio hardware
     r"EXI[A-Z]|SI[A-Z]|GD[A-Z]|DB[A-Z]"              # misc console hardware
     r")")
