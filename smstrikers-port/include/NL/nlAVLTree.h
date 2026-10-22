@@ -208,7 +208,8 @@ template <typename KeyType, typename ValueType, typename AllocatorType, typename
 inline ValueType* AVLTreeBase<KeyType, ValueType, AllocatorType, CompareType>::FindGet(
     const KeyType& key) const
 {
-    ValueType* foundValue;
+    // PORT: never set when the key is missing; the console returned whatever the register held.
+    ValueType* foundValue = nullptr;
     AVLTreeEntry<KeyType, ValueType>* node = m_Root;
 
     while (node != nullptr)
