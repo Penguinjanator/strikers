@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
+#include <atomic>
 
 // salPortNextBuffer() returns the ring slot the DAC would be playing and advances MusyX by one 5 ms
 // tick.
@@ -33,14 +34,16 @@ constexpr int kTargetBuffers = 6;
 constexpr int kMaxBuffersPerUpdate = 24;
 
 SDL_AudioStream* s_stream = nullptr;
-// Bytes the device pulls at once, queued in addition to kTargetBuffers.
+// Bytes the device pulls at once, queued in addition to kTargetBuffers: SDL pads a short pull with
+// silence, and just after a pull the queue holds only what is left of the target.
 int s_pullBytes = 0;
 bool s_ownsSubsystem = false;
 bool s_failed = false;
 int s_logging = -1;
 
 unsigned long s_buffers = 0;      // ticks handed to the device
-unsigned long s_underruns = 0;    // updates that found the queue already empty
+// Pulls the queue could not fill, counted on SDL's audio thread.
+std::atomic<unsigned long> s_underruns{ 0 };
 bool s_everNonSilent = false;
 bool s_reported = false;
 
@@ -68,12 +71,20 @@ void report() {
         return;
     s_reported = true;
     const unsigned int frames = salPortBufferBytes() / (kChannels * sizeof(int16_t));
-    std::fprintf(stderr,
-                 "[port] audio: %lu ticks (%.1f s of output), %lu underruns, %s\n",
+    std::fprintf(stderr, "[port] audio: %lu ticks (%.1f s of output), %lu underruns, %s\n",
                  s_buffers, (double)s_buffers * (double)frames / (double)kSampleRate,
-                 s_underruns,
+                 s_underruns.load(),
                  s_everNonSilent ? "output was non-silent" : "output was silent throughout");
 }
+
+#if !defined(SDL3ON2_SDL_H_)
+// Runs on SDL's audio thread under the stream's lock; a non-zero shortfall is padded with silence.
+void SDLCALL on_pull(void*, SDL_AudioStream*, int additional, int)
+{
+    if (additional > 0)
+        ++s_underruns;
+}
+#endif
 
 } // namespace
 
@@ -106,8 +117,6 @@ int PortAudioStart(void) {
         return 0;
     }
 
-#if defined(__SWITCH__)
-    // Switch's SDL2 takes a whole device buffer per pull and pads any shortfall with silence.
     {
         SDL_AudioSpec dev;
         int frames = 0;
@@ -117,7 +126,6 @@ int PortAudioStart(void) {
             s_pullBytes = static_cast<int>(static_cast<long long>(frames) * kSampleRate / dev.freq)
                           * kChannels * static_cast<int>(sizeof(int16_t));
     }
-#endif
 
     SDL_ResumeAudioStreamDevice(s_stream);
     // atexit, not PortAudioStop: salExitAi is reached only if the game shuts MusyX down, and it
@@ -192,8 +200,11 @@ void PortAudioUpdate(void) {
     if (queued < 0)
         return;
 
+#if defined(SDL3ON2_SDL_H_)
+    // sdl3on2 has no get callback; an update that finds nothing queued is the nearest it can tell.
     if (queued == 0 && s_buffers != 0)
         ++s_underruns;
+#endif
 
     const int target = static_cast<int>(bufBytes) * kTargetBuffers + s_pullBytes;
     int want = (target - queued + static_cast<int>(bufBytes) - 1) / static_cast<int>(bufBytes);
@@ -226,6 +237,11 @@ void PortAudioUpdate(void) {
 
         if (!SDL_PutAudioStreamData(s_stream, pcm, static_cast<int>(bufBytes)))
             break;
+#if !defined(SDL3ON2_SDL_H_)
+        // From the first tick, so the pulls made while the game is still booting are not counted.
+        if (s_buffers == 0)
+            SDL_SetAudioStreamGetCallback(s_stream, on_pull, nullptr);
+#endif
         ++s_buffers;
     }
 }
@@ -234,7 +250,7 @@ void PortAudioStats(unsigned long* outBuffers, unsigned long* outUnderruns, int*
     if (outBuffers != nullptr)
         *outBuffers = s_buffers;
     if (outUnderruns != nullptr)
-        *outUnderruns = s_underruns;
+        *outUnderruns = s_underruns.load();
     if (outEverNonSilent != nullptr)
         *outEverNonSilent = s_everNonSilent ? 1 : 0;
 }

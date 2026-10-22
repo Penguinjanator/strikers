@@ -1,3 +1,4 @@
+#include "port/prompts.h"
 #include "Game/FE/feRender.h"
 #include "NL/glx/glxTexture.h"   // PORT: glx_GetTex
 #include <stdlib.h>              // PORT: getenv, for the probes
@@ -307,6 +308,9 @@ unsigned char FERender::RenderImageInstance(const TLImageInstance* pTLImageInsta
     textureHandle = pTexRes->GetTextureHandle();
     if (!textureHandle)
         return 1;
+    // PORT: the choose-sides pads share one texture; each may show the controller on its port.
+    if (uintptr_t padTexture = PortPromptsPadTexture(pTLImageInstance))
+        textureHandle = padTexture;
 
     nlMatrix4 matTM;
     m_pMatrixStack->GetTop(matTM);

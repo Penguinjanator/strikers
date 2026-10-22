@@ -336,19 +336,16 @@ static void CheckResults()
     {
         sceneType = GetSceneType();
 
+        // PORT: one save file, and the player already chose Save or Load; no overwrite question.
         if (sceneType == SaveLoadScene::ST_ASK_SAVE)
         {
-            FEPopupMenu* pPopup = (FEPopupMenu*)nlSingleton<GameSceneManager>::Instance()->Push(SCENE_POPUP_MENU, SCREEN_NOTHING, false);
-
-            pPopup->Create(POPUP_MEMCARD_ASK_SAVE_OVERWRITE, ContinueWithoutSavingCB, OverwriteFileAndContinueCB);
+            OverwriteFileAndContinueCB();
             return;
         }
 
         if (sceneType == SaveLoadScene::ST_ASK_LOAD)
         {
-            FEPopupMenu* pPopup = (FEPopupMenu*)nlSingleton<GameSceneManager>::Instance()->Push(SCENE_POPUP_MENU, SCREEN_NOTHING, false);
-
-            pPopup->Create(POPUP_MEMCARD_ASK_LOAD_OVERWRITE, ContinueWithoutLoadingCB, ContinueLoadingCB);
+            ContinueLoadingCB();
             return;
         }
 
@@ -391,16 +388,9 @@ static void CheckResults()
             }
         }
 
-        if (SaveLoadScene::mInstance->mSaveLoadMode == SaveLoadScene::SLM_AT_BOOT)
-        {
-            pPopup->Create(POPUP_NOT_ENOUGH_SPACE_CANMANAGE, RetryCB, ContinueWithoutSavingCB, ManageMemCardCB);
-            return;
-        }
-        else
-        {
-            pPopup->Create(POPUP_NOT_ENOUGH_SPACE, RetryCB, ContinueWithoutSavingCB);
-            return;
-        }
+        // PORT: the boot variant's MANAGE MEMORY CARD resets to the IPL, which here quits the game.
+        pPopup->Create(POPUP_NOT_ENOUGH_SPACE, RetryCB, ContinueWithoutSavingCB);
+        return;
     }
 
     case -2:
@@ -458,7 +448,7 @@ static void CheckResults()
             return;
         }
 
-        if (sceneType == SaveLoadScene::ST_ASK_SAVE || sceneType == SaveLoadScene::ST_ASK_LOAD)
+        if (sceneType == SaveLoadScene::ST_ASK_LOAD)
         {
             SaveLoad::RememberCurrentMemCardSerialID(0);
             FEPopupMenu* pPopup = (FEPopupMenu*)nlSingleton<GameSceneManager>::Instance()->Push(SCENE_POPUP_MENU, SCREEN_NOTHING, false);
@@ -467,7 +457,7 @@ static void CheckResults()
             return;
         }
 
-        if (sceneType == SaveLoadScene::ST_SHOULD_LOAD_OR_SAVE)
+        if (sceneType == SaveLoadScene::ST_SHOULD_LOAD_OR_SAVE || sceneType == SaveLoadScene::ST_ASK_SAVE)
         {
             if (!SaveLoad::HasEnoughFreeSpace(0))
             {
@@ -476,10 +466,10 @@ static void CheckResults()
                 return;
             }
 
+            // PORT: create the file and save, without the create-file question or autosave notice.
             SaveLoad::RememberCurrentMemCardSerialID(0);
-            FEPopupMenu* pPopup = (FEPopupMenu*)nlSingleton<GameSceneManager>::Instance()->Push(SCENE_POPUP_MENU, SCREEN_NOTHING, false);
-
-            pPopup->Create(POPUP_MEMCARD_ASK_SAVE_NO_FILE, CreateFileAndSaveCB, ContinueWithoutSavingCB);
+            gSceneTypeStackDepth = 0;
+            PushSceneType(SaveLoadScene::ST_SAVE);
             return;
         }
 
@@ -717,13 +707,18 @@ void SaveLoadScene::UpdateText()
         SaveLoadScene::eSaveLoad prevOp = GetSceneType();
         switch ((unsigned)prevOp)
         {
+        // PORT: PLEASE WAIT and LOADING, which every language's table carries, in place of the Memory Card and POWER Button warnings.
         case SaveLoadScene::ST_SAVE:
         case SaveLoadScene::ST_GAMESAVEIDTEST:
-            text->m_LocStrId = 0xCF941DC9;
+        case SaveLoadScene::ST_ASK_SAVE:
+        case SaveLoadScene::ST_ASK_LOAD:
+        case SaveLoadScene::ST_CHECKING:
+        case SaveLoadScene::ST_SHOULD_LOAD_OR_SAVE:
+            text->m_LocStrId = 0xDD17BD6D;
             text->m_OverloadFlags |= 0x8;
             break;
         case SaveLoadScene::ST_LOAD:
-            text->m_LocStrId = 0xFAA420FA;
+            text->m_LocStrId = 0x9750565D;
             text->m_OverloadFlags |= 0x8;
             break;
         case SaveLoadScene::ST_FORMAT:
@@ -733,13 +728,6 @@ void SaveLoadScene::UpdateText()
             break;
         case SaveLoadScene::ST_DELETE:
             text->m_LocStrId = 0x1A7FDB2D;
-            text->m_OverloadFlags |= 0x8;
-            break;
-        case SaveLoadScene::ST_ASK_SAVE:
-        case SaveLoadScene::ST_ASK_LOAD:
-        case SaveLoadScene::ST_CHECKING:
-        case SaveLoadScene::ST_SHOULD_LOAD_OR_SAVE:
-            text->m_LocStrId = 0xE8E70E54;
             text->m_OverloadFlags |= 0x8;
             break;
         case SaveLoadScene::ST_ABOUT_AUTOSAVE:
@@ -913,7 +901,7 @@ void SaveLoadScene::Update(float fDeltaT)
         }
         else
         {
-            minTime = 1.75f;
+            minTime = 0.0f;   // PORT: the console held 1.75 s so its do-not-touch warning could be read
         }
         if (gSceneTime <= minTime)
         {

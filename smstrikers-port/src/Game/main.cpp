@@ -863,6 +863,8 @@ int main(int argc, char* argv[])
 
         PortTexturesInit(info.userPath); // PORT: texture packs
 
+        // PORT: after aurora_initialize, since PADInit registers with Aurora's input router.
+        PADInit();
         // Aurora's PAD reads SDL gamepads and reports PAD_ERR_NO_CONTROLLER when there is neither a gamepad nor a keyboard binding.
         PortInstallKeyboardBindings();
 

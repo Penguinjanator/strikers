@@ -131,7 +131,10 @@ void nlInitMemory()
         VMAlloc(0x7E000000, 0x900000);
         DVDInit();
         VIInit();
+#if !defined(PORT_USE_AURORA)
+        // PORT: the first nlMalloc runs in a static constructor, before Aurora's input router exists; main calls PADInit instead.
         PADInit();
+#endif
 
         void* arenaLo = OSGetArenaLo();
         void* arenaHi = OSGetArenaHi();

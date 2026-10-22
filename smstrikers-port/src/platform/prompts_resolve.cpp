@@ -255,7 +255,7 @@ Image trim(const Image& image)
     return out;
 }
 
-static void scale(const Image& src, unsigned w, unsigned h, uint8_t* out)
+void scale(const Image& src, unsigned w, unsigned h, uint8_t* out)
 {
     const double sw = src.width, sh = src.height;
     for (unsigned y = 0; y < h; ++y)

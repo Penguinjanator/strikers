@@ -614,6 +614,9 @@ if(NX)
     # Only Switch prompt glyphs; no other controller family appears on the console.
     file(GLOB _strikers_nx_prompts CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/input-prompts/kenney/Nintendo Switch/*.png"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/input-prompts/controllers/joycon_*.png"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/input-prompts/controllers/switchpro.png"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/input-prompts/controllers/LICENSE-AL2009man.txt"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/input-prompts/LICENSE-Kenney.txt")
     set(_strikers_nx_romfs_files "")
     if(_strikers_nx_dawn_seed)

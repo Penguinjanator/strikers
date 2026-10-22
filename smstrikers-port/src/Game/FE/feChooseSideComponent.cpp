@@ -1,3 +1,4 @@
+#include "port/prompts.h"
 #include "Game/FE/feChooseSideComponent.h"
 #include "Game/FE/feFinder.h"
 #include "Game/FE/tlComponentInstance.h"
@@ -30,6 +31,8 @@ IChooseSide::IChooseSide()
  */
 IChooseSide::~IChooseSide()
 {
+    const void* none[4] = {};
+    PortPromptsPadInstances(none); // PORT: the scene frees the instances with it
 }
 
 /**
@@ -273,6 +276,17 @@ void IChooseSide::CheckControllers(int disabledSide)
  */
 void IChooseSide::ResetAndPositionControllers(bool reset)
 {
+    // PORT: picture each pad as the controller on its port; both scenes bind before calling this.
+    const void* pads[4];
+    for (int i = 0; i < 4; i++)
+    {
+        pads[i] = mInstanceTable[i] == NULL
+                    ? NULL
+                    : FEFinder<TLInstance, 3>::Find<TLInstance>(
+                          mInstanceTable[i], InlineHasher(nlStringLowerHash("controller")));
+    }
+    PortPromptsPadInstances(pads);
+
     for (int i = 0; i < 4; i++)
     {
         SetReady(i, false);

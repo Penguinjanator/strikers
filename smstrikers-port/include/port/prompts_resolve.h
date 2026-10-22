@@ -137,6 +137,9 @@ void c8Tile(const uint8_t* rows, unsigned w, unsigned h, uint8_t* out);
 
 Image trim(const Image& image);
 
+// Area-weighted, alpha-premultiplied resample into w * h RGBA.
+void scale(const Image& src, unsigned w, unsigned h, uint8_t* out);
+
 Image place(const Image& art, Family family, const char* token, Form form);
 
 uint16_t rgb5a3(const uint8_t* rgba);

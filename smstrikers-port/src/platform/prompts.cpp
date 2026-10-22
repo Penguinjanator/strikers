@@ -14,6 +14,8 @@ extern "C" void PortPromptsLegendsLoaded() {}
 extern "C" void PortPromptsLegendReloaded(unsigned long) {}
 extern "C" void PortPromptsLegendsUnloading() {}
 extern "C" int PortPromptsSetFamily(const char*) { return 0; }
+extern "C" void PortPromptsPadInstances(const void* const*) {}
+extern "C" uintptr_t PortPromptsPadTexture(const void*) { return 0; }
 
 #else
 
@@ -26,20 +28,23 @@ extern "C" int PortPromptsSetFamily(const char*) { return 0; }
 #include "prompt_art.h"
 
 #include "NL/nlFont.h"
+#include "NL/nlMemory.h"
 #include "NL/nlString.h"
 #include "NL/glx/glxTexture.h"
-#include "NL/gl/glTexture.h"
 #include "NL/gl/gl.h"
 
 #include <SDL3/SDL.h>
+#include <aurora/aurora.h>
 #include <dolphin/pad.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <algorithm>
 #include <array>
 #include <map>
+#include <new>
 #include <set>
 #include <string>
 #include <vector>
@@ -68,7 +73,6 @@ struct FontState
 
 std::vector<FontState> s_fonts;
 bool s_loaded[kLegendCount] = {};
-bool s_legendsDirty;
 std::array<unsigned char, 1568> s_originals[kLegendCount];
 Icon s_icons[Count] = {};
 bool s_initialized = false;
@@ -83,6 +87,14 @@ std::set<std::string> s_missingIcons;
 bool s_disabledWarning;
 
 std::string s_artDir;
+
+// The choose-sides controller images are 64x64 texels over 64 of the 480 frame lines.
+const unsigned kPadLines = 64;
+
+const void* s_padInstances[4];
+std::map<std::string, Image> s_padArt;
+// Never rewritten or freed: a queued draw may still read one after the window is resized.
+std::map<std::string, PlatTexture*> s_padTextures;
 
 std::map<std::string, Image> s_art;
 std::map<std::string, Image> s_cells;
@@ -370,35 +382,75 @@ void textureHeader(unsigned char* blob)
     be32(blob + 20, 256);
 }
 
+// Queued draws read a legend's bytes later on Aurora's thread, so a kept blob is never rewritten.
+const unsigned char* keepBlob(const unsigned char* blob)
+{
+    static std::map<std::string, unsigned char*> kept;
+    unsigned char*& slot = kept[std::string(reinterpret_cast<const char*>(blob), 1568)];
+    if (!slot)
+    {
+        slot = static_cast<unsigned char*>(nlMalloc(1568, 32, false));
+        memcpy(slot, blob, 1568);
+    }
+    return slot;
+}
+
+void pointLegend(PlatTexture* tex, const unsigned char* blob)
+{
+    blob = keepBlob(blob);
+    tex->m_SwizzledData = const_cast<unsigned char*>(blob + 32);
+    tex->m_PaletteData = reinterpret_cast<u16*>(const_cast<unsigned char*>(blob + 1056));
+    tex->Prepare();
+    PortTextureDumpSkip(1);
+    PortTextureCreated(&tex->m_TexObj, &tex->m_TlutObj);
+    PortTextureDumpSkip(0);
+}
+
+void paintLegend(int c)
+{
+    PlatTexture* tex = glx_GetTex(kLegends[c], false, false);
+    if (!s_loaded[c] || !tex)
+        return;
+    int original = originalLegend(s_icons[kLegendControls[c]], s_loaded, c);
+    if (original >= 0)
+    {
+        pointLegend(tex, s_originals[original].data());
+        return;
+    }
+    const Image* icon = compose(s_icons[kLegendControls[c]], Menu);
+    if (!icon)
+    {
+        pointLegend(tex, s_originals[c].data());
+        return;
+    }
+    unsigned char blob[1568], rows[1024];
+    uint16_t palette[256];
+    textureHeader(blob);
+    quantizeCI8(icon->rgba.data(), 1024, rows, palette);
+    c8Tile(rows, 32, 32, blob + 32);
+    for (int i = 0; i < 256; ++i)
+        be16(blob + 1056 + i * 2, palette[i]);
+    pointLegend(tex, blob);
+}
+
 void paintLegends()
 {
-    PortTextureDumpSkip(1);
     for (int c = 0; c < kLegendCount; ++c)
-    {
-        if (!s_loaded[c] || !glx_GetTex(kLegends[c], false, false))
-            continue;
-        int original = originalLegend(s_icons[kLegendControls[c]], s_loaded, c);
-        if (original >= 0)
-        {
-            glTextureReplace(kLegends[c], s_originals[original].data(), 1568);
-            continue;
-        }
-        const Image* icon = compose(s_icons[kLegendControls[c]], Menu);
-        if (!icon)
-        {
-            glTextureReplace(kLegends[c], s_originals[c].data(), 1568);
-            continue;
-        }
-        unsigned char blob[1568], rows[1024];
-        uint16_t palette[256];
-        textureHeader(blob);
-        quantizeCI8(icon->rgba.data(), 1024, rows, palette);
-        c8Tile(rows, 32, 32, blob + 32);
-        for (int i = 0; i < 256; ++i)
-            be16(blob + 1056 + i * 2, palette[i]);
-        glTextureReplace(kLegends[c], blob, sizeof blob);
-    }
-    PortTextureDumpSkip(0);
+        paintLegend(c);
+}
+
+// Keeps the disc's art for a freshly loaded legend, so a family with no art of its own restores it.
+bool captureLegend(int c)
+{
+    auto* tex = glx_GetTex(kLegends[c], false, false);
+    if (!tex || tex->m_Format != GXTex_CI8 || tex->m_Width != 32 || tex->m_Height != 32 ||
+        tex->m_Levels != 1 || tex->m_nPaletteEntries != 256)
+        return false;
+    textureHeader(s_originals[c].data());
+    memcpy(s_originals[c].data() + 32, tex->m_SwizzledData, 1024);
+    memcpy(s_originals[c].data() + 1056, tex->m_PaletteData, 512);
+    s_loaded[c] = true;
+    return true;
 }
 
 void update()
@@ -622,11 +674,6 @@ extern "C" const unsigned char* PortPromptsMenuImage(unsigned button, unsigned* 
 
 extern "C" void PortPromptsFrame()
 {
-    if (s_legendsDirty)
-    {
-        s_legendsDirty = false;
-        PortPromptsLegendsLoaded();
-    }
     for (const auto& font : s_fonts)
     {
         if (glx_GetTex(font.hash, false, false) != font.page)
@@ -688,14 +735,16 @@ extern "C" void PortPromptsFontUnloading(nlFont* font)
         }
 }
 
-// Repaint replaced legends before the next frame, outside any active render encoder.
+// Called as the disc's legend is added, so it is replaced before anything draws it.
 extern "C" void PortPromptsLegendReloaded(unsigned long hash)
 {
     for (int i = 0; i < kLegendCount; ++i)
         if (kLegends[i] == hash)
         {
             s_loaded[i] = false;
-            s_legendsDirty = true;
+            update();
+            if (captureLegend(i))
+                paintLegend(i);
         }
 }
 
@@ -709,20 +758,115 @@ extern "C" void PortPromptsLegendsLoaded()
 {
     update();
     for (int i = 0; i < kLegendCount; ++i)
-    {
-        auto* tex = glx_GetTex(kLegends[i], false, false);
-        if (!tex || tex->m_Format != GXTex_CI8 || tex->m_Width != 32 || tex->m_Height != 32 ||
-            tex->m_Levels != 1 || tex->m_nPaletteEntries != 256)
-            continue;
-        if (s_loaded[i])
-            continue;
-        textureHeader(s_originals[i].data());
-        memcpy(s_originals[i].data() + 32, tex->m_SwizzledData, 1024);
-        memcpy(s_originals[i].data() + 1056, tex->m_PaletteData, 512);
-        s_loaded[i] = true;
-    }
-    glFinish();
+        if (!s_loaded[i])
+            captureLegend(i);
     paintLegends();
+}
+
+namespace
+{
+
+// The art for the pad on one port, or nullptr for the disc's GameCube pad.
+const char* padFile(int port)
+{
+    Family family = s_override;
+    if (family == Auto)
+    {
+        if (!padForPort(port))
+            return nullptr;
+        family = padFamily(port);
+    }
+    switch (family)
+    {
+    case Xbox:        return "xbox.png";
+    case Playstation: return "playstation.png";
+    case Steamdeck:   return "steamdeck.png";
+    case Nintendo:
+        switch (s_override == Auto ? PADGetControllerType(port) : PAD_TYPE_SWITCH_PROCON)
+        {
+        case PAD_TYPE_JOYCON_PAIR:  return "joycon_grip.png";
+        case PAD_TYPE_JOYCON_LEFT:  return "joycon_left.png";
+        case PAD_TYPE_JOYCON_RIGHT: return "joycon_right.png";
+        default:                    return "switchpro.png";
+        }
+    default: return nullptr;
+    }
+}
+
+const Image* padArt(const std::string& file)
+{
+    auto found = s_padArt.find(file);
+    if (found == s_padArt.end())
+    {
+        Image image = {};
+        const std::string path = s_artDir + "/controllers/" + file;
+        SDL_Surface* png = SDL_LoadPNG(path.c_str());
+        SDL_Surface* rgba = png ? SDL_ConvertSurface(png, SDL_PIXELFORMAT_RGBA32) : nullptr;
+        if (rgba && SDL_LockSurface(rgba))
+        {
+            image.width = unsigned(rgba->w);
+            image.height = unsigned(rgba->h);
+            image.rgba.resize(size_t(rgba->w) * rgba->h * 4);
+            for (int y = 0; y < rgba->h; ++y)
+                memcpy(&image.rgba[size_t(y) * rgba->w * 4],
+                       static_cast<const unsigned char*>(rgba->pixels) + y * rgba->pitch,
+                       size_t(rgba->w) * 4);
+            SDL_UnlockSurface(rgba);
+        }
+        else
+            fprintf(stderr, "[prompts] %s: %s\n", path.c_str(), SDL_GetError());
+        SDL_DestroySurface(rgba);
+        SDL_DestroySurface(png);
+        found = s_padArt.emplace(file, std::move(image)).first;
+    }
+    return found->second.width ? &found->second : nullptr;
+}
+
+// About one texel per framebuffer pixel, so no mip chain; in steps of 32 so a resize makes few.
+unsigned padSize()
+{
+    const unsigned lines = aurora_window_size().fb_height * kPadLines / 480;
+    return std::max(64u, std::min(1024u, (lines + 31) & ~31u));
+}
+
+PlatTexture* padTexture(const std::string& file, unsigned size)
+{
+    PlatTexture*& texture = s_padTextures[file + "@" + std::to_string(size)];
+    if (!texture)
+    {
+        const Image* art = padArt(file);
+        if (!art)
+            return nullptr;
+        texture = new (nlMalloc(sizeof(PlatTexture), 32, false)) PlatTexture();
+        texture->Create(size, size, GXTex_RGBA8, 1, true, true);
+        scale(*art, size, size, static_cast<uint8_t*>(texture->m_LinearData));
+        texture->Swizzle(true);
+        texture->Prepare();
+    }
+    return texture;
+}
+
+}   // namespace
+
+extern "C" void PortPromptsPadInstances(const void* const* instances)
+{
+    for (int p = 0; p < 4; ++p)
+        s_padInstances[p] = instances[p];
+}
+
+extern "C" uintptr_t PortPromptsPadTexture(const void* instance)
+{
+    if (!instance || s_artDir.empty())
+        return 0;
+    for (int p = 0; p < 4; ++p)
+    {
+        if (s_padInstances[p] != instance)
+            continue;
+        const char* file = padFile(p);
+        // glx_GetTex reads a tagged PlatTexture pointer in the port's region as the texture.
+        return file ? reinterpret_cast<uintptr_t>(padTexture(file, padSize())) : 0;
+    }
+    return 0;
 }
 
 extern "C" void PortPromptsEvent(const SDL_Event* ev)
