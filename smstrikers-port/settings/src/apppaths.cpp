@@ -150,6 +150,14 @@ void AppPaths::keepAppSettings(bool portable)
 
 bool AppPaths::moveToPortable(const QString& from, const QString& root, QString* error)
 {
+    // A game folder inside the one being moved would be carried into its own user/.
+    if (movedPath(root, from) != root)
+    {
+        if (error != nullptr)
+            *error = QDir::toNativeSeparators(root);
+        return false;
+    }
+
     const QDir src(from);
     QStringList files;
     QStringList dirs;

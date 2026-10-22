@@ -665,6 +665,16 @@ static bool PortReadyToQuit()
     }
     if (!SaveLoad::CardBusy())
         return true;
+#if defined(PORT_USE_AURORA) && !defined(__SWITCH__)
+    // PORT: the window stays open while the card finishes, so say why a second close does nothing.
+    static bool s_titled = false;
+    if (!s_titled)
+    {
+        s_titled = true;
+        if (SDL_Window* window = aurora_get_window())
+            SDL_SetWindowTitle(window, "Super Mario Strikers - saving...");
+    }
+#endif
     // PORT: well inside the Switch's 15 s before a locked exit is killed anyway.
     if (port_monotonic_ns() - s_since > 10000000000ull)
     {

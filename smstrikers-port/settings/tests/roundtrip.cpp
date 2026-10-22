@@ -609,8 +609,8 @@ int main(int argc, char** argv)
 
     // 13. The pad defaults are Aurora's PADDeadZones, which the game uses when the keys are unset.
     {
-        const QString header = QFileInfo(example).dir().filePath(
-            QStringLiteral("extern/aurora/lib/input.hpp"));
+        const QString header =
+            QFileInfo(example).dir().filePath(QStringLiteral("extern/aurora/lib/gamepad.hpp"));
         const QString text = QString::fromUtf8(readAll(header));
         check(!text.isEmpty(), QStringLiteral("read %1").arg(header));
         const struct
@@ -681,6 +681,16 @@ int main(int argc, char** argv)
         check(AppPaths::movedPath(old + QStringLiteral(" 2/files"), old) ==
                   old + QStringLiteral(" 2/files"),
               QStringLiteral("a sibling folder with the same prefix is left alone"));
+
+        QTemporaryDir nest;
+        write(nest.filePath(QStringLiteral("USA/MemoryCardA.USA.raw")), "card");
+        write(nest.filePath(QStringLiteral("game/strikers")), "exe");
+        check(
+            !AppPaths::moveToPortable(nest.path(), nest.filePath(QStringLiteral("game")), &failed),
+            QStringLiteral("a game folder inside the user folder refuses the move"));
+        check(readAll(nest.filePath(QStringLiteral("game/strikers"))) == "exe" &&
+                  readAll(nest.filePath(QStringLiteral("USA/MemoryCardA.USA.raw"))) == "card",
+              QStringLiteral("... and moves nothing"));
     }
 
     QTextStream out(stdout);

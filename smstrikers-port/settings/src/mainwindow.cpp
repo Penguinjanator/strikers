@@ -1411,7 +1411,8 @@ bool MainWindow::offerPortableMove()
     const QString from = AppPaths::userFolder();
     const QString to = AppPaths::portableUserFolder();
     if (m_ini.has(QStringLiteral("USER_DIR")) || QFileInfo::exists(to) ||
-        QDir(from).isEmpty(QDir::AllEntries | QDir::NoDotAndDotDot))
+        QDir(from).isEmpty(QDir::AllEntries | QDir::NoDotAndDotDot) ||
+        AppPaths::movedPath(AppPaths::archiveRoot(), from) != AppPaths::archiveRoot())
         return false;
 
     const auto answer = QMessageBox::question(
