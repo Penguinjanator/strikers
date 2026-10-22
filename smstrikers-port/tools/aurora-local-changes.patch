@@ -44,7 +44,7 @@ index e9094f4..53ac0b9 100644
    set(AURORA_IMGUI_IMPLEMENTATION ON)
    include(../cmake/AuroraDearImguiProvider.cmake)
 diff --git a/include/aurora/aurora.h b/include/aurora/aurora.h
-index 92b734f..01349e2 100644
+index 92b734f..9f3daf5 100644
 --- a/include/aurora/aurora.h
 +++ b/include/aurora/aurora.h
 @@ -86,9 +86,13 @@ typedef struct {
@@ -61,7 +61,7 @@ index 92b734f..01349e2 100644
    bool allowJoystickBackgroundEvents;
    bool pauseOnFocusLost;
    bool allowTextureDumps;
-@@ -128,6 +132,18 @@ typedef struct {
+@@ -128,7 +132,21 @@ typedef struct {
  
  AuroraInfo aurora_initialize(int argc, char* argv[], const AuroraConfig* config);
  void aurora_shutdown();
@@ -78,8 +78,11 @@ index 92b734f..01349e2 100644
 +/* smstrikers-port: rebuild the framebuffer from the window and the locked aspect now rather than on the next event pump. Safe between frames only; idempotent. */
 +void aurora_apply_frame_buffer_resize();
  const AuroraEvent* aurora_update();
++/* smstrikers-port: routes queued gamepad button and axis events, and passes each to `seen`; safe mid-frame. */
++void aurora_pump_pad_events(void (*seen)(const union SDL_Event* event));
  bool aurora_begin_frame();
  void aurora_end_frame();
+ 
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
 index 94504b1..4072626 100644
 --- a/include/aurora/gfx.h
@@ -228,7 +231,7 @@ index 11fa99a..1ddafb0 100644
  // Use AuroraReadbackCapturePeeks (GXAurora.h)
  // void GXPeekZ(u16 x, u16 y, u32* z);
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 3df2b4a..cb0c394 100644
+index 3df2b4a..f3d1fc2 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
 @@ -1,4 +1,8 @@
@@ -444,7 +447,7 @@ index 3df2b4a..cb0c394 100644
  #endif
  }
  } // namespace
-@@ -450,6 +606,36 @@ AuroraInfo aurora_initialize(int argc, char* argv[], const AuroraConfig* config)
+@@ -450,7 +606,38 @@ AuroraInfo aurora_initialize(int argc, char* argv[], const AuroraConfig* config)
    return aurora::initialize(argc, argv, *config);
  }
  void aurora_shutdown() { aurora::shutdown(); }
@@ -479,8 +482,10 @@ index 3df2b4a..cb0c394 100644
 +  }
 +}
  const AuroraEvent* aurora_update() { return aurora::update(); }
++void aurora_pump_pad_events(void (*seen)(const SDL_Event*)) { aurora::window::pump_pad_events(seen); } // smstrikers-port
  bool aurora_begin_frame() { return aurora::begin_frame(); }
  void aurora_end_frame() { aurora::end_frame(); }
+ SDL_Window* aurora_get_window() { return aurora::window::get_sdl_window(); }
 diff --git a/lib/dawn/BackendBinding.cpp b/lib/dawn/BackendBinding.cpp
 index 447ead8..5f5b2c3 100644
 --- a/lib/dawn/BackendBinding.cpp
@@ -826,10 +831,38 @@ index 011f593..b51f206 100644
      const float stickDeadZone = deadZones.useDeadzones ? deadZones.stickDeadZone / 32767.f : 0.f;
      const float substickDeadZone = deadZones.useDeadzones ? deadZones.substickDeadZone / 32767.f : 0.f;
 diff --git a/lib/dolphin/pad/pad.cpp b/lib/dolphin/pad/pad.cpp
-index 89b597f..3a3395d 100644
+index 89b597f..60cd94b 100644
 --- a/lib/dolphin/pad/pad.cpp
 +++ b/lib/dolphin/pad/pad.cpp
-@@ -154,30 +154,32 @@ std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsProCon{{
+@@ -34,10 +34,11 @@ std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsStandard{{
+     {SDL_GAMEPAD_BUTTON_DPAD_RIGHT, PAD_BUTTON_RIGHT},
+ }};
+ 
++// smstrikers-port: face buttons by label (B passes); upstream maps them by GameCube position.
+ std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsXBox360{{
+     {SDL_GAMEPAD_BUTTON_SOUTH, PAD_BUTTON_A},
+-    {SDL_GAMEPAD_BUTTON_EAST, PAD_BUTTON_X},
+-    {SDL_GAMEPAD_BUTTON_WEST, PAD_BUTTON_B},
++    {SDL_GAMEPAD_BUTTON_EAST, PAD_BUTTON_B},
++    {SDL_GAMEPAD_BUTTON_WEST, PAD_BUTTON_X},
+     {SDL_GAMEPAD_BUTTON_NORTH, PAD_BUTTON_Y},
+     {SDL_GAMEPAD_BUTTON_START, PAD_BUTTON_START},
+     {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, PAD_TRIGGER_Z},
+@@ -49,10 +50,11 @@ std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsXBox360{{
+     {SDL_GAMEPAD_BUTTON_DPAD_RIGHT, PAD_BUTTON_RIGHT},
+ }};
+ 
++// smstrikers-port: face buttons by label.
+ std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsXBoxOne{{
+     {SDL_GAMEPAD_BUTTON_SOUTH, PAD_BUTTON_A},
+-    {SDL_GAMEPAD_BUTTON_EAST, PAD_BUTTON_X},
+-    {SDL_GAMEPAD_BUTTON_WEST, PAD_BUTTON_B},
++    {SDL_GAMEPAD_BUTTON_EAST, PAD_BUTTON_B},
++    {SDL_GAMEPAD_BUTTON_WEST, PAD_BUTTON_X},
+     {SDL_GAMEPAD_BUTTON_NORTH, PAD_BUTTON_Y},
+     {SDL_GAMEPAD_BUTTON_START, PAD_BUTTON_START},
+     {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, PAD_TRIGGER_Z},
+@@ -154,30 +156,32 @@ std::array<PADButtonMapping, PAD_BUTTON_COUNT> g_defaultButtonsProCon{{
      {SDL_GAMEPAD_BUTTON_DPAD_RIGHT, PAD_BUTTON_RIGHT},
  }};
  
@@ -4754,10 +4787,32 @@ index c8c9549..55fdd6c 100644
 -
 -#endif
 diff --git a/lib/window.cpp b/lib/window.cpp
-index cf84de3..9c7a686 100644
+index cf84de3..2b24ed1 100644
 --- a/lib/window.cpp
 +++ b/lib/window.cpp
-@@ -345,6 +345,10 @@ bool create_window(AuroraBackend backend) {
+@@ -336,6 +336,21 @@ const AuroraEvent* poll_events() {
+   return g_events.data();
+ }
+ 
++// smstrikers-port: other events wait for poll_events, which can resize the swapchain mid-frame.
++void pump_pad_events(void (*seen)(const SDL_Event*)) {
++  SDL_PumpEvents();
++  SDL_Event event;
++  while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_EVENT_GAMEPAD_AXIS_MOTION, SDL_EVENT_GAMEPAD_BUTTON_UP) > 0) {
++    if (targets_primary_window(&event)) {
++      input::sdl::dispatch(event);
++    }
++    if (seen != nullptr) {
++      seen(&event);
++    }
++  }
++  input::reconcile();
++}
++
+ bool create_window(AuroraBackend backend) {
+   SDL_WindowFlags flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
+ #if TARGET_OS_IOS || TARGET_OS_TV
+@@ -345,6 +360,10 @@ bool create_window(AuroraBackend backend) {
    if (g_config.startFullscreen) {
      flags |= SDL_WINDOW_FULLSCREEN;
    }
@@ -4768,7 +4823,7 @@ index cf84de3..9c7a686 100644
  #endif
    auto width = static_cast<Sint32>(g_config.windowWidth);
    auto height = static_cast<Sint32>(g_config.windowHeight);
-@@ -488,10 +492,18 @@ AuroraWindowSize get_window_size() {
+@@ -488,10 +507,18 @@ AuroraWindowSize get_window_size() {
      fb_h = scaledH;
    }
    if (g_frameBufferAspectFit) {
@@ -4791,7 +4846,7 @@ index cf84de3..9c7a686 100644
        fb_w = fitW;
        fb_h = fitH;
      }
-@@ -592,6 +604,13 @@ void request_frame_buffer_resize() {
+@@ -592,6 +619,13 @@ void request_frame_buffer_resize() {
    }
  }
  
@@ -4806,10 +4861,18 @@ index cf84de3..9c7a686 100644
    if (scale < 0.f) {
      scale = 0.f;
 diff --git a/lib/window.hpp b/lib/window.hpp
-index 51257ea..50cca23 100644
+index 51257ea..7370c85 100644
 --- a/lib/window.hpp
 +++ b/lib/window.hpp
-@@ -48,6 +48,8 @@ void set_window_size(uint32_t width, uint32_t height);
+@@ -36,6 +36,7 @@ void destroy_window();
+ void show_window();
+ AuroraWindowSize get_window_size();
+ const AuroraEvent* poll_events();
++void pump_pad_events(void (*seen)(const SDL_Event*));
+ SDL_Window* get_sdl_window();
+ SDL_Renderer* get_sdl_renderer();
+ bool is_paused() noexcept;
+@@ -48,6 +49,8 @@ void set_window_size(uint32_t width, uint32_t height);
  void set_window_position(uint32_t x, uint32_t y);
  void center_window();
  void request_frame_buffer_resize();

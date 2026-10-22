@@ -637,6 +637,7 @@ void aurora_capture_frame(const char* path) {
   }
 }
 const AuroraEvent* aurora_update() { return aurora::update(); }
+void aurora_pump_pad_events(void (*seen)(const SDL_Event*)) { aurora::window::pump_pad_events(seen); } // smstrikers-port
 bool aurora_begin_frame() { return aurora::begin_frame(); }
 void aurora_end_frame() { aurora::end_frame(); }
 SDL_Window* aurora_get_window() { return aurora::window::get_sdl_window(); }

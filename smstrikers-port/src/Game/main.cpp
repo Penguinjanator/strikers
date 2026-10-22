@@ -918,7 +918,7 @@ int main(int argc, char* argv[])
         PortBenchFrameBegin();
         PortBenchAddAcquire(acquireNs);
 
-        // PORT: SDL's pad state only changes in a pump and the acquire blocks under vsync, so pump again after it.
+        // PORT: the acquire blocks under vsync, so route the pad events that arrived during it.
         {
             static int s_latePump = -1;
             if (s_latePump < 0)
@@ -929,7 +929,7 @@ int main(int argc, char* argv[])
             if (s_latePump)
             {
                 PortBenchInputPumped();
-                SDL_PumpEvents();
+                aurora_pump_pad_events(PortPromptsEvent);
             }
         }
 

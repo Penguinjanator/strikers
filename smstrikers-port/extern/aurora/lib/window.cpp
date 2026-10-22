@@ -336,6 +336,21 @@ const AuroraEvent* poll_events() {
   return g_events.data();
 }
 
+// smstrikers-port: other events wait for poll_events, which can resize the swapchain mid-frame.
+void pump_pad_events(void (*seen)(const SDL_Event*)) {
+  SDL_PumpEvents();
+  SDL_Event event;
+  while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_EVENT_GAMEPAD_AXIS_MOTION, SDL_EVENT_GAMEPAD_BUTTON_UP) > 0) {
+    if (targets_primary_window(&event)) {
+      input::sdl::dispatch(event);
+    }
+    if (seen != nullptr) {
+      seen(&event);
+    }
+  }
+  input::reconcile();
+}
+
 bool create_window(AuroraBackend backend) {
   SDL_WindowFlags flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
 #if TARGET_OS_IOS || TARGET_OS_TV

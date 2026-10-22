@@ -145,6 +145,8 @@ AuroraWindowSize aurora_window_size();
 /* smstrikers-port: rebuild the framebuffer from the window and the locked aspect now rather than on the next event pump. Safe between frames only; idempotent. */
 void aurora_apply_frame_buffer_resize();
 const AuroraEvent* aurora_update();
+/* smstrikers-port: routes queued gamepad button and axis events, and passes each to `seen`; safe mid-frame. */
+void aurora_pump_pad_events(void (*seen)(const union SDL_Event* event));
 bool aurora_begin_frame();
 void aurora_end_frame();
 
