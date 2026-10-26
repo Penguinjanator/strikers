@@ -71,10 +71,14 @@ static void port_StartSkippedLoads()
 
 static bool port_SkippedLoadsDone()
 {
+    static bool s_done;
+    if (s_done)
+        return true;
     if (!PlatAudio::IsEntireSampleFileInMem())
         return false;
     AudioLoader::LoadFEAudioData(false);
     AudioLoader::LoadPermanentSoundGroups(false);
+    s_done = true;
     return true;
 }
 
