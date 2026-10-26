@@ -218,11 +218,12 @@ bool StartMatch(World& w, Machine* host, const std::vector<Machine*>& guests)
     return host->session.Start() != 0;
 }
 
+// The session's auto delay: only the part of the worst path past the guessing window.
 int ExpectedDelay(const NetParams& p)
 {
-    const double b = p.oneWayMs + 2 * p.jitterMs + 3;
-    int d = (int)std::ceil(b / 20.0);
-    return d < 1 ? 1 : d > 8 ? 8 : d;
+    const double b = p.oneWayMs + 2 * p.jitterMs + 3 - 14 * 20.0;
+    int d = b > 0 ? (int)std::ceil(b / 20.0) : 0;
+    return d > 8 ? 8 : d;
 }
 
 // ONLINE_SIM_MATCHES and ONLINE_SIM_TICKS lengthen the run.
@@ -242,8 +243,12 @@ void TestManyMatches()
     // Clocks 0.4% apart and different frame rates, so time sync has something to do.
     Machine* a = w.Add(0x0A000001, 0.002, 60, 1, id, "many");
     Machine* b = w.Add(0x0A000002, -0.002, 144, 1, id, "many");
-    a->game.matchTicks = ticks;
-    b->game.matchTicks = ticks;
+    // The wandering pads press Start, which often pauses a machine already past the pause tick.
+    for (Machine* m : { a, b })
+    {
+        m->game.matchTicks = ticks;
+        m->game.pausesPerMatch = 3;
+    }
     CHECK(Connect(w, a, b));
     w.RunFor(5);
     CHECK(a->State().delayTicks == ExpectedDelay(w.net.params));
@@ -332,8 +337,16 @@ void TestManyMatches()
                 expected, offByOne);
     std::printf("  datagrams: %llu sent, %llu lost\n", (unsigned long long)w.net.sent,
                 (unsigned long long)w.net.lost);
+    std::printf("  pauses: %d\n", a->game.pausesTaken);
+    std::printf("  rollbacks: a %d (%llu ticks again of %llu, longest %u), b %d (%llu of %llu, "
+                "longest %u)\n",
+                a->game.rollbacks, (unsigned long long)a->game.ticksRerun,
+                (unsigned long long)a->game.ticksRun, a->game.longestRollback, b->game.rollbacks,
+                (unsigned long long)b->game.ticksRerun, (unsigned long long)b->game.ticksRun,
+                b->game.longestRollback);
     CHECK((int)a->game.results.size() == matches);
     CHECK(desyncs == 0);
+    CHECK(a->game.pausesTaken >= matches);
     CHECK(a->game.maxStallMs <= 250 && b->game.maxStallMs <= 250);
     CHECK(onBudget + offByOne == total);
     CHECK(onBudget * 10 >= total * 9);
@@ -1378,7 +1391,12 @@ void TestBarrierPresses()
     };
     CHECK(Connect(w, a, b));
     CHECK(StartMatch(w, a, { b }));
-    CHECK(w.RunUntil([&] { return a->game.tick >= 40 && b->game.tick >= 40; }, 60));
+    // A machine may run ahead of the other's records on guesses, so wait for b to hold a's.
+    CHECK(w.RunUntil(
+        [&] {
+            return a->game.tick >= 40 && b->game.tick >= 40 && b->session.Engine().Have(0) >= 40;
+        },
+        60));
     w.onFrame = nullptr;
     int carried = 0;
     for (uint32_t t = 0; t < 40; t++)
@@ -1659,11 +1677,7 @@ void ArmPause(World& w, const std::vector<Machine*>& ms, PauseWatch& pw, uint32_
     pw = PauseWatch();
     pw.at = at;
     for (Machine* m : ms)
-    {
-        m->game.armedKind = 4;
-        m->game.freezeTick = at;
-        m->game.held = false;
-    }
+        m->game.ArmFromOutside(4, at);
     w.onFrame = [ms, &pw](Machine& m) {
         for (size_t i = 0; i < ms.size(); i++)
         {
@@ -1724,6 +1738,30 @@ void TestPause()
     w.onFrame = nullptr;
     std::printf("solo pause at %u: actions %x\n", pw.at, (unsigned)pw.act[0].actions);
     CHECK(ResumedWithoutReseed(pw.act[0]));
+}
+
+// Ticks run on a guess at a leaver's input run again with the CPU once the drop arrives.
+void TestDropBehindGuess()
+{
+    online::Lockstep lock;
+    const int8_t slots[ONLINE_MAX_SLOTS] = { 0, 1, -1, -1 };
+    lock.Begin(1, 0, 0x3, slots);
+    lock.StartGeneration();
+    SlotInput in[ONLINE_MAX_SLOTS];
+    uint8_t rec[1][online::kRecordSize] = {};
+    rec[0][16] = 1;
+    for (uint32_t t = lock.Have(1); t < 5; t++)
+        CHECK(lock.Add(1, t, 1, rec) == 1);
+    for (uint32_t t = 0; t < 10; t++)
+    {
+        lock.Generate(t);
+        lock.ReadPredicted(t, in);
+    }
+    CHECK(lock.TakeMispredicted() == online::kNoTick);
+    lock.Drop(1, 7);
+    CHECK(lock.TakeMispredicted() == 7);
+    lock.ReadPredicted(7, in);
+    CHECK(in[1].kind == ONLINE_SLOT_CPU);
 }
 
 // A Windows machine joins a Mac's room: every platform plays every other, with no check.
@@ -1788,6 +1826,7 @@ int main()
     run("shared-skip", TestSharedSkip);
     run("retail-selection", TestRetailSelection);
     run("pause", TestPause);
+    run("drop-behind-guess", TestDropBehindGuess);
     run("seed-replay", TestSeedReplay);
     run("cross-platform", TestCrossPlatform);
     run("many", TestManyMatches);

@@ -28,7 +28,7 @@ void put_header(uint8_t* p, uint8_t cls, uint16_t protocol)
 
 bool is_platform(uint8_t v) { return v < ONLINE_PLATFORM_COUNT; }
 bool is_flag(uint8_t v) { return v <= 1; }
-bool is_delay(uint8_t v) { return v >= ONLINE_MIN_DELAY_TICKS && v <= ONLINE_MAX_DELAY_TICKS; }
+bool is_delay(uint8_t v) { return v <= ONLINE_MAX_DELAY_TICKS; }
 // PORT_BARRIER_INTRO, _GOAL, _END and _PAUSE.
 bool is_barrier(uint8_t v) { return v >= 1 && v <= 4; }
 

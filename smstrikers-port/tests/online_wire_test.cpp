@@ -262,9 +262,10 @@ void TestMessages()
     g.u.go.delayTicks = 9;
     n = EncodeMessageBody(g, body);
     CHECK(!DecodeMessageBody(MSG_GO, body, n, &out));
+    // No delay is the rollback default.
     g.u.go.delayTicks = 0;
     n = EncodeMessageBody(g, body);
-    CHECK(!DecodeMessageBody(MSG_GO, body, n, &out));
+    CHECK(DecodeMessageBody(MSG_GO, body, n, &out) && out.u.go.delayTicks == 0);
 
     // A pause (barrier 4) resumes without a reseed; 5 names no barrier.
     Message r;

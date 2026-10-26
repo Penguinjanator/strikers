@@ -1,4 +1,5 @@
 #include "NL/nlMath.h"
+#include "port/rollback.h"
 #include "Game/Core/mtRandom.h"
 #include "port/lockstep.h"
 #include "port/fpconv.h"
@@ -6,6 +7,8 @@
 #include "math.h"
 
 unsigned int nlDefaultSeed = 0x12345678;
+
+static const bool s_rollbackState = (PortSimState(&nlDefaultSeed, sizeof nlDefaultSeed), true);
 
 struct coeffs
 {

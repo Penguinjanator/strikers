@@ -1,4 +1,5 @@
 #include "Game/AI/Scripts/RootScript.h"
+#include "port/rollback.h"
 #include "Game/AI/AIPlay.h"
 #include "Game/AI/Scripts/ScriptCaching.h"
 #include "Game/AI/Scripts/ScriptQuestions.h"
@@ -66,6 +67,8 @@ cDecisionEntity g_pDecisionEntities[44] = {
     cDecisionEntity(DECISION_ENTITY_PLAY, AIPLAY_GSTATE_POSTGOAL, NULL, NULL),
     cDecisionEntity(DECISION_ENTITY_PLAY, AIPLAY_GSTATE_POSTREDCARD, NULL, NULL),
 };
+
+static const bool s_rollbackState = (PortSimState(&g_pDecisionEntities, sizeof g_pDecisionEntities), true);
 
 /**
  * Offset/Address/Size: 0x1E8C | 0x8007C478 | size: 0x8

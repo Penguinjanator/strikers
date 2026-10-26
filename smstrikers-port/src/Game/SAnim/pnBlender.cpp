@@ -1,10 +1,13 @@
 #include "Game/SAnim/pnBlender.h"
+#include "port/rollback.h"
 
 #include "math.h"
 
 static f32 CANT_COLLIDE = *(f32*)__float_max;
 
 SlotPool<cPN_Blender> cPN_Blender::m_BlenderSlotPool(0x10, 0x10);
+
+static const bool s_rollbackState = (PortSimSlotPool(&cPN_Blender::m_BlenderSlotPool), true);
 
 void cPN_Blender::operator delete(void* ptr)
 {

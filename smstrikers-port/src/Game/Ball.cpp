@@ -1,4 +1,5 @@
 #include "Game/WorldManager.h"
+#include "port/rollback.h"
 #include "NL/platqmath.h"
 
 #include "Game/Ball.h"
@@ -35,6 +36,8 @@ static f32 CANT_COLLIDE = *(f32*)__float_max;
 cBall* g_pBall = NULL;
 static float gfPerfectPassSFXVol;
 static bool gbCanFadeOutPerfectPassSFX = true;
+
+static const bool s_rollbackState = (PortSimState(&gbCanFadeOutPerfectPassSFX, sizeof gbCanFadeOutPerfectPassSFX), true);
 
 static const nlVector3 v3Zero = { 0.f, 0.f, 0.f };
 static const char szRegBallBlurTexture[] = "global/shotstreak";

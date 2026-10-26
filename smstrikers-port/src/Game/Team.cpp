@@ -1,4 +1,5 @@
 #include "Game/Team.h"
+#include "port/rollback.h"
 
 #include "Game/AI/Fielder.h"
 #include "Game/Audio/WorldAudio.h"
@@ -23,6 +24,8 @@
 
 cTeam* g_pTeams[2] = { NULL, NULL };
 cTeam* g_pCurrentlyUpdatingTeam;
+
+static const bool s_rollbackState = (PortSimState(&g_pCurrentlyUpdatingTeam, sizeof g_pCurrentlyUpdatingTeam), true);
 static const nlVector2 g_vMarkDistanceConfidence = { 15.0f, 1.0f };
 static const unsigned short g_aNeutralPlayerFacingDirections[5] = {
     0,

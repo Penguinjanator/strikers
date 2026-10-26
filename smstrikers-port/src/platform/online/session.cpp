@@ -438,7 +438,7 @@ uint8_t Session::ExpectedDelay(uint64_t now)
 {
     if (m_settings.delayTicks != 0)
         return m_settings.delayTicks;
-    // Fair delay: the worst path between any two machines, which in a star crosses the host.
+    // The worst path's input is guessed as far as snapshots reach; only the rest becomes delay.
     double worstUs = 0;
     double rtt[ONLINE_MAX_MACHINES] = {};
     double sd[ONLINE_MAX_MACHINES] = {};
@@ -469,7 +469,8 @@ uint8_t Session::ExpectedDelay(uint64_t now)
                 worstUs = star;
         }
     }
-    int d = (int)((worstUs + kTickUs - 1) / kTickUs);
+    const double guessedUs = (double)kMaxAhead * kTickUs;
+    int d = worstUs > guessedUs ? (int)((worstUs - guessedUs + kTickUs - 1) / kTickUs) : 0;
     if (d < ONLINE_MIN_DELAY_TICKS)
         d = ONLINE_MIN_DELAY_TICKS;
     if (d > ONLINE_MAX_DELAY_TICKS)
@@ -1845,6 +1846,8 @@ void Session::Update(float timeScale)
     }
     if (m_reportPending)
         WriteReport();
+    if (m_lock.Active())
+        CommitConfirmed();
     UpdateProblem(now);
     FillState(now);
 }

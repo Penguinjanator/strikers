@@ -33,6 +33,7 @@ extern cBall* g_pBall;
 #include <stdlib.h>
 #include "port/discord.h"
 #include "port/overlay.h"
+#include "port/rollback.h"
 #include "port/simhygiene.h"
 #include <string.h>
 #include "Game/AnimInventory.h"
@@ -146,6 +147,7 @@ static inline void DestroyPowerupsImpl(cGame* pGame)
  */
 void CreateGame()
 {
+    PortSimHeapScope simHeap;
     g_pGame = new (nlMalloc(sizeof(cGame), 8, false)) cGame();
     g_pTeams[0] = new (nlMalloc(sizeof(cTeam), 8, false)) cTeam(0);
     g_pTeams[1] = new (nlMalloc(sizeof(cTeam), 8, false)) cTeam(1);
@@ -669,11 +671,11 @@ void cGame::EnterPostGame()
     NisPlayer* pNisPlayer = NisPlayer::Instance();
     pNisPlayer->mWinnerSide[0] = awayScore > homeScore;
 
+    // PORT: in lockstep the end freezes the next tick, on a replay too and whether or not the cutscene started.
+    if (g_simLockstep)
+        PortSimBarrierArm(PORT_BARRIER_END);
     if (!Presentation::Instance().DuringEndOfGamePresentation())
     {
-        // PORT: in lockstep mode the end freezes the tick after this one, not when its cutscene has loaded.
-        if (g_simLockstep)
-            PortSimBarrierArm(PORT_BARRIER_END);
         NisPlayer::Instance()->Reset();
         Presentation::Instance().Call("GameEndNoSuddenDeath", "");
     }

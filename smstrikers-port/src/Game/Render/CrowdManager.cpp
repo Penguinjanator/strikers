@@ -1,4 +1,5 @@
 #include "Game/Render/CrowdManager.h"
+#include "port/rollback.h"
 
 #include "Game/NisPlayer.h"
 #include "NL/gl/glConstant.h"
@@ -169,6 +170,7 @@ static void CrowdBundleLoad_cb(void*, unsigned long, void*)
  */
 void CrowdManager::SetState(eCrowdState state, bool force)
 {
+    PortSimHeapPauseScope presentation;
     if (state == m_State && !force)
     {
         return;

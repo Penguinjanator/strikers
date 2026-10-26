@@ -1,4 +1,5 @@
 #include "Game/NisPlayer.h"
+#include "port/rollback.h"
 #include <stdlib.h>
 #include "Game/Camera/CameraMan.h"
 #include "Game/Character.h"
@@ -693,6 +694,7 @@ BasicString<char, Detail::TempStringAllocator> NisPlayer::GetTargetFilter(NisTar
  */
 void NisPlayer::Load(const char* nisType, NisTarget target, NisUseStadiumOffset useStadiumOffset, NisUseFilter useFilter, NisWinnerType winnerType)
 {
+    PortSimHeapPauseScope presentation;
     mActive = true;
 
     BasicString<char, Detail::TempStringAllocator> filter = GetTargetFilter(target, winnerType);

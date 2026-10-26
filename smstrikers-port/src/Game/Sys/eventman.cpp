@@ -287,10 +287,17 @@ Event* EventManager::GetFreeEvent()
  */
 void EventManager::DispatchEvents()
 {
+    // PORT: events from ticks a rollback could still undo wait here for the screen's handlers.
+    Event* pending = NULL;
     m_dispatching = 1; // stb 1 at +0
     while (m_queue != 0)
     {
         Event* e = nlDLRingRemoveStart(&m_queue); // free->queue ring
+        if (PortSimEventPending(this, e))
+        {
+            nlDLRingAddEnd(&pending, e);
+            continue;
+        }
         if (m_handlers != 0)
         {
             EventHandler* it = nlDLRingGetStart(m_handlers);
@@ -322,6 +329,7 @@ void EventManager::DispatchEvents()
     }
 
     m_dispatching = 0;
-    m_queue = m_deferred;
+    m_queue = pending;
+    nlDLRingAppendRing(&m_queue, m_deferred);
     m_deferred = NULL;
 }

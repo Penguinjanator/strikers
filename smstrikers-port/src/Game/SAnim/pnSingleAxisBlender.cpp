@@ -1,8 +1,11 @@
 #include "Game/SAnim/pnSingleAxisBlender.h"
+#include "port/rollback.h"
 
 #include "NL/nlMemory.h"
 
 SlotPool<cPN_SingleAxisBlender> cPN_SingleAxisBlender::m_SingleAxisBlenderSlotPool(0x10, 0x10);
+
+static const bool s_rollbackState = (PortSimSlotPool(&cPN_SingleAxisBlender::m_SingleAxisBlenderSlotPool), true);
 
 /**
  * Offset/Address/Size: 0x5DC | 0x801EF320 | size: 0xD4

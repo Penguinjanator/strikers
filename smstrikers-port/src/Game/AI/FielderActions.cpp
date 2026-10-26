@@ -1,4 +1,5 @@
 #include "Game/AI/FielderActions.h"
+#include "port/rollback.h"
 #include "port/simhygiene.h"
 #include "Game/Camera/CameraMan.h"
 #include "Game/Camera/animcam.h"
@@ -61,6 +62,8 @@ HitReactInfo g_HitReactInfo[4] = {
     { 0x71, 0x0000 },
     { 0x70, 0xc000 },
 };
+
+static const bool s_rollbackState = (PortSimState(&g_HitReactInfo, sizeof g_HitReactInfo), true);
 
 // extern HitReactInfo g_HitReactInfo[4];
 // static unsigned short g_IdleTurnCompletionDelta = 0xB6; // size: 0x2, address: 0x803976D2
@@ -2979,12 +2982,17 @@ void MatrixCamFinishedCallback(MatrixEffectCam* pMatrixCam)
 
 static nlVector3 captainStsTargetPos = { 0.0f, 0.0f, 0.0f };
 static bool setCaptainStscaptainStsTargetPos;
+// PORT: set on one tick and consumed on the next.
+static const bool s_stsTargetState = (PortSimState(&captainStsTargetPos, sizeof captainStsTargetPos),
+                                      PortSimState(&setCaptainStscaptainStsTargetPos, sizeof setCaptainStscaptainStsTargetPos), true);
 
 /**
  * Offset/Address/Size: 0x2D08 | 0x80029840 | size: 0x450
  */
 void cFielder::SetupCaptainSTSAnimCam(bool arg1)
 {
+    // PORT: the camera and the animation it loads are the screen's and outlive a rollback.
+    PortSimHeapPauseScope presentation;
     mActionShootToScoreVars.captainStsCamera = new ((cAnimCamera*)nlMalloc(sizeof(cAnimCamera), 8, false)) cAnimCamera();
 
     BasicString<char, Detail::TempStringAllocator> cameraName = Format(BasicString<char, Detail::TempStringAllocator>("{0}_ShootToScoreCamera"),
@@ -3468,7 +3476,10 @@ void cFielder::ActionShootToScore(float fDeltaT)
                 }
                 else
                 {
+                    // PORT: the camera stack is the screen's and outlives a rollback, so its cameras do too.
+                    PortSimHeapPause();
                     MatrixEffectCam* pMatrixCam = new (nlMalloc(sizeof(MatrixEffectCam), 8, false)) MatrixEffectCam();
+                    PortSimHeapResume();
                     pMatrixCam->mbUseGameplayTransparencyFlags = true;
                     pMatrixCam->m_pFilter = &rumbleFilter;
                     pMatrixCam->mfSpinDuration = sfOtherMatrixCamDuration;
@@ -3592,7 +3603,10 @@ void cFielder::ActionShootToScore(float fDeltaT)
                     FixedUpdateTask::mTimeScale = sfMatrixCamTimeScale;
                     ParticleUpdateTask::SetTimeScale(sfMatrixCamParticleTimeScale);
 
+                    // PORT: the camera stack is the screen's and outlives a rollback, so its cameras do too.
+                    PortSimHeapPause();
                     MatrixEffectCam* pMatrixCam2 = new (nlMalloc(sizeof(MatrixEffectCam), 8, false)) MatrixEffectCam();
+                    PortSimHeapResume();
                     cCameraManager::PushCamera(pMatrixCam2);
                     pMatrixCam2->m_pFilter = &rumbleFilter;
 
@@ -3669,8 +3683,7 @@ void cFielder::ActionShootToScore(float fDeltaT)
             if (m_pCurrentAnimController->TestTrigger(fGreenRegionMaxWidth))
             {
                 cCharacter::m_ModelType = CharModel_Rigid;
-                cCameraManager::Remove(*mActionShootToScoreVars.captainStsCamera);
-                delete mActionShootToScoreVars.captainStsCamera;
+                cCameraManager::Release(mActionShootToScoreVars.captainStsCamera);
                 mActionShootToScoreVars.captainStsCamera = NULL;
                 m_pCurrentAnimController->m_fPlaybackSpeedScale = mActionShootToScoreVars.preCaptainStsPlaybackSpeed;
             }

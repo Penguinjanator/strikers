@@ -4,6 +4,7 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace online
@@ -104,6 +105,9 @@ void Session::BeginMatch(uint32_t startInUs, uint8_t delayTicks, uint64_t now)
     Reanchor(0.0, m_startUs);
     m_edgePending = false;
     m_componentsCount = 0;
+    m_committed = 0;
+    for (int i = 0; i < kPendingRing; i++)
+        m_pending[i].tick = kNoTick;
     for (size_t i = 0; i < m_links.size(); i++)
     {
         Link& l = *m_links[i];
@@ -500,14 +504,20 @@ int Session::TickInput(uint32_t tick, SlotInput out[ONLINE_MAX_SLOTS])
                 m_links[i]->sendNow = true;
         SendDue(now);
     }
-    if (!m_lock.Ready(tick))
+    // Input is guessed as far as snapshots reach; a tick run again always goes through.
+    const bool rerun = tick < m_loopNext;
+    if (!rerun && tick >= ConfirmedTick() + kMaxAhead)
     {
         NoteStall(now, true);
         Reanchor((double)tick, now);
         return 0;
     }
+    m_lock.ReadPredicted(tick, out);
+    if (rerun)
+        return 1;
+    // Between ticks: every tick before this one is finished, components and all.
+    CommitConfirmed();
     NoteStall(now, false);
-    m_lock.Read(tick, out);
     m_loopNext = tick + 1;
     if (SchedulePos(now) < (double)tick)
         Reanchor((double)tick, now);
@@ -520,40 +530,127 @@ int Session::TickInput(uint32_t tick, SlotInput out[ONLINE_MAX_SLOTS])
     return 1;
 }
 
-void Session::TickHash(uint32_t tick, uint64_t hash)
+uint32_t Session::RollbackTo()
 {
     if (!m_lock.Active())
+        return kNoTick;
+    const uint32_t t = m_lock.TakeMispredicted();
+    // A guess for a tick the loop has not reached yet needs nothing undone.
+    return t != kNoTick && t < m_loopNext ? t : kNoTick;
+}
+
+uint32_t Session::SettledTick() const
+{
+    const uint32_t confirmed = ConfirmedTick();
+    const uint32_t wrong = m_lock.Mispredicted();
+    return wrong != kNoTick && wrong < confirmed ? wrong : confirmed;
+}
+
+void Session::Rewind(uint32_t tick)
+{
+    if (!m_lock.Active() || tick >= m_loopNext || tick < m_committed)
         return;
-    uint32_t bad = kNoTick;
-    if (m_lock.SetHash(m_self, tick, hash, &bad) && m_desync == ONLINE_DESYNC_NONE)
-        RaiseDesync(FirstDifference(bad), m_self, NULL, false);
-    for (size_t i = 0; i < m_stamps.size();)
+    for (uint32_t t = tick; t < m_loopNext; t++)
+        if (m_pending[t % kPendingRing].tick == t)
+            m_pending[t % kPendingRing].tick = kNoTick;
+    m_loopNext = tick;
+}
+
+uint32_t Session::ConfirmedTick() const
+{
+    const uint32_t c = m_lock.Confirmed();
+    return c == kNoTick ? m_loopNext : c;
+}
+
+void Session::TickHash(uint32_t tick, uint64_t hash)
+{
+    if (!m_lock.Active() || tick < m_committed)
+        return;
+    // The tick's components, if it takes any, come after its hash.
+    PendingHash& p = m_pending[tick % kPendingRing];
+    p.tick = tick;
+    p.hash = hash;
+    p.components = 0;
+    if (tick < 12 && std::getenv("STRIKERS_ROLLBACK_LOG") != NULL)
     {
-        if (m_stamps[i].tick + 1 < tick)
-        {
-            m_stamps.erase(m_stamps.begin() + (long)i);
-            continue;
-        }
-        i++;
+        char line[96];
+        std::snprintf(line, sizeof line, "[rollback] pending t=%u hash %016llx", tick,
+                      (unsigned long long)hash);
+        m_env->Log(line);
     }
-    if (m_endTick != kNoTick && tick >= m_endTick && !m_matchOver)
-        MatchEnded();
 }
 
 void Session::TickComponents(uint32_t tick, const uint64_t* hashes, const char* const* names,
                              int count)
 {
-    if (!m_lock.Active() || count < 1)
+    if (!m_lock.Active() || count < 1 || tick < m_committed)
         return;
     if (count > kMaxComponents)
         count = kMaxComponents;
-    m_lock.SetComponents(m_self, tick, hashes, count, names);
-    m_componentsTick = tick;
-    m_componentsCount = count;
-    std::memcpy(m_componentsHash, hashes, sizeof(uint64_t) * (size_t)count);
-    for (size_t i = 0; i < m_links.size(); i++)
-        if (m_links[i]->used)
-            m_links[i]->componentsLeft = 3;
+    PendingHash& p = m_pending[tick % kPendingRing];
+    if (p.tick != tick)
+        return;
+    p.components = count;
+    p.names = names;
+    std::memcpy(p.component, hashes, sizeof(uint64_t) * (size_t)count);
+}
+
+void Session::CommitConfirmed()
+{
+    // A tick waiting to run again on input that arrived since keeps its old hash out.
+    uint32_t confirmed = ConfirmedTick();
+    const uint32_t wrong = m_lock.Mispredicted();
+    if (wrong != kNoTick && wrong < confirmed)
+        confirmed = wrong;
+    while (m_committed < confirmed && m_committed < m_loopNext)
+    {
+        const PendingHash& p = m_pending[m_committed % kPendingRing];
+        if (p.tick != m_committed)
+            break;
+        const uint32_t tick = m_committed++;
+        if (tick < 12 && std::getenv("STRIKERS_ROLLBACK_LOG") != NULL)
+        {
+            char line[128];
+            std::snprintf(line, sizeof line,
+                          "[rollback] commit t=%u hash %016llx confirmed %u loop %u", tick,
+                          (unsigned long long)p.hash, ConfirmedTick(), m_loopNext);
+            m_env->Log(line);
+        }
+        uint32_t bad = kNoTick;
+        if (m_lock.SetHash(m_self, tick, p.hash, &bad) && m_desync == ONLINE_DESYNC_NONE)
+            RaiseDesync(FirstDifference(bad), m_self, NULL, false);
+        static const bool logAll = std::getenv("STRIKERS_ROLLBACK_CHECK") != NULL;
+        if (logAll && p.components > 0)
+        {
+            char line[1400];
+            int at = std::snprintf(line, sizeof line, "[rollback] committed t=%u", tick);
+            for (int i = 0; i < p.components && at < (int)sizeof line; i++)
+                at += std::snprintf(line + at, sizeof line - at, " %s=%04llx", p.names[i],
+                                    (unsigned long long)(p.component[i] & 0xFFFF));
+            m_env->Log(line);
+        }
+        if (p.components > 0)
+        {
+            m_lock.SetComponents(m_self, tick, p.component, p.components, p.names);
+            m_componentsTick = tick;
+            m_componentsCount = p.components;
+            std::memcpy(m_componentsHash, p.component, sizeof(uint64_t) * (size_t)p.components);
+            for (size_t i = 0; i < m_links.size(); i++)
+                if (m_links[i]->used)
+                    m_links[i]->componentsLeft = 3;
+        }
+        for (size_t i = 0; i < m_stamps.size();)
+        {
+            if (m_stamps[i].tick + 1 < tick)
+            {
+                m_stamps.erase(m_stamps.begin() + (long)i);
+                continue;
+            }
+            i++;
+        }
+        if (m_endTick != kNoTick && tick >= m_endTick && !m_matchOver)
+            MatchEnded();
+    }
 }
 
 int Session::TickActions(uint32_t tick, OnlineTickActions* out)
@@ -937,8 +1034,9 @@ float Session::ClockRate()
             rate = 0.995f;
         else if (m_advance < -0.5)
             rate = 1.01f;
-        // Frame stretching: the next tick's input is in flight, so slow down rather than freeze.
-        const int missing = m_lock.Missing(m_loopNext);
+        // Frame stretching: slow down near the guess limit rather than freeze.
+        const uint32_t limit = ConfirmedTick() + kMaxAhead;
+        const int missing = m_loopNext + 1 >= limit ? m_lock.Missing(ConfirmedTick()) : -1;
         if (missing >= 0)
         {
             const Link* l = MachineLink(IsHost() ? missing : 0);
@@ -948,7 +1046,7 @@ float Session::ClockRate()
                 const double peer =
                     (double)l->peerTick +
                     ((double)(Since(now, l->timingAtUs)) + oneWay) * m_timeScale / kTickUs;
-                const double sentAgo = (peer - ((double)m_loopNext - m_delay)) * kTickUs;
+                const double sentAgo = (peer - ((double)limit - kMaxAhead - m_delay)) * kTickUs;
                 if (sentAgo >= 0 && sentAgo < (double)kStretchWithinUs)
                     rate = 0.75f;
             }
@@ -972,7 +1070,7 @@ void Session::UpdateProblem(uint64_t now)
     float seconds = 0;
     if (m_lock.Active() && m_phase == ONLINE_PHASE_MATCH && m_stalled && !m_matchOver)
     {
-        const int missing = m_lock.Missing(m_loopNext);
+        const int missing = m_lock.Missing(ConfirmedTick());
         const Link* l = missing >= 0 ? MachineLink(IsHost() ? missing : 0) : NULL;
         if (l != NULL && Since(now, l->lastHeardUs) >= kWaitingAfterUs)
         {

@@ -1,6 +1,7 @@
 #include "NL/platpad.h"
 #include "port/lockstep.h"
 #include "port/online.h"
+#include "port/rollback.h"
 #include "port/overlay.h"
 #include <stdlib.h>
 #include "dolphin/os.h"
@@ -23,6 +24,8 @@ namespace
 {
 PadStatus padCategories[2];
 PadStatus* padStatus = &padCategories[0];
+// PORT: the fixed update's pads carry button edges from tick to tick, so they roll back with it.
+const bool s_rollbackState = (PortSimState(&padCategories[1], sizeof padCategories[1]), true);
 
 // PORT: in an online match a pad index is a slot; only a slot a device here feeds rumbles, on it.
 static inline void PortControlMotor(int slot, u32 command)

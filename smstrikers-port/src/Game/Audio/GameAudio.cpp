@@ -1,4 +1,5 @@
 #include "NL/nlstring_tmpl.h"
+#include "port/rollback.h"
 #include "Game/GameAudio.h"
 #include "NL/nlWare.h"
 #include "Game/Audio/AudioLoader.h"
@@ -566,6 +567,8 @@ bool cGameSFX::KillLowerPrioritySFX(int priority)
  */
 uintptr_t cGameSFX::Play(Audio::SoundAttributes& sfxData)
 {
+    if (PortRollbackResimulating())
+        return Audio::NothingPlayed(sfxData);
     // PORT: uintptr_t holds (uintptr_t)pSFXEmitter when mf_ReturnEmitterOnPlay is set, and unsigned long is four bytes on Windows.
     uintptr_t voiceID;
     SFXEmitter* pSFXEmitter;

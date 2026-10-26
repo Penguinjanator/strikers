@@ -1,4 +1,5 @@
 #include "Game/Character.h"
+#include "port/rollback.h"
 #include "Game/CharacterTemplate.h"
 #include "Game/CharacterTriggers.h"
 #include "Game/Effects/EmissionManager.h"
@@ -51,6 +52,8 @@ static bool sbElectricFenceDebug = false;
 eCharacterModelType cCharacter::m_ModelType = CharModel_Rigid;
 
 nlVector3 g_v3PrevJointPosition = { 0.0f, 0.0f, 0.0f };
+
+static const bool s_rollbackState = (PortSimState(&g_v3PrevJointPosition, sizeof g_v3PrevJointPosition), true);
 
 static inline float CharacterAnimSmoothStep(float x);
 inline float ClampMin(float speedRatio, const float min);
@@ -1404,11 +1407,18 @@ cCharacter::cCharacter(eCharacterClass cc, const int* nModelID, cSHierarchy* pHi
     cSHierarchy* hierarchy2 = m_pPoseAccumulator->m_BaseSHierarchy;
     m_nSpine1JointIndex = hierarchy2->GetNodeIndexByID(nlStringLowerHash("bip01 spine1"));
 
-    m_pCharacterSFX = new (nlMalloc(sizeof(Audio::cCharacterSFX), 8, false)) Audio::cCharacterSFX();
+    {
+        // PORT: the audio update walks this voice's sounds every frame, rollback or not.
+        PortSimHeapPauseScope presentation;
+        m_pCharacterSFX = new (nlMalloc(sizeof(Audio::cCharacterSFX), 8, false)) Audio::cCharacterSFX();
+    }
 
     m_pEffectsTexturing = NULL;
 
-    m_pBlinker = MakeBlinker(m_eCharacterClass, (u32)nModelID[0]);
+    {
+        PortSimHeapPauseScope presentation;
+        m_pBlinker = MakeBlinker(m_eCharacterClass, (u32)nModelID[0]);
+    }
 
     if (m_pBlinker != NULL && !m_pBlinker->m_bValid)
     {

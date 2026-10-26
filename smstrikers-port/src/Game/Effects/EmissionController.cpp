@@ -1,4 +1,5 @@
 #include "Game/Effects/EmissionController.h"
+#include "port/rollback.h"
 #include "NL/vmath.h"
 #include "Game/Effects/ParticleSystem.h"
 #include "Game/Effects/EmissionManager.h"
@@ -71,6 +72,7 @@ EmissionController::EmissionController(EffectsGroup* pEffectsGroup, unsigned sho
  */
 void EmissionController::InitializeSystemsFromGroup()
 {
+    PortSimHeapPauseScope presentation;
     EffectsSpec* pSpec;
     EffectsSpec* pEndSpec;
     EffectsSpec* pSpecs;
@@ -593,6 +595,8 @@ void EmissionController::Render()
  */
 void EmissionController::SetUpdateCallback(const Function1<void, EmissionController&>& callback)
 {
+    // PORT: the stored callback outlives the tick that set it, so its copy stays off the simulation heap.
+    PortSimHeapPauseScope presentation;
     mUpdateCallback = callback;
 }
 
@@ -601,5 +605,7 @@ void EmissionController::SetUpdateCallback(const Function1<void, EmissionControl
  */
 void EmissionController::SetFinishedCallback(const Function1<void, EmissionController&>& callback)
 {
+    // PORT: the stored callback outlives the tick that set it, so its copy stays off the simulation heap.
+    PortSimHeapPauseScope presentation;
     mFinishedCallback = callback;
 }

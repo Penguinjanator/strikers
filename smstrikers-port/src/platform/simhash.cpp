@@ -1,6 +1,11 @@
 // The simulation state hashes the online desync check compares.
 
 #include "port/simhash.h"
+#include "port/lockstep.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "port/rollback.h"
 
 #include "Game/AI/Fielder.h"
 #include "Game/AI/Powerups.h"
@@ -106,11 +111,26 @@ int char_index(const void* p)
     return -2;
 }
 
-void hash_body(Hasher& h, dBodyID body)
+extern "C" int PortSimHeapOwns(const void* p);
+
+void hash_body(Hasher& h, dBodyID body, const PhysicsObject* owner, const char* what)
 {
     if (body == NULL)
     {
         h.u32(0xB0D1E5u);
+        return;
+    }
+    // Diagnostic: a body that no longer belongs to the physics object pointing at it.
+    static const bool check = std::getenv("STRIKERS_ROLLBACK_CHECK") != NULL;
+    if (check && (!PortSimHeapOwns(body) || dBodyGetData(body) != (const void*)owner))
+    {
+        std::fprintf(
+            stderr,
+            "[rollback] %s physics %p (heap %d) has body %p (heap %d) owned by %p, tick %u%s\n",
+            what, (const void*)owner, PortSimHeapOwns(owner), (const void*)body,
+            PortSimHeapOwns(body), PortSimHeapOwns(body) ? dBodyGetData(body) : NULL, PortSimTick(),
+            PortRollbackResimulating() ? " again" : "");
+        h.u32(0xBADB0D1u);
         return;
     }
     h.fs(dBodyGetPosition(body), 3);
@@ -153,7 +173,8 @@ uint64_t hash_ball(const cBall* b)
     HB(h, b->m_unk_0xA5);
     HB(h, b->m_unk_0xA6);
     // Spin lives only in the ODE body.
-    hash_body(h, b->m_pPhysicsBall != NULL ? b->m_pPhysicsBall->m_bodyID : NULL);
+    hash_body(h, b->m_pPhysicsBall != NULL ? b->m_pPhysicsBall->m_bodyID : NULL, b->m_pPhysicsBall,
+              "ball");
     return h.done();
 }
 
@@ -292,7 +313,8 @@ uint64_t hash_character(int index)
     HV(h, c->m_v3AnimMoveAdjust);
     HI(h, c->m_eAnimID);
     HF(h, c->m_pCurrentAnimController != NULL ? c->m_pCurrentAnimController->m_fTime : -1.0f);
-    hash_body(h, c->m_pPhysicsCharacter != NULL ? c->m_pPhysicsCharacter->m_bodyID : NULL);
+    hash_body(h, c->m_pPhysicsCharacter != NULL ? c->m_pPhysicsCharacter->m_bodyID : NULL,
+              c->m_pPhysicsCharacter, "character");
 
     if (c->m_eClassType == PLAYER || c->m_eClassType == FIELDER || c->m_eClassType == GOALIE)
     {
@@ -343,6 +365,10 @@ void hash_clock(Hasher& h, const Clock* c)
     HI(h, c->m_clockState);
 }
 
+}   // namespace
+extern "C" int PortSimHeapOwns(const void* p);
+namespace
+{
 uint64_t hash_powerup(int slot)
 {
     const PowerupBase* p = g_pPowerups[slot];
@@ -362,7 +388,8 @@ uint64_t hash_powerup(int slot)
     HI(h, p->m_nThrowerPadID);
     HI(h, p->meSize);
     HB(h, p->mbExploder);
-    hash_body(h, p->m_pPhysicsObject != NULL ? p->m_pPhysicsObject->m_bodyID : NULL);
+    hash_body(h, p->m_pPhysicsObject != NULL ? p->m_pPhysicsObject->m_bodyID : NULL,
+              p->m_pPhysicsObject, "powerup");
     return h.done();
 }
 

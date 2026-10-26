@@ -1,4 +1,5 @@
 #include "Game/AI/ScriptAction.h"
+#include "port/rollback.h"
 
 #include "Game/AI/Fuzzy.h"
 #include "Game/AI/FuzzyVariant.h"
@@ -7,6 +8,8 @@
 extern FuzzyVariant fvNotSet;
 
 SlotPool<ScriptAction> ScriptAction::m_ScriptActionSlotPool(0xA, 0xA);
+
+static const bool s_rollbackState = (PortSimSlotPool(&ScriptAction::m_ScriptActionSlotPool), true);
 
 /**
  * Offset/Address/Size: 0xB4 | 0x80061E68 | size: 0x1EC

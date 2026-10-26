@@ -1,4 +1,5 @@
 #include "Game/Physics/PhysicsFakeBall.h"
+#include "port/rollback.h"
 #include "Game/Physics/PhysicsPlane.h"
 #include "Game/Physics/PhysicsGroundPlane.h"
 #include "Game/Physics/Physics.h"
@@ -18,6 +19,13 @@ FakeBallWorld* FakeBallWorld::mpPredictWorld;
 nlDLListSlotPool<BallCacheInfo*> FakeBallWorld::mBallCacheList;
 float FakeBallWorld::mfLastCacheTime = -1.0f;
 nlDLListIterator<BallCacheInfo*>* FakeBallWorld::mpCacheIterator;
+
+static const bool s_rollbackState = (PortSimSlotPool(&BallCacheInfo::mBallCacheInfoSlotPool),
+                              PortSimState(&FakeBallWorld::mpPredictWorld, sizeof FakeBallWorld::mpPredictWorld),
+                              PortSimState(&FakeBallWorld::mBallCacheList.m_Head, sizeof FakeBallWorld::mBallCacheList.m_Head),
+                              PortSimSlotPool(&FakeBallWorld::mBallCacheList.m_Allocator),
+                              PortSimState(&FakeBallWorld::mfLastCacheTime, sizeof FakeBallWorld::mfLastCacheTime),
+                              PortSimState(&FakeBallWorld::mpCacheIterator, sizeof FakeBallWorld::mpCacheIterator), true);
 
 class SimpleCollisionSpace : public CollisionSpace
 {
@@ -631,6 +639,9 @@ FakeBallWorld::~FakeBallWorld()
 static inline void ResetBallIteratorState()
 {
     static nlDLListIterator<BallCacheInfo*> iter = FakeBallWorld::mBallCacheList.Begin();
+    // PORT: mpCacheIterator points here, so it rolls back with it.
+    static const bool s_rollbackState = (PortSimState(&iter, sizeof iter), true);
+    (void)s_rollbackState;
 
     iter.m_Curr = nlDLRingGetStart(FakeBallWorld::mBallCacheList.m_Head);
     iter.m_Head = FakeBallWorld::mBallCacheList.m_Head;

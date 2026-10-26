@@ -1,4 +1,8 @@
 #include "Game/Effects/EmissionManager.h"
+#include "dolphin/os.h"
+#include "port/lockstep.h"
+#include "port/rollback.h"
+#include <vector>
 #include "dolphin/types.h"
 #include "NL/nlAVLTree.h"
 #include "NL/gl/glFont.h"
@@ -7,6 +11,9 @@
 #include "Game/Replay.h"
 
 static class efList* controllers = nullptr;
+static void ReleaseController(EmissionController* controller);
+static void ReclaimControllers(bool all);
+static void ForgetAllBorn();
 static class efList* errors = nullptr;
 static nlAVLTree<unsigned long, LingerMessage*, DefaultKeyCompare<unsigned long> >* lingerers = nullptr;
 static EffectsLight g_EffectsLights[3];
@@ -85,9 +92,11 @@ bool EmissionManager::Shutdown()
     {
         next = (EmissionController*)(current->m_nextNode);
         controllers->Remove(current);
-        delete current;
+        ReleaseController(current);
         current = next;
     }
+    ReclaimControllers(true);
+    ForgetAllBorn();
 
     delete controllers;
     controllers = nullptr;
@@ -119,6 +128,7 @@ bool EmissionManager::Shutdown()
  */
 void EmissionManager::Update(float dt)
 {
+    ReclaimControllers(false);
     if (NisPlayer::Instance()->WorldIsFrozen())
     {
         dt = 0.0f;
@@ -137,7 +147,7 @@ void EmissionManager::Update(float dt)
             EmissionController* toBeDeleted = p;
             p = (EmissionController*)p->m_nextNode;
             controllers->Remove(toBeDeleted);
-            delete toBeDeleted;
+            ReleaseController(toBeDeleted);
         }
     }
 
@@ -300,11 +310,112 @@ efList* EmissionManager::GetContainer()
     return controllers;
 }
 
+// PORT: the tick that made each live controller, so a rollback ends those its undone ticks made.
+struct BornAt
+{
+    EmissionController* controller;
+    unsigned int tick;
+};
+static std::vector<BornAt> s_born;
+
+static void ForgetAllBorn() { s_born.clear(); }
+
+static void ForgetBorn(EmissionController* controller)
+{
+    for (size_t i = 0; i < s_born.size(); i++)
+        if (s_born[i].controller == controller)
+        {
+            s_born[i] = s_born.back();
+            s_born.pop_back();
+            return;
+        }
+}
+
+// PORT: a controller the screen lets go stays allocated until no restorable tick can name it.
+struct Released
+{
+    EmissionController* controller;
+    unsigned int tick;
+};
+static std::vector<Released> s_released;
+
+static void ReleaseController(EmissionController* controller)
+{
+    ForgetBorn(controller);
+    if (PortRollbackConfirmed() == 0xFFFFFFFFu)
+    {
+        delete controller;
+        return;
+    }
+    // PORT: the finished callback runs now, while its owner exists; only the memory waits.
+    if (controller->mFinishedCallback)
+    {
+        controller->mFinishedCallback(*controller);
+        controller->mFinishedCallback = Function1<void, EmissionController&>();
+    }
+    PortSimHeapPauseScope presentation;
+    s_released.push_back(Released{ controller, PortSimTick() });
+}
+
+static void ReclaimControllers(bool all)
+{
+    const unsigned int confirmed = PortRollbackConfirmed();
+    size_t kept = 0;
+    for (size_t i = 0; i < s_released.size(); i++)
+    {
+        if (all || confirmed == 0xFFFFFFFFu ||
+            confirmed >= s_released[i].tick + PORT_ROLLBACK_TICKS)
+            delete s_released[i].controller;
+        else
+            s_released[kept++] = s_released[i];
+    }
+    s_released.resize(kept);
+}
+
+static void effects_snapshot(void (*append)(const void* p, size_t size))
+{
+    const unsigned int tick = PortSimTick();
+    append(&tick, sizeof tick);
+}
+
+static size_t effects_unsnapshot(const unsigned char* in)
+{
+    unsigned int tick;
+    memcpy(&tick, in, sizeof tick);
+    if (controllers == nullptr)
+    {
+        s_born.clear();
+        return sizeof tick;
+    }
+    for (size_t i = 0; i < s_born.size();)
+    {
+        if (s_born[i].tick < tick)
+        {
+            i++;
+            continue;
+        }
+        // PORT: its maker is undone, so it must not call back into the restored state.
+        EmissionController* c = s_born[i].controller;
+        s_born[i] = s_born.back();
+        s_born.pop_back();
+        if (!EmissionManager::IsStillAlive(c))
+            continue;
+        c->mUpdateCallback = Function1<void, EmissionController&>();
+        c->mFinishedCallback = Function1<void, EmissionController&>();
+        controllers->Remove(c);
+        ReleaseController(c);
+    }
+    return sizeof tick;
+}
+
+static const bool s_rollbackState = (PortSimStateHook(effects_snapshot, effects_unsnapshot), true);
+
 /**
  * Offset/Address/Size: 0x798 | 0x801F90B8 | size: 0xBC
  */
 EmissionController* EmissionManager::Create(EffectsGroup* pEffectsGroup, unsigned short id)
 {
+    PortSimHeapPauseScope presentation;
     EmissionController* pController;
 
     if (!globalIdCounterInit)
@@ -325,6 +436,8 @@ EmissionController* EmissionManager::Create(EffectsGroup* pEffectsGroup, unsigne
 
     pController = new (nlMalloc(sizeof(EmissionController), 8, false)) EmissionController(pEffectsGroup, id, defaultView);
     controllers->Append(pController);
+    if (PortSimInTick())
+        s_born.push_back(BornAt{ pController, PortSimTick() });
     return pController;
 }
 
@@ -336,6 +449,9 @@ static unsigned long fx_sTerrain;
 bool EmissionManager::IsStillAlive(EmissionController* controller)
 {
     EmissionController* current;
+    // PORT: after Shutdown nothing is alive; the world's props ask while they are destroyed.
+    if (controllers == nullptr)
+        return false;
     current = (EmissionController*)(controllers->m_headNode);
 
     while (current != nullptr)
@@ -425,7 +541,7 @@ void EmissionManager::DestroyAll(bool exceptPersistent)
         if ((defaultView == current->m_GlView) && ((!exceptPersistent) || ((unsigned int)(current->m_uUserData + 0x21530000) != 0x0000BEEF /* PORT: u32 wrap */)))
         {
             controllers->Remove(current);
-            delete current;
+            ReleaseController(current);
         }
 
         current = next;
@@ -454,7 +570,7 @@ void EmissionManager::Destroy(uintptr_t userData, const EffectsGroup* pEffectsGr
         if (((pEffectsGroup == nullptr || current->m_pGroup == pEffectsGroup)) && (userData == current->m_uUserData))
         {
             controllers->Remove(current);
-            delete current;
+            ReleaseController(current);
         }
 
         current = next;
@@ -515,7 +631,7 @@ static inline void ReplayRemoveAllNonPersistent()
             if ((defaultView == glView) && ((unsigned int)(current->m_uUserData + 0x21530000) != 0x0000BEEF /* PORT: u32 wrap */))
             {
                 controllers->Remove(current);
-                delete current;
+                ReleaseController(current);
             }
             current = next;
         }
@@ -628,7 +744,7 @@ void EmissionManager::Replay(SaveFrame& frame)
                 if ((defaultView == glView) && ((unsigned int)(current->m_uUserData + 0x21530000) != 0x0000BEEF /* PORT: u32 wrap */))
                 {
                     controllers->Remove(current);
-                    delete current;
+                    ReleaseController(current);
                 }
                 current = next;
             }

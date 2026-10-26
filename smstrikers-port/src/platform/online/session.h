@@ -126,6 +126,18 @@ class Session
     int MayBeginMatch();
     void MatchEnded();
     int TickInput(uint32_t tick, SlotInput out[ONLINE_MAX_SLOTS]);
+
+    // Rollback: the earliest tick that ran on a wrong guess, or kNoTick; asking clears it.
+    uint32_t RollbackTo();
+
+    // A replay stopped at a freeze: ticks from `tick` run again; their hashes do not count.
+    void Rewind(uint32_t tick);
+
+    // Every machine's input is in for the ticks before this one.
+    uint32_t ConfirmedTick() const;
+
+    // As ConfirmedTick, but not past a tick still waiting to run again on input that came since.
+    uint32_t SettledTick() const;
     void TickHash(uint32_t tick, uint64_t hash);
     void TickComponents(uint32_t tick, const uint64_t* hashes, const char* const* names, int count);
     int TickActions(uint32_t tick, OnlineTickActions* out);
@@ -455,6 +467,20 @@ class Session
     bool m_delayAuto;
     uint64_t m_delayGrewUs;
     uint32_t m_loopNext;
+
+    // Rollback: a tick's hashes count once its input is all in; a tick run again replaces them.
+    struct PendingHash
+    {
+        uint32_t tick;
+        uint64_t hash;
+        int components;
+        uint64_t component[kMaxComponents];
+        const char* const* names;
+    };
+    static const int kPendingRing = 64;
+    PendingHash m_pending[kPendingRing];
+    uint32_t m_committed;   // the next tick whose hash is still pending
+    void CommitConfirmed();
     double m_anchorPos;
     uint64_t m_anchorUs;
     double m_rate;   // ticks per microsecond

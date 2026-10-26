@@ -1,4 +1,6 @@
 #include "Game/ObjectBlur.h"
+#include "port/lockstep.h"
+#include "port/rollback.h"
 
 #include "NL/nlMath.h"
 #include "NL/nlString.h"
@@ -11,12 +13,109 @@
 #include "NL/gl/glMatrix.h"
 
 #include "Game/ReplayManager.h"
+#include <vector>
 
 BlurHandler* BlurManager::m_activeBlurHandler = NULL;
 
 SlotPool<BlurHandler> BlurHandler::m_BlurHandlerSlotPool(0x10, 0x10);
 
 static f32 fFlimmerOffset = 0.01f;
+
+// PORT: a released handler's slot waits until no restorable tick can name it.
+struct ReleasedBlur
+{
+    BlurHandler* handler;
+    unsigned int tick;
+};
+static std::vector<ReleasedBlur> s_released;
+
+static void FreeBlurHandler(BlurHandler* handler)
+{
+    delete[] handler->m_pointRingBuffer;
+    BlurHandler::m_BlurHandlerSlotPool.Free(handler);
+}
+
+static bool BlurHandlerReleased(const BlurHandler* handler)
+{
+    for (const ReleasedBlur& r : s_released)
+        if (r.handler == handler)
+            return true;
+    return false;
+}
+
+// PORT: the tick that made each live handler, so a rollback ends those its undone ticks made.
+struct BornBlur
+{
+    BlurHandler* handler;
+    unsigned int tick;
+};
+static std::vector<BornBlur> s_born;
+
+static void ForgetBornBlur(BlurHandler* handler)
+{
+    for (size_t i = 0; i < s_born.size(); i++)
+        if (s_born[i].handler == handler)
+        {
+            s_born[i] = s_born.back();
+            s_born.pop_back();
+            return;
+        }
+}
+
+static void ReleaseBlurHandler(BlurHandler* handler)
+{
+    ForgetBornBlur(handler);
+    const unsigned int confirmed = PortRollbackConfirmed();
+    if (confirmed == 0xFFFFFFFFu)
+    {
+        FreeBlurHandler(handler);
+        return;
+    }
+    PortSimHeapPauseScope presentation;
+    s_released.push_back(ReleasedBlur{ handler, PortSimTick() });
+}
+
+static void ReclaimBlurHandlers()
+{
+    const unsigned int confirmed = PortRollbackConfirmed();
+    size_t kept = 0;
+    for (size_t i = 0; i < s_released.size(); i++)
+    {
+        if (confirmed == 0xFFFFFFFFu || confirmed >= s_released[i].tick + PORT_ROLLBACK_TICKS)
+            FreeBlurHandler(s_released[i].handler);
+        else
+            s_released[kept++] = s_released[i];
+    }
+    s_released.resize(kept);
+}
+
+static void blur_snapshot(void (*append)(const void* p, size_t size))
+{
+    const unsigned int tick = PortSimTick();
+    append(&tick, sizeof tick);
+}
+
+static size_t blur_unsnapshot(const unsigned char* in)
+{
+    unsigned int tick;
+    memcpy(&tick, in, sizeof tick);
+    for (size_t i = 0; i < s_born.size();)
+    {
+        if (s_born[i].tick < tick)
+        {
+            i++;
+            continue;
+        }
+        BlurHandler* handler = s_born[i].handler;
+        s_born[i] = s_born.back();
+        s_born.pop_back();
+        nlDLRingRemove<BlurHandler>(&BlurManager::m_activeBlurHandler, handler);
+        ReleaseBlurHandler(handler);
+    }
+    return sizeof tick;
+}
+
+static const bool s_rollbackState = (PortSimStateHook(blur_snapshot, blur_unsnapshot), true);
 
 static const nlColour kWhite = { 0xFF, 0xFF, 0xFF, 0xFF };
 
@@ -25,6 +124,10 @@ static const nlColour kWhite = { 0xFF, 0xFF, 0xFF, 0xFF };
  */
 void BlurManager::Shutdown()
 {
+    for (const ReleasedBlur& r : s_released)
+        FreeBlurHandler(r.handler);
+    s_released.clear();
+    s_born.clear();
     nlDeleteDLRing<BlurHandler>(&m_activeBlurHandler);
     m_activeBlurHandler = NULL;
     SlotPoolBase::BaseFreeBlocks(&BlurHandler::m_BlurHandlerSlotPool, sizeof(BlurHandler));
@@ -35,6 +138,7 @@ void BlurManager::Shutdown()
  */
 void BlurManager::Update(float deltaTime)
 {
+    ReclaimBlurHandlers();
     if (m_activeBlurHandler == NULL)
         return;
 
@@ -68,10 +172,7 @@ void BlurManager::Update(float deltaTime)
         {
             nlDLRingRemove<BlurHandler>(&m_activeBlurHandler, current);
             if (current != NULL)
-            {
-                delete[] current->m_pointRingBuffer;
-                BlurHandler::m_BlurHandlerSlotPool.Free(current);
-            }
+                ReleaseBlurHandler(current);
         }
         else
         {
@@ -87,14 +188,14 @@ void BlurManager::Update(float deltaTime)
  */
 void BlurManager::DestroyHandler(BlurHandler* handler, float timeToDie)
 {
+    // PORT: a rollback can hand back a handler the screen has already let go.
+    if (handler != NULL && BlurHandlerReleased(handler))
+        return;
     if (timeToDie == 0.0f)
     {
         nlDLRingRemove<BlurHandler>(&m_activeBlurHandler, handler);
         if (handler != NULL)
-        {
-            delete[] handler->m_pointRingBuffer;
-            BlurHandler::m_BlurHandlerSlotPool.Free(handler);
-        }
+            ReleaseBlurHandler(handler);
     }
     else
     {
@@ -109,6 +210,7 @@ void BlurManager::DestroyHandler(BlurHandler* handler, float timeToDie)
  */
 BlurHandler* BlurManager::GetNewHandler(const char* szTextureName, float fLineWidth, int maxPositionEntries, bool bAdditive)
 {
+    PortSimHeapPauseScope presentation;
     BlurHandler* handler = nullptr;
 
     BlurHandler::m_BlurHandlerSlotPool.Allocate(handler);
@@ -127,6 +229,8 @@ BlurHandler* BlurManager::GetNewHandler(const char* szTextureName, float fLineWi
     }
 
     nlDLRingAddEnd<BlurHandler>(&m_activeBlurHandler, handler);
+    if (handler != nullptr && PortSimInTick())
+        s_born.push_back(BornBlur{ handler, PortSimTick() });
 
     return handler;
 }

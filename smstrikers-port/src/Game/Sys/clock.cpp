@@ -1,10 +1,16 @@
 #include "Game/Sys/clock.h"
+#include "port/rollback.h"
 #include "NL/nlTask.h"
 
 Clock* ClockManager::m_inactiveList = NULL;
 Clock* ClockManager::m_activeList = NULL;
 Clock* ClockManager::m_pendingActiveList = NULL;
 bool ClockManager::m_bUpdatingClocks = false;
+
+static const bool s_rollbackState = (PortSimState(&ClockManager::m_inactiveList, sizeof ClockManager::m_inactiveList),
+                                      PortSimState(&ClockManager::m_activeList, sizeof ClockManager::m_activeList),
+                                      PortSimState(&ClockManager::m_pendingActiveList, sizeof ClockManager::m_pendingActiveList),
+                                      PortSimState(&ClockManager::m_bUpdatingClocks, sizeof ClockManager::m_bUpdatingClocks), true);
 
 /**
  * Offset/Address/Size: 0x3D8 | 0x80212D90 | size: 0x4

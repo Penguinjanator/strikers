@@ -1,4 +1,5 @@
 #include "Game/RumbleActions.h"
+#include "port/rollback.h"
 
 #if defined(__SWITCH__)
 #include "NL/platpad.h"
@@ -117,6 +118,8 @@ void UpdateRumbleActions(float dt)
  */
 void BeginRumbleAction(eRumbleActionPreset preset, cGlobalPad* pad)
 {
+    if (PortRollbackResimulating())
+        return;
     RumbleOp* ops;
     s32 idx;
 

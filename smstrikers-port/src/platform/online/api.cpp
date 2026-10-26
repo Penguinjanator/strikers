@@ -48,6 +48,9 @@ extern AuroraConfig g_config;
 }
 #endif
 
+online::NetPipe* PortOnlineAutotestPipe(online::NetPipe* pipe);
+extern "C" void PortOnlineAutotestPads(PADStatus* ports);
+
 namespace
 {
 using online::NetAddr;
@@ -111,7 +114,8 @@ class GameEnv : public online::SessionEnv
         }
         switch (purpose)
         {
-        case online::PIPE_GAME:      return online::UdpOpen(6, port, false, false, error);
+        case online::PIPE_GAME:
+            return PortOnlineAutotestPipe(online::UdpOpen(6, port, false, false, error));
         case online::PIPE_DISCOVERY: return online::UdpOpen(4, port, true, false, error);
         default:                     return online::UdpOpen(4, 0, false, true, error);
         }
@@ -765,8 +769,9 @@ void PortOnlineSampleLocalPads(const struct PADStatus* ports)
     std::lock_guard<std::mutex> g(s_lock);
     ensure_locked();
     std::memcpy(s_frame, ports, sizeof s_frame);
+    PortOnlineAutotestPads(s_frame);
     online::LocalPad local[4];
-    to_local(ports, local);
+    to_local(s_frame, local);
     s_session->SampleLocalPads(local);
 }
 
@@ -860,6 +865,31 @@ int PortOnlineTickInput(unsigned int tick, struct PADStatus* pads)
     for (int s = 0; s < ONLINE_MAX_SLOTS; s++)
         to_pad(in[s], &pads[s]);
     return 1;
+}
+
+unsigned int PortOnlineRollbackTo(void)
+{
+    std::lock_guard<std::mutex> g(s_lock);
+    return s_session != NULL ? s_session->RollbackTo() : online::kNoTick;
+}
+
+void PortOnlineRewind(unsigned int tick)
+{
+    std::lock_guard<std::mutex> g(s_lock);
+    if (s_session != NULL)
+        s_session->Rewind(tick);
+}
+
+unsigned int PortOnlineConfirmedTick(void)
+{
+    std::lock_guard<std::mutex> g(s_lock);
+    return s_session != NULL ? s_session->ConfirmedTick() : online::kNoTick;
+}
+
+unsigned int PortOnlineSettledTick(void)
+{
+    std::lock_guard<std::mutex> g(s_lock);
+    return s_session != NULL ? s_session->SettledTick() : online::kNoTick;
 }
 
 void PortOnlineTickHash(unsigned int tick, uint64_t hash)

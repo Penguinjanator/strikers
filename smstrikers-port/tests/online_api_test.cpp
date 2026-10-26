@@ -73,7 +73,9 @@ int PortSimLocalInput(unsigned int tick, struct PADStatus* pads)
     std::memset(pads, 0, 4 * sizeof(PADStatus));
     return 1;
 }
+void PortOnlineAutotestPads(PADStatus*) {}
 }
+online::NetPipe* PortOnlineAutotestPipe(online::NetPipe* pipe) { return pipe; }
 
 namespace
 {
@@ -122,6 +124,10 @@ class ApiSide : public Side
         }
         return 1;
     }
+    uint32_t RollbackTo() override { return PortOnlineRollbackTo(); }
+    uint32_t SettledTick() override { return PortOnlineSettledTick(); }
+    void Rewind(uint32_t tick) override { PortOnlineRewind(tick); }
+    uint32_t ConfirmedTick() override { return PortOnlineConfirmedTick(); }
     void BarrierReached(int kind, uint32_t tick) override { PortOnlineBarrierReached(kind, tick); }
     void BarrierDone(int kind) override { PortOnlineBarrierDone(kind); }
     int MayRunTick(uint32_t tick) override { return PortOnlineMayRunTick(tick); }

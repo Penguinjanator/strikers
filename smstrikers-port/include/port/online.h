@@ -18,7 +18,7 @@ struct PADStatus;
 #define ONLINE_MAX_LOCAL_HUMANS 2
 #define ONLINE_MAX_STADIUMS 7
 #define ONLINE_MAX_NEARBY 8
-#define ONLINE_MIN_DELAY_TICKS 1
+#define ONLINE_MIN_DELAY_TICKS 0
 #define ONLINE_MAX_DELAY_TICKS 8
 #define ONLINE_TICK_MS 20
 
@@ -434,8 +434,20 @@ int PortOnlineMayBeginMatch(void);
 // The final whistle, from inside the tick that ends the match.
 void PortOnlineMatchEnded(void);
 
-// Slot input for `tick`; 0 holds the tick until every machine's input has arrived.
+// Slot input for `tick`, missing input guessed from the newest; 0 once past what snapshots reach.
 int PortOnlineTickInput(unsigned int tick, struct PADStatus* pads);
+
+// The earliest tick that ran on a wrong guess, 0xFFFFFFFF for none; asking clears it.
+unsigned int PortOnlineRollbackTo(void);
+
+// The ticks from `tick` on, which ran before a freeze held this machine, run again.
+void PortOnlineRewind(unsigned int tick);
+
+// Every machine's input is in for the ticks before this one.
+unsigned int PortOnlineConfirmedTick(void);
+
+// As PortOnlineConfirmedTick, but not past a tick still waiting to run again.
+unsigned int PortOnlineSettledTick(void);
 
 // The combined state hash of `tick`, after the tick ran.
 void PortOnlineTickHash(unsigned int tick, uint64_t hash);

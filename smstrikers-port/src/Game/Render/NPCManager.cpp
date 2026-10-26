@@ -1,4 +1,5 @@
 #include "Game/Render/NPCManager.h"
+#include "port/rollback.h"
 
 #include "Game/Game.h"
 #include "Game/SHierarchy.h"
@@ -149,6 +150,8 @@ NPCManager::NPCManager()
 
     delete stack;
 
+    // PORT: Chain Chomp and Bowser are the match's; the sideline NPCs above are the screen's.
+    PortSimHeapScope simHeap;
     CreateNPCTemplate(5, true);
     PhysicsNPC* chainPhysics = new (nlMalloc(sizeof(PhysicsNPC), 8, false)) PhysicsNPC(g_pGame->m_pGameTweaks->fChainChompRadius);
     ChainChomp* chainChomp = new (nlMalloc(sizeof(ChainChomp), 8, false)) ChainChomp(*mNPCTemplate[5].hierarchy, mNPCTemplate[5].modelID, *chainPhysics, mpInventorySAnim);

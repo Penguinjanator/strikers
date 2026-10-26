@@ -14,6 +14,12 @@ namespace online
 const uint32_t kTickUs = ONLINE_TICK_MS * 1000;
 const uint32_t kNoTick = 0xFFFFFFFFu;
 
+// The furthest a machine runs past every machine's input; at most PORT_ROLLBACK_TICKS - 2.
+const uint32_t kMaxAhead = 14;
+
+// The ticks before the intro's freeze: neutral input on every machine, never guessed.
+const uint32_t kNeutralTicks = 3;
+
 // Time from `then` to `now`, 0 when `then` was read later on another path.
 inline uint64_t Since(uint64_t now, uint64_t then) { return now > then ? now - then : 0; }
 
@@ -130,6 +136,14 @@ class Lockstep
     int Missing(uint32_t tick) const;
     void Read(uint32_t tick, SlotInput out[ONLINE_MAX_SLOTS]) const;
 
+    // Read with missing records guessed as the newest; a later record that differs marks the tick.
+    void ReadPredicted(uint32_t tick, SlotInput out[ONLINE_MAX_SLOTS]);
+
+    // The earliest tick run on a wrong guess, or kNoTick; taking it clears it.
+    uint32_t TakeMispredicted();
+    uint32_t Mispredicted() const { return m_mispredicted; }
+    int Mispredictions() const { return m_mispredictions; }
+
     void Drop(int machine, uint32_t tick);
     bool Dropped(int machine) const { return m_dropTick[machine] != kNoTick; }
     uint32_t DropTick(int machine) const { return m_dropTick[machine]; }
@@ -173,6 +187,17 @@ class Lockstep
 
     std::vector<uint8_t> m_log[ONLINE_MAX_MACHINES];
     uint32_t m_have[ONLINE_MAX_MACHINES];
+
+    // What each tick read for a machine's missing record, by tick modulo the ring.
+    static const int kPredictRing = 256;
+    struct Prediction
+    {
+        uint32_t tick;
+        uint8_t rec[kRecordSize];
+    };
+    Prediction m_predicted[ONLINE_MAX_MACHINES][kPredictRing];
+    uint32_t m_mispredicted;
+    int m_mispredictions;
     uint32_t m_dropTick[ONLINE_MAX_MACHINES];
     int m_conflicts;
 

@@ -1,4 +1,6 @@
 #include "Game/PadActions.h"
+#include "port/rollback.h"
+#include <cstddef>
 
 #include "NL/platpad.h"
 #include "NL/nlConfig.h"
@@ -37,6 +39,14 @@ void InitPads()
         {
             cPadManager::m_aPads[i] = new (nlMalloc(sizeof(PadMonkey), 8, false)) PadMonkey(i);
         }
+    }
+
+    // PORT: the pads' pressures and polar sticks carry between ticks; vtable and index never change.
+    for (int i = 0; i < 4; i++)
+    {
+        char* p = (char*)cPadManager::m_aPads[i];
+        const size_t from = offsetof(cGlobalPad, m_polarAnalogLeft);
+        PortSimState(p + from, sizeof(cPlatPad) - from);
     }
 
     UpdateMonkeyState(0);

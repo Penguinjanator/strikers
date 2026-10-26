@@ -1,4 +1,6 @@
 #include "Game/Render/SidelineExplodable.h"
+#include "port/rollback.h"
+#include <cstddef>
 #include "Game/Render/AnimatedModelExplodable.h"
 #include "Game/Render/StaticModelExplodable.h"
 #include "Game/Character.h"
@@ -29,6 +31,12 @@ ExplosionFragment** SidelineExplodableManager::sFragmentLookupTable = NULL;
 SlotPool<SidelineExplodableNode> SidelineExplodableNode::sSidelineExplodableNodeSlotPool(16, 16);
 SlotPool<DrawableFragmentHandleNode> DrawableFragmentHandleNode::sDrawableFragmentHandleNodePool(16, 16);
 
+static const bool s_rollbackState2 = (PortSimState(&SidelineExplodableManager::sbIsInitialized, sizeof SidelineExplodableManager::sbIsInitialized),
+                                      PortSimState(&SidelineExplodableManager::sFragmentLookupTable, sizeof SidelineExplodableManager::sFragmentLookupTable),
+                                      PortSimState(&SidelineExplodableManager::sUnusedDrawableFragments, sizeof SidelineExplodableManager::sUnusedDrawableFragments), true);
+
+static const bool s_rollbackState = (PortSimSlotPool(&DrawableFragmentHandleNode::sDrawableFragmentHandleNodePool), true);
+
 /**
  * Offset/Address/Size: 0x2188 | 0x801694E8 | size: 0x200
  */
@@ -56,7 +64,9 @@ void ExplosionFragment::Deactivate()
 
     mFragmentModelHash = 0;
 
-    if (mpSmokeEmissionController != NULL)
+    // PORT: a smoke a rollback undid is released without the finished callback that clears this.
+    if (mpSmokeEmissionController != NULL &&
+        EmissionManager::IsStillAlive(mpSmokeEmissionController))
     {
         EmissionController& smokeControl = *mpSmokeEmissionController;
         smokeControl.mUpdateCallback = Function1<void, EmissionController&>();
@@ -167,6 +177,10 @@ SidelineExplodable::~SidelineExplodable()
         mExplosionFragments[i].Deactivate();
     }
 
+    PortSimStateForget((char*)this + offsetof(SidelineExplodable, mExplosionFragments));
+    for (int i = 0; i < mExplosionFragments.mSize; i++)
+        PortSimStateForget(&mExplosionFragments[i].mpPhysicsObject);
+
     SidelineExplodableManager::RemoveSidelineExplodable(this);
 }
 
@@ -177,6 +191,15 @@ void SidelineExplodable::Initialize(int numFragmentModels)
 {
     mNumFragmentModels = numFragmentModels;
     Allocate();
+
+    // PORT: a prop's explosion state rolls back with the match, though the prop is the world's.
+    const size_t from = offsetof(SidelineExplodable, mExplosionFragments);
+    PortSimState((char*)this + from, offsetof(SidelineExplodable, mpAssociatedEffect) - from);
+    // PORT: each fragment's smoke is the screen's, so it stays out like mpAssociatedEffect.
+    const size_t first = offsetof(ExplosionFragment, mpPhysicsObject);
+    const size_t smoke = offsetof(ExplosionFragment, mpSmokeEmissionController);
+    for (int i = 0; i < mExplosionFragments.mSize; i++)
+        PortSimState((char*)&mExplosionFragments[i] + first, smoke - first);
 
     SidelineExplodableManager::AddSidelineExplodable(this);
 }

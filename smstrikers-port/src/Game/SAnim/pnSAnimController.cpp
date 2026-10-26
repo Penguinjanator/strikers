@@ -1,8 +1,11 @@
 #include "Game/SAnim/pnSAnimController.h"
+#include "port/rollback.h"
 #include "Game/SAnim.h"
 #include "Game/SAnim/AnimRetargeter.h"
 
 SlotPool<cPN_SAnimController> cPN_SAnimController::m_SAnimControllerSlotPool(0x10, 0x10);
+
+static const bool s_rollbackState = (PortSimSlotPool(&cPN_SAnimController::m_SAnimControllerSlotPool), true);
 
 /**
  * Offset/Address/Size: 0xDC0 | 0x801EB41C | size: 0x98

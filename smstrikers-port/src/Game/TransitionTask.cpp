@@ -29,6 +29,9 @@
 #include "Game/WorldManager.h"
 #include "Game/ObjectBlur.h"
 #include "port/lockstep.h"
+#include "Game/AI/Powerups.h"
+#include "Game/AI/ScriptAction.h"
+#include "Game/Triggers/AnimTrigger.h"
 #include "Game/Camera/CameraMan.h"
 #include "Game/CameraLoader.h"
 #include "Game/Effects/EmissionManager.h"
@@ -560,6 +563,17 @@ void TransitionTask::InitializeGameState()
     tDebugPrintManager::Print(DC_MEMORY, "-----------------------------------------\n\n");
 
     gSebringLoadPackageToVirtualMemory = true;
+
+    // PORT: the simulation's slot pools start each match empty, so their blocks come from its heap.
+    if (g_simLockstep)
+    {
+        CompactSlotPools();
+        CompactPowerups();
+        SlotPoolBase::BaseFreeBlocks(&AnimTriggerCallbackInfo::m_AnimTriggerCallbackInfoSlotPool, sizeof(AnimTriggerCallbackInfo));
+        SlotPoolBase::BaseFreeBlocks(&ScriptAction::m_ScriptActionSlotPool, sizeof(ScriptAction));
+        BallCacheInfo::mBallCacheInfoSlotPool.FreeBlocks();
+        FakeBallWorld::mBallCacheList.m_Allocator.FreeBlocks();
+    }
 
     if (nlSingleton<GameInfoManager>::Instance()->IsInCupMode())
     {

@@ -11,7 +11,8 @@ extern EventManager* g_pEventManager;
 void DispatchEventsTask::Run(float dt)
 {
     // PORT: lockstep mode's simulation handlers run at tick ends, and here only while the task state runs no ticks.
-    if (g_simLockstep && nlTaskManager::m_pInstance->m_CurrState != 2)
+    // PORT: an online pause sets it on the pausing machine alone; events wait for the resume tick.
+    if (g_simLockstep && nlTaskManager::m_pInstance->m_CurrState != 2 && PortSimPauseSlot() < 0)
         PortSimDispatchEvents();
     g_pEventManager->DispatchEvents();
 }

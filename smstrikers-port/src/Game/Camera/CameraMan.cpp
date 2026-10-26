@@ -1,4 +1,6 @@
 #include "Game/Camera/CameraMan.h"
+#include "port/lockstep.h"
+#include "port/rollback.h"
 #include "NL/vmath.h"
 
 #include "NL/nlDLRing.h"
@@ -23,6 +25,7 @@
 #include "port/simcamera.h"
 
 #include "math.h"
+#include <vector>
 
 extern float g_fSimulationTick;
 
@@ -46,6 +49,9 @@ float cCameraManager::m_fFOV = 50.0f;
 
 nlVector3 cCameraManager::m_UpVectorStack[2] = { { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f } };
 
+static const bool s_rollbackState = (PortSimState(&cCameraManager::m_UpVectorStack, sizeof cCameraManager::m_UpVectorStack),
+                                      PortSimState(&cCameraManager::m_UpVectorStackSize, sizeof cCameraManager::m_UpVectorStackSize), true);
+
 cRumbleFilter* pRumbleFilter;
 
 /**
@@ -54,7 +60,8 @@ cRumbleFilter* pRumbleFilter;
 void FireCameraRumbleFilter(float fRumbleX, float fRumbleY)
 {
     nlDLRingGetStart<cBaseCamera>(cCameraManager::m_cameraStack);
-    if (nlDLRingGetStart<cBaseCamera>(cCameraManager::m_cameraStack)->m_pFilter != NULL)
+    // PORT: a replayed tick already shook the screen; the simulation camera's spring still steps.
+    if (!PortRollbackResimulating() && nlDLRingGetStart<cBaseCamera>(cCameraManager::m_cameraStack)->m_pFilter != NULL)
     {
         nlDLRingGetStart<cBaseCamera>(cCameraManager::m_cameraStack)->m_pFilter->Rumble(fRumbleX, fRumbleY);
     }
@@ -402,6 +409,50 @@ void cCameraManager::PushCamera(cBaseCamera* pCamera)
     cCameraManager::StopCurrentCamRumbleFilterSFXLoop();
 
     nlDLRingAddStart<cBaseCamera>(&cCameraManager::m_cameraStack, pCamera);
+}
+
+namespace
+{
+struct ReleasedCamera
+{
+    cBaseCamera* camera;
+    unsigned int tick;
+};
+std::vector<ReleasedCamera> s_releasedCameras;
+
+void ReclaimCameras(void)
+{
+    const unsigned int confirmed = PortRollbackConfirmed();
+    size_t kept = 0;
+    for (size_t i = 0; i < s_releasedCameras.size(); i++)
+    {
+        if (confirmed == 0xFFFFFFFFu ||
+            confirmed >= s_releasedCameras[i].tick + PORT_ROLLBACK_TICKS)
+            delete s_releasedCameras[i].camera;
+        else
+            s_releasedCameras[kept++] = s_releasedCameras[i];
+    }
+    s_releasedCameras.resize(kept);
+}
+}   // namespace
+
+void cCameraManager::Release(cBaseCamera* camera)
+{
+    if (camera == NULL)
+        return;
+    ReclaimCameras();
+    // PORT: a replayed tick lets go of a camera its first run already let go of.
+    for (const ReleasedCamera& r : s_releasedCameras)
+        if (r.camera == camera)
+            return;
+    Remove(*camera);
+    if (PortRollbackConfirmed() == 0xFFFFFFFFu)
+    {
+        delete camera;
+        return;
+    }
+    PortSimHeapPauseScope presentation;
+    s_releasedCameras.push_back(ReleasedCamera{ camera, PortSimTick() });
 }
 
 /**

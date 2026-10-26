@@ -1,6 +1,9 @@
 #include "Game/AI/FilteredRandom.h"
 
 #include "NL/nlMath.h"
+#include "port/rollback.h"
+
+extern "C" int PortSimHeapOwns(const void* p);
 
 extern unsigned int nlDefaultSeed;
 
@@ -29,6 +32,9 @@ FilteredRandomChance::FilteredRandomChance()
     {
         m_hist[i + 10] = InitialHistoryChance[i + 10];
     }
+    // PORT: the AI keeps these in function statics, outside the simulation heap, so the history registers itself.
+    if (!PortSimHeapOwns(this))
+        PortSimState(this, sizeof *this);
 }
 
 /**
@@ -54,6 +60,9 @@ FilteredRandomRange::FilteredRandomRange()
     {
         m_hist[i] = InitialHistoryRange[i];
     }
+    // PORT: the AI keeps these in function statics, outside the simulation heap, so the history registers itself.
+    if (!PortSimHeapOwns(this))
+        PortSimState(this, sizeof *this);
 }
 
 /**
@@ -75,6 +84,9 @@ FilteredRandomReal::FilteredRandomReal()
     {
         m_hist[i] = p[i];
     }
+    // PORT: the AI keeps these in function statics, outside the simulation heap, so the history registers itself.
+    if (!PortSimHeapOwns(this))
+        PortSimState(this, sizeof *this);
 }
 
 /**

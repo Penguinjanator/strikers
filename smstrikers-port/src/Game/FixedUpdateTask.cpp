@@ -1,4 +1,5 @@
 #include "Game/FixedUpdateTask.h"
+#include "port/rollback.h"
 
 #include "Game/Ball.h"
 #include "Game/BasicStadium.h"
@@ -25,6 +26,9 @@ float FixedUpdateTask::mAccumulatedDeltaT;
 float FixedUpdateTask::mSimulationTime;
 float FixedUpdateTask::mfFrameLockTime;
 float FixedUpdateTask::mTimeScale = 1.0f;
+
+static const bool s_rollbackState = (PortSimState(&FixedUpdateTask::mSimulationTime, sizeof FixedUpdateTask::mSimulationTime),
+                                      PortSimState(&FixedUpdateTask::mTimeScale, sizeof FixedUpdateTask::mTimeScale), true);
 
 extern "C" float* PortSimTimeScalePtr(void)
 {

@@ -1,4 +1,5 @@
 #include "PhotoFlashEffect.h"
+#include "port/rollback.h"
 
 #include "NL/nlColour.h"
 #include "NL/gl/glState.h"
@@ -16,6 +17,8 @@ static float sSecondsSinceFlash = 999.0f;
  */
 void PhotoFlash::Flash()
 {
+    if (PortRollbackResimulating())
+        return;
     sNumFramesSinceFlash = 0;
     sSecondsSinceFlash = 0.0f;
 }

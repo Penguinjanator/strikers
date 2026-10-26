@@ -1,6 +1,8 @@
 #include "engine.h"
 
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace online
@@ -155,6 +157,8 @@ void Lockstep::Clear()
     for (int s = 0; s < ONLINE_MAX_SLOTS; s++)
         m_slotMachine[s] = -1;
     m_delay = ONLINE_MIN_DELAY_TICKS;
+    m_mispredicted = kNoTick;
+    m_mispredictions = 0;
     std::memset(m_latest, 0, sizeof m_latest);
     std::memset(m_taps, 0, sizeof m_taps);
     std::memset(m_connected, 0, sizeof m_connected);
@@ -162,6 +166,8 @@ void Lockstep::Clear()
     {
         m_log[m].clear();
         m_have[m] = 0;
+        for (int i = 0; i < kPredictRing; i++)
+            m_predicted[m][i].tick = kNoTick;
         m_dropTick[m] = kNoTick;
         m_newestHash[m] = kNoTick;
         m_componentsHead[m] = 0;
@@ -225,9 +231,27 @@ void Lockstep::Sample(int human, const PadBytes& pad, bool connected, bool taps)
 
 void Lockstep::StartGeneration()
 {
+    // The first ticks are neutral on every machine: the intro poses players between them.
+    for (int m = 0; m < ONLINE_MAX_MACHINES; m++)
+    {
+        if (!InMatch(m))
+            continue;
+        const int humans = HumansOf(m);
+        std::vector<uint8_t>& log = m_log[m];
+        while (m_have[m] < kNeutralTicks)
+        {
+            uint8_t rec[kRecordSize] = {};
+            for (int h = 0; h < humans; h++)
+                rec[16] = (uint8_t)(rec[16] | (1 << h));
+            log.insert(log.end(), rec, rec + kRecordSize);
+            m_have[m]++;
+        }
+    }
     const int humans = HumansOf(m_self);
     std::vector<uint8_t>& log = m_log[m_self];
-    while (m_have[m_self] < (uint32_t)m_delay)
+    // With input delay, the ticks before the first one a sample can reach are neutral too.
+    const uint32_t neutral = (uint32_t)m_delay > kNeutralTicks ? (uint32_t)m_delay : kNeutralTicks;
+    while (m_have[m_self] < neutral)
     {
         uint8_t rec[kRecordSize] = {};
         for (int h = 0; h < humans; h++)
@@ -292,6 +316,16 @@ int Lockstep::Add(int machine, uint32_t firstTick, int count, const uint8_t (*re
         }
         if (t > m_have[machine])
             break;
+        // A tick that ran on a guess at this record runs again if the guess was wrong.
+        const Prediction& p = m_predicted[machine][t % kPredictRing];
+        if (p.tick == t && std::memcmp(p.rec, records[i], kRecordSize) != 0)
+        {
+            m_mispredictions++;
+            if (m_mispredicted == kNoTick || t < m_mispredicted)
+                m_mispredicted = t;
+            if (t < 12 && std::getenv("STRIKERS_ROLLBACK_LOG") != NULL)
+                std::fprintf(stderr, "[rollback] mispredicted m%d t=%u\n", machine, t);
+        }
         log.insert(log.end(), records[i], records[i] + kRecordSize);
         m_have[machine]++;
         added++;
@@ -363,11 +397,45 @@ void Lockstep::Read(uint32_t tick, SlotInput out[ONLINE_MAX_SLOTS]) const
     }
 }
 
+void Lockstep::ReadPredicted(uint32_t tick, SlotInput out[ONLINE_MAX_SLOTS])
+{
+    Read(tick, out);
+    int nth[ONLINE_MAX_MACHINES] = {};
+    for (int s = 0; s < ONLINE_MAX_SLOTS; s++)
+    {
+        const int m = m_slotMachine[s];
+        if (m < 0 || !InMatch(m))
+            continue;
+        const int h = nth[m]++;
+        if (m == m_self || tick >= m_dropTick[m] || tick < m_have[m])
+            continue;
+        // The newest record this machine has sent stands in for the ones still on their way.
+        static const uint8_t kNone[kRecordSize] = {};
+        const uint8_t* last =
+            m_have[m] != 0 ? &m_log[m][(size_t)(m_have[m] - 1) * kRecordSize] : kNone;
+        Prediction& p = m_predicted[m][tick % kPredictRing];
+        p.tick = tick;
+        std::memcpy(p.rec, last, kRecordSize);
+        out[s].pad = RecordGet(last, h);
+        out[s].connected = (last[16] >> h) & 1;
+    }
+}
+
+uint32_t Lockstep::TakeMispredicted()
+{
+    const uint32_t t = m_mispredicted;
+    m_mispredicted = kNoTick;
+    return t;
+}
+
 void Lockstep::Drop(int machine, uint32_t tick)
 {
     if (!InMatch(machine) || machine == m_self || m_dropTick[machine] != kNoTick)
         return;
     m_dropTick[machine] = tick;
+    // Ticks from here that ran on this machine's input, guessed or not, run again with the CPU.
+    if (m_mispredicted == kNoTick || tick < m_mispredicted)
+        m_mispredicted = tick;
 }
 
 bool Lockstep::SetHash(int machine, uint32_t tick, uint64_t hash, uint32_t* mismatchTick)

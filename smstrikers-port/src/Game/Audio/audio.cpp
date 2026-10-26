@@ -1,5 +1,7 @@
 #include "NL/nlLexicalCast.h"
 #include "Game/Sys/audio.h"
+#include "port/lockstep.h"
+#include "port/rollback.h"
 #include "Game/Sys/GCStream.h"
 #include "Game/Sys/debug.h"
 #include "Game/Game.h"
@@ -59,6 +61,45 @@ struct FadeAudioData
 };
 
 FadeAudioData* g_pFadeList;
+
+// PORT: a sound an undone tick started stops following its object, which the rollback may have freed.
+static unsigned int s_emitterTick[0x40];
+
+static void sounds_snapshot(void (*append)(const void*, size_t))
+{
+    const unsigned int tick = PortSimTick();
+    append(&tick, sizeof tick);
+}
+
+static size_t sounds_unsnapshot(const unsigned char* in)
+{
+    unsigned int tick;
+    memcpy(&tick, in, sizeof tick);
+    for (unsigned long i = 0; i < 0x40; i++)
+    {
+        SFXEmitter* e = Audio::GetEmitter(i);
+        if (e == NULL || !e->bInUse || s_emitterTick[i] < tick)
+            continue;
+        const bool follows = (e->posUpdateMethod == PHYSOBJ && PortSimHeapOwns(e->pPhysObj)) ||
+                             (e->posUpdateMethod == PTRS_TO_VECTORS &&
+                              (PortSimHeapOwns(e->pos.pvPos) || PortSimHeapOwns(e->dir.pvDir)));
+        if (follows)
+        {
+            e->posUpdateMethod = NONE;
+            e->pPhysObj = NULL;
+        }
+    }
+    return sizeof tick;
+}
+
+static const bool s_soundsRollback = (PortSimStateHook(sounds_snapshot, sounds_unsnapshot), true);
+
+// PORT: the mixer's fades outlive the tick that asks for one, so they stay outside the simulation heap.
+static FadeAudioData* NewFadeData()
+{
+    PortSimHeapPauseScope presentation;
+    return (FadeAudioData*)nlMalloc(sizeof(FadeAudioData), 8, false);
+}
 
 static bool gbFilterOn = false;
 static bool gbPitchBent = false;
@@ -3060,7 +3101,11 @@ SFXEmitter* GetEmitter(unsigned long id)
  */
 SFXEmitter* GetFreeEmitter(unsigned long& id)
 {
-    return PlatAudio::GetFreeEmitter(id);
+    SFXEmitter* e = PlatAudio::GetFreeEmitter(id);
+    // PORT: emitters made outside a tick count as made at its start, so a rollback leaves them.
+    if (e != NULL && id < 0x40)
+        s_emitterTick[id] = PortSimInTick() ? PortSimTick() : 0;
+    return e;
 }
 
 /**
@@ -3203,7 +3248,7 @@ static void AddSFXVolFadeData(unsigned long identifier, float* currentVol, float
         return;
     }
 
-    FadeAudioData* pFadeData = (FadeAudioData*)nlMalloc(sizeof(FadeAudioData), 8, false);
+    FadeAudioData* pFadeData = NewFadeData();
     pFadeData->fadeType = FADE_TYPE_NONE;
     pFadeData->identifier.index = -1;
     pFadeData->identifier.index = 0;
@@ -3276,7 +3321,7 @@ static inline void AddFilterFadeData(float currentVal, float fadeStepSize, float
         delete existing;
     }
 
-    FadeAudioData* newFade = (FadeAudioData*)nlMalloc(sizeof(FadeAudioData), 8, false);
+    FadeAudioData* newFade = NewFadeData();
 
     newFade->fadeType = FADE_TYPE_NONE;
     newFade->identifier.index = -1;
@@ -3322,6 +3367,8 @@ static inline void AddFilterFadeData(float currentVal, float fadeStepSize, float
  */
 void FadeFilter(float currentVal, float fadeToVal, float fadeDuration, float fadeTimeStart)
 {
+    if (PortRollbackResimulating())
+        return;
     TransitionTask* pTask = TransitionTask::sm_pGlobalTask;
     TRANSITION_STATE state;
     if (pTask != NULL)
@@ -3421,7 +3468,7 @@ static inline void AddPitchBendFadeData(float currentVal, float fadeStepSize, fl
         delete existing;
     }
 
-    FadeAudioData* newFade = (FadeAudioData*)nlMalloc(sizeof(FadeAudioData), 8, false);
+    FadeAudioData* newFade = NewFadeData();
 
     newFade->fadeType = FADE_TYPE_NONE;
     newFade->identifier.index = -1;
@@ -3467,6 +3514,8 @@ static inline void AddPitchBendFadeData(float currentVal, float fadeStepSize, fl
  */
 void PitchBend(float currentVal, float fadeToVal, float fadeDuration, float fadeTimeStart)
 {
+    if (PortRollbackResimulating())
+        return;
     TransitionTask* pTask = TransitionTask::sm_pGlobalTask;
     TRANSITION_STATE state;
     if (pTask != NULL)
@@ -3533,6 +3582,8 @@ void PitchBend(float currentVal, float fadeToVal, float fadeDuration, float fade
  */
 void FadeFilterToFullStrength()
 {
+    if (PortRollbackResimulating())
+        return;
     if (!gbFilterOn)
     {
         GameTweaks* tweaks = g_pGame->m_pGameTweaks;
@@ -3552,6 +3603,8 @@ void FadeFilterToFullStrength()
  */
 void FadeFilterFromCurrentToZero()
 {
+    if (PortRollbackResimulating())
+        return;
     FadeAudioData* node;
 
     f32 t = (f32)gWorldSFX.GetGroupFilterFreq() / 16383.0f;
@@ -3622,7 +3675,7 @@ static void AddFilterFadeData(float currentVal, float fadeStepSize, float fadeDu
         return;
     }
 
-    FadeAudioData* pFadeData = (FadeAudioData*)nlMalloc(sizeof(FadeAudioData), 8, false);
+    FadeAudioData* pFadeData = NewFadeData();
     pFadeData->fadeType = FADE_TYPE_NONE;
     pFadeData->identifier.index = -1;
     pFadeData->identifier.index = 0;

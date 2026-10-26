@@ -2,6 +2,8 @@
 #include "Game/Physics/Physics.h"
 
 #include "NL/nlMemory.h"
+#include "port/rollback.h"
+#include "port/lockstep.h"
 #include "Game/Ball.h"
 #include "Game/BasicStadium.h"
 #include "Game/Field.h"
@@ -21,6 +23,8 @@ typedef ListContainerBase<char*, NewAdapter<ListEntry<char*> > > PhysicsCharList
 // PORT: linkable, so the debug menu can drive it. Only the keyword changed.
 bool sbDisableCollisionDetection;
 static bool sbNonMovingAABBsInitialized;
+
+static const bool s_rollbackState = (PortSimState(&sbNonMovingAABBsInitialized, sizeof sbNonMovingAABBsInitialized), true);
 nlListContainer<PhysicsObject*> g_StaticPhysicsPrimitives;
 nlListContainer<PhysicsObject*> g_NetPhysicsObjects;
 PhysicsMesh* g_TerrainMesh;
@@ -60,6 +64,14 @@ public:
  */
 void* ODEAlloc(size_t size)
 {
+    // PORT: ODE allocations during a tick stay in the simulation heap, even inside presentation code the tick calls.
+    if (PortSimInTick() && PortSimHeapPaused())
+    {
+        PortSimHeapResume();
+        void* p = nlMalloc(size, 8, false);
+        PortSimHeapPause();
+        return p;
+    }
     return nlMalloc(size, 8, false);
 }
 
@@ -68,7 +80,7 @@ void* ODEAlloc(size_t size)
  */
 void* ODERealloc(void* oldPtr, size_t oldSize, size_t newSize)
 {
-    void* newPtr = nlMalloc(newSize, 8, false);
+    void* newPtr = ODEAlloc(newSize);
     if (oldSize != 0)
     {
         memcpy(newPtr, oldPtr, oldSize);
@@ -91,6 +103,7 @@ void ODEFree(void* ptr, size_t size)
 bool PhysicsLoader::StartLoad(LoadingManager* manager)
 {
     const char* pBaseName;
+    PortSimHeapScope simHeap;
 
     dSetAllocHandler(ODEAlloc);
     dSetReallocHandler(ODERealloc);
@@ -144,6 +157,7 @@ bool PhysicsLoader::StartLoad(LoadingManager* manager)
         nlStrNCat<char>(szTemp, pBaseName, "/NetMesh01", 0x100);
         uNegativeNetMeshID = nlStringLowerHash(szTemp);
 
+        PortSimHeapPauseScope presentation;
         PhysicsNet::spPhysNetPositiveX->mpNetMesh->Initialize(uPositiveNetMeshID);
         PhysicsNet::spPhysNetNegativeX->mpNetMesh->Initialize(uNegativeNetMeshID);
     }

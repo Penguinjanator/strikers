@@ -11,6 +11,10 @@ typedef void (*SlotPoolFreeFunc)(void* data);
 struct SlotPoolBlock;
 struct SlotPoolEntry;
 
+// PORT: outside a tick a pool that rolls back lends from its twin, leaving the restored free list alone.
+extern "C" int PortSimHeapActive(void);
+extern "C" int PortSimHeapOwns(const void* p);
+
 class SlotPoolBase
 {
 public:
@@ -26,6 +30,16 @@ public:
     /* 0x0C */ SlotPoolEntry* m_FreeList;  // Head of entry list
     /* 0x10 */ SlotPoolAllocatorFunc m_AllocFn;
     /* 0x14 */ SlotPoolFreeFunc m_FreeFn;
+    // PORT: the twin for allocations outside a tick; NULL for a pool rollback never restores.
+    SlotPoolBase* m_pPresentation;
+
+    SlotPoolBase* For(bool allocating, const void* entry)
+    {
+        if (m_pPresentation == NULL)
+            return this;
+        const bool sim = allocating ? PortSimHeapActive() != 0 : PortSimHeapOwns(entry) != 0;
+        return sim ? this : m_pPresentation;
+    }
 }; // total size: 0x18
 
 struct SlotPoolBlock
@@ -78,28 +92,30 @@ public:
     // Allocate an entry from the free list
     void Allocate(T*& out)
     {
-        if (m_FreeList == NULL)
+        SlotPoolBase* pool = this->For(true, NULL);
+        if (pool->m_FreeList == NULL)
         {
-            BaseAddNewBlock(this, sizeof(T));
+            BaseAddNewBlock(pool, sizeof(T));
         }
-        if (m_FreeList != NULL)
+        if (pool->m_FreeList != NULL)
         {
-            out = (T*)m_FreeList;
-            m_FreeList = m_FreeList->next;
+            out = (T*)pool->m_FreeList;
+            pool->m_FreeList = pool->m_FreeList->next;
         }
     }
 
     void AllocateForReturn(T*& out)
     {
+        SlotPoolBase* pool = this->For(true, NULL);
         T* entry = NULL;
-        if (m_FreeList == NULL)
+        if (pool->m_FreeList == NULL)
         {
-            BaseAddNewBlock(this, sizeof(T));
+            BaseAddNewBlock(pool, sizeof(T));
         }
-        if (m_FreeList != NULL)
+        if (pool->m_FreeList != NULL)
         {
-            entry = (T*)m_FreeList;
-            m_FreeList = m_FreeList->next;
+            entry = (T*)pool->m_FreeList;
+            pool->m_FreeList = pool->m_FreeList->next;
         }
         out = entry;
     }
@@ -119,9 +135,10 @@ public:
     // Return an entry back to the free list
     void Free(T* entry)
     {
+        SlotPoolBase* pool = this->For(false, entry);
         SlotPoolEntry* e = (SlotPoolEntry*)entry;
-        e->next = m_FreeList;
-        m_FreeList = e;
+        e->next = pool->m_FreeList;
+        pool->m_FreeList = e;
     }
 
     void DeleteEntry(T* entry)

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <new>
@@ -103,6 +104,40 @@ inline int size_class(std::size_t n)
 
 inline std::size_t class_size(int c) { return (std::size_t)32 << c; }
 
+// The simulation heap: inside a sim scope every allocation comes from here, one span to snapshot.
+#if defined(__SWITCH__)
+const std::size_t kSimSize = 48u * 1024u * 1024u;
+#else
+const std::size_t kSimSize = 64u * 1024u * 1024u;
+#endif
+
+struct SimHeap
+{
+    char* lo;
+    char* bump;
+    char* end;
+    AllocState state;
+};
+SimHeap s_sim;
+int s_simScope;
+int s_simPause;   // presentation called from inside a tick allocates outside the simulation heap
+
+bool sim_init()
+{
+    if (s_sim.lo != nullptr)
+        return true;
+    if (!region_init())
+        return false;
+    std::uintptr_t a = ((std::uintptr_t)s_bump + 4095) & ~(std::uintptr_t)4095;
+    if ((char*)(a + kSimSize) > s_end)
+        return false;
+    s_bump = (char*)(a + kSimSize);
+    s_sim.lo = (char*)a;
+    s_sim.bump = s_sim.lo;
+    s_sim.end = s_sim.lo + kSimSize;
+    return true;
+}
+
 }   // namespace
 
 void MemoryAllocator::Initialize(void* memory, unsigned int size)
@@ -126,7 +161,10 @@ void* MemoryAllocator::Allocate(unsigned long size, unsigned int alignment, bool
     if (alignment > kHeaderSize)
         alignment = kHeaderSize;   // the header already reserves the largest
 
-    AllocState* st = state_for(&m_free_block_list);
+    const bool sim = s_simScope > 0 && s_simPause == 0 && this == &StandardAllocator && sim_init();
+    AllocState* st = sim ? &s_sim.state : state_for(&m_free_block_list);
+    char** bump = sim ? &s_sim.bump : &s_bump;
+    char* end = sim ? s_sim.end : s_end;
     const std::size_t want = kHeaderSize + (size ? (std::size_t)size : 1);
     const int cls = size_class(want);
 
@@ -141,10 +179,14 @@ void* MemoryAllocator::Allocate(unsigned long size, unsigned int alignment, bool
     else
     {
         const std::size_t take = class_size(cls);
-        if (s_bump + take > s_end)
+        if (*bump + take > end)
+        {
+            if (sim)
+                std::fprintf(stderr, "memalloc: simulation heap full at %zu MB\n", kSimSize >> 20);
             return nullptr;
-        block = s_bump;
-        s_bump += take;
+        }
+        block = *bump;
+        *bump += take;
     }
 
     std::uintptr_t raw = (std::uintptr_t)block + kHeaderSize;
@@ -221,3 +263,93 @@ extern "C" void port_region_stats(std::size_t* used, std::size_t* total)
         *total = (s_region != nullptr) ? (std::size_t)(s_end - s_region) : 0;
 }
 
+extern "C" int g_simLockstep;
+
+// Off the lockstep path the simulation never rolls back, so its objects stay in the region.
+extern "C" void PortSimHeapEnter(void)
+{
+    if (g_simLockstep)
+        s_simScope++;
+}
+
+extern "C" void PortSimHeapLeave(void)
+{
+    if (g_simLockstep)
+        s_simScope--;
+}
+
+extern "C" int PortSimHeapActive(void) { return s_simScope > 0 && s_simPause == 0; }
+
+extern "C" void PortSimHeapPause(void) { s_simPause++; }
+extern "C" int PortSimHeapPaused(void) { return s_simScope > 0 && s_simPause > 0; }
+extern "C" void PortSimHeapResume(void) { s_simPause--; }
+
+extern "C" int PortSimHeapOwns(const void* p)
+{
+    return s_sim.lo != nullptr && (const char*)p >= s_sim.lo && (const char*)p < s_sim.end;
+}
+
+extern "C" std::size_t PortSimHeapUsed(void)
+{
+    return s_sim.lo ? (std::size_t)(s_sim.bump - s_sim.lo) : 0;
+}
+
+// The used span plus sizeof(SimHeap) bookkeeping; past the saved bump everything is free again.
+extern "C" std::size_t PortSimHeapSnapshotSize(void) { return PortSimHeapUsed() + sizeof(SimHeap); }
+
+extern "C" void PortSimHeapSave(void* out)
+{
+    const std::size_t used = PortSimHeapUsed();
+    std::memcpy(out, &s_sim, sizeof s_sim);
+    if (used != 0)
+        std::memcpy((char*)out + sizeof s_sim, s_sim.lo, used);
+}
+
+extern "C" void PortSimHeapRestore(const void* in)
+{
+    SimHeap saved;
+    std::memcpy(&saved, in, sizeof saved);
+    const std::size_t used = (std::size_t)(saved.bump - saved.lo);
+    if (used != 0)
+        std::memcpy(s_sim.lo, (const char*)in + sizeof saved, used);
+    // Fresh blocks past the restored bump must read as zero again, as the system's pages did.
+    if (s_sim.bump > saved.bump)
+        std::memset(saved.bump, 0, (std::size_t)(s_sim.bump - saved.bump));
+    s_sim = saved;
+}
+
+extern "C" const void* PortSimHeapBase(void) { return s_sim.lo; }
+
+// Diagnostic: the block of the simulation heap that holds `p`, as its payload start and size.
+extern "C" int PortSimHeapBlockOf(const void* p, const void** start, std::size_t* size)
+{
+    if (s_sim.lo == nullptr || (const char*)p < s_sim.lo || (const char*)p >= s_sim.bump)
+        return 0;
+    // Blocks are laid out back to back from lo, each a size class long.
+    char* block = s_sim.lo;
+    while (block < s_sim.bump)
+    {
+        const BlockHeader* h = nullptr;
+        // The payload begins kHeaderSize past the block, aligned; its header sits just before it.
+        for (std::size_t off = kHeaderSize; off <= kHeaderSize * 2; off += 8)
+        {
+            const BlockHeader* c = (const BlockHeader*)(block + off - sizeof(BlockHeader));
+            if (c->offset == off && c->owner == &s_sim.state)
+            {
+                h = c;
+                break;
+            }
+        }
+        if (h == nullptr)
+            return 0;
+        const std::size_t span = class_size(size_class(h->offset + h->size));
+        if ((const char*)p < block + span)
+        {
+            *start = block + h->offset;
+            *size = h->size;
+            return 1;
+        }
+        block += span;
+    }
+    return 0;
+}

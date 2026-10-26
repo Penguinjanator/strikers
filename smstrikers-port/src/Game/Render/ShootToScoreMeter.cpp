@@ -1,4 +1,5 @@
 #include "Game/Render/ShootToScoreMeter.h"
+#include "port/rollback.h"
 #include "Game/Camera/CameraMan.h"
 #include "Game/Game.h"
 #include "NL/nlString.h"
@@ -23,6 +24,8 @@ u32 NumberTextures[4] = {
 };
 
 ShootToScoreMeter ShootToScoreMeter::instance;
+// PORT: the Super Strike actions drive the meter, and the captain's second button reads its shake.
+static const bool s_rollbackState = (PortSimState(&ShootToScoreMeter::instance, sizeof ShootToScoreMeter::instance), true);
 
 static nlColour sWhiteBarColour = { 255, 255, 255, 255 };
 static nlColour sHyperColour = { 181, 240, 255, 255 };

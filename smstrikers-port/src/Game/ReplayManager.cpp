@@ -5,6 +5,7 @@
 #include "Game/FixedUpdateTask.h"
 #include "NL/nlTask.h"
 #include "NL/nlMemory.h"
+#include "port/rollback.h"
 #include "NL/globalpad.h"
 #include "PowerPC_EABI_Support/Runtime/MWCPlusLib.h"
 #include "Game/main.h"
@@ -91,11 +92,13 @@ void ReplayManager::Uninitialize()
  */
 void ReplayManager::GrabSnapshot()
 {
+    PortSimHeapPauseScope presentation;
     SwapPreviousAndCurrent();
 
     mCurrent->Grab();
 
-    if (nlTaskManager::m_pInstance->m_CurrState == 2)
+    // PORT: a tick run again after a rollback is already in the replay.
+    if (nlTaskManager::m_pInstance->m_CurrState == 2 && !PortRollbackResimulating())
     {
         float time = mReplay->EndTime() + g_fSimulationTick;
         mTime = time;

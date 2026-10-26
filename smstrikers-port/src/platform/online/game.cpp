@@ -440,8 +440,11 @@ extern "C" void PortOnlineGameInit(void)
 
 extern "C" int PortOnlineGameAtMainMenu(void) { return resting_on(SCENE_MAIN_MENU); }
 
+extern "C" void PortOnlineAutotestFrame(int atMainMenu);
+
 extern "C" void PortOnlineGameFrame(void)
 {
+    PortOnlineAutotestFrame(resting_on(SCENE_MAIN_MENU));
     if (s_stage == STAGE_NONE && !s_selectOpen && PortOnlinePanelIdle())
     {
         // The menu's online prompt; the session stays closed.

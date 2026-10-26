@@ -1,4 +1,5 @@
 #include "Game/Render/Bowser.h"
+#include "port/rollback.h"
 #include "NL/vmath.h"
 #include "Game/SAnim/pnFeather.h"
 #include "Game/SAnim/pnBlender.h"
@@ -35,6 +36,8 @@ static const nlVector3 v3Zero = { 0.0f, 0.0f, 0.0f };
 static const nlVector3 gv3BowserHomePosition = { 0.0f, 100.0f, -10.0f };
 
 float Bowser::mfYAxisTilt = 0.0f;
+// PORT: the field's tilt pushes the ball.
+static const bool s_tiltState = (PortSimState(&Bowser::mfYAxisTilt, sizeof Bowser::mfYAxisTilt), true);
 
 /**
  * Offset/Address/Size: 0x4BBC | 0x8015D930 | size: 0x2C
@@ -132,7 +135,11 @@ Bowser::Bowser(cSHierarchy& rSHierarchy, int nTeam, PhysicsNPC& rPhysNPC, cInven
         g_pGame->ResetBowserTimer(g_pGame->m_pGameTweaks->fBowserTiltTime);
     }
 
-    m_pCharacterSFX = new (nlMalloc(sizeof(Audio::cCharacterSFX), 8, false)) Audio::cCharacterSFX();
+    {
+        // PORT: the audio update walks this voice's sounds every frame, rollback or not.
+        PortSimHeapPauseScope presentation;
+        m_pCharacterSFX = new (nlMalloc(sizeof(Audio::cCharacterSFX), 8, false)) Audio::cCharacterSFX();
+    }
     SetupBaseSFX();
 }
 

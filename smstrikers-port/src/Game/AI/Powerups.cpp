@@ -1,4 +1,5 @@
 #include "Game/AI/Powerups.h"
+#include "port/rollback.h"
 #include "Game/AI/Fielder.h"
 #include "Game/AI/AiUtil.h"
 #include "Game/AI/Scripts/ScriptQuestions.h"
@@ -91,6 +92,10 @@ struct PowerupRegistry
 PowerupModelPool powerupModelPool;
 PowerupRegistry powerupRegistry;
 
+static const bool s_rollbackState2 = (PortSimState(&g_pPowerups, sizeof g_pPowerups),
+                                      PortSimState(&powerupModelPool, sizeof powerupModelPool),
+                                      PortSimState(&powerupRegistry, sizeof powerupRegistry), true);
+
 const char* uFREEZE_SHELL_STREAK_TEXTURE = "global/blueshellstreak";
 const char* uSPINY_SHELL_STREAK_TEXTURE = "global/redshellstreak";
 const char* uGREEN_SHELL_STREAK_TEXTURE = "global/greenshellstreak";
@@ -108,6 +113,13 @@ SlotPool<SpinyShell> SpinyShell::m_SpinyShellSlotPool(16, 16);
 SlotPool<RedShell> RedShell::m_RedShellSlotPool(16, 16);
 SlotPool<Banana> Banana::m_BananaSlotPool(16, 16);
 SlotPool<Bobomb> Bobomb::m_BobombSlotPool(16, 16);
+
+static const bool s_rollbackState = (PortSimSlotPool(&FreezeShell::m_FreezeShellSlotPool),
+                              PortSimSlotPool(&GreenShell::m_GreenShellSlotPool),
+                              PortSimSlotPool(&SpinyShell::m_SpinyShellSlotPool),
+                              PortSimSlotPool(&RedShell::m_RedShellSlotPool),
+                              PortSimSlotPool(&Banana::m_BananaSlotPool),
+                              PortSimSlotPool(&Bobomb::m_BobombSlotPool), true);
 
 namespace
 {

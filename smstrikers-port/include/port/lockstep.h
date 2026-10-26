@@ -104,6 +104,9 @@ void PortSimDispatchEvents(void);
 int PortSimEventHandler(const struct EventHandler* handler);
 void PortSimHoldEvent(struct EventManager* manager, struct Event* event);
 
+// Events: non-zero while `event` came from an unconfirmed tick; the screen holds it until then.
+int PortSimEventPending(struct EventManager* manager, struct Event* event);
+
 // Camera: after the tick's events, steps the sim camera and the screen positions AI reads.
 void PortSimCameraStep(void);
 

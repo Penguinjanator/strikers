@@ -17,9 +17,10 @@
 #elif !defined(_WIN32)
 
 #include <execinfo.h>
+#include <sys/ucontext.h>
 #include <unistd.h>
 
-static void crash_handler(int sig)
+static void crash_handler(int sig, siginfo_t* info, void* uc)
 {
     // Async-signal-safe only: backtrace_symbols() mallocs, so raw addresses go out and atos
     // resolves them.
@@ -35,6 +36,21 @@ static void crash_handler(int sig)
     }
     write(2, "\n*** strikers: ", 15);
     write(2, name, strlen(name));
+#if defined(__APPLE__) && defined(__aarch64__)
+    {
+        // The faulting address and instruction: the frame list starts at the caller of a leaf.
+        char line[96];
+        const uintptr_t pc = uc != NULL ? (uintptr_t)((ucontext_t*)uc)->uc_mcontext->__ss.__pc : 0;
+        const int n = snprintf(line, sizeof line, "fault at %p, pc %p\n",
+                               info != NULL ? info->si_addr : NULL, (void*)pc);
+        write(2, line, (size_t)n);
+        void* frames[1] = { (void*)pc };
+        backtrace_symbols_fd(frames, 1, 2);
+    }
+#else
+    (void)info;
+    (void)uc;
+#endif
 
     void* frames[64];
     int n = backtrace(frames, 64);
@@ -51,9 +67,9 @@ __attribute__((constructor)) static void port_install_crash_handler(void)
 
     struct sigaction sa;
     memset(&sa, 0, sizeof sa);
-    sa.sa_handler = crash_handler;
+    sa.sa_sigaction = crash_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_ONSTACK;
+    sa.sa_flags = SA_ONSTACK | SA_SIGINFO;
 
     // Not SIGSTKSZ, which since glibc 2.34 can expand to a sysconf() call and cannot size a
     // file-scope array. 64 KiB clears every MINSIGSTKSZ.

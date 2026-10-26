@@ -1,6 +1,9 @@
 // The lockstep simulation camera and the stick turn that stands in for its remap.
 
 #include "port/lockstep.h"
+#include <cstdio>
+#include <cstdlib>
+#include "port/rollback.h"
 #include "port/simcamera.h"
 
 #include "Game/Camera/CameraMan.h"
@@ -51,6 +54,13 @@ struct Rumble
 {
     nlVector2 pos0, pos1, vel0, vel1;
 } s_rumble;
+
+// The simulation camera rolls back with the match; s_render is the screen's and does not.
+const bool s_rollbackState =
+    (PortSimState(s_storage, sizeof s_storage), PortSimState(&s_stepped, sizeof s_stepped),
+     PortSimState(&s_held, sizeof s_held), PortSimState(&s_projection, sizeof s_projection),
+     PortSimState(&s_view, sizeof s_view), PortSimState(s_frustum, sizeof s_frustum),
+     PortSimState(&s_rumble, sizeof s_rumble), true);
 
 void rumble_reset(void) { std::memset(&s_rumble, 0, sizeof s_rumble); }
 

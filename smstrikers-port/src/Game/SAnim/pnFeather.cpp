@@ -1,4 +1,5 @@
 #include "Game/SAnim/pnFeather.h"
+#include "port/rollback.h"
 
 #include "math.h"
 #include "NL/nlMemory.h"
@@ -7,6 +8,8 @@
 static f32 CANT_COLLIDE = *(f32*)__float_max;
 
 SlotPool<cPN_Feather> cPN_Feather::m_FeatherSlotPool(0x10, 0x10);
+
+static const bool s_rollbackState = (PortSimSlotPool(&cPN_Feather::m_FeatherSlotPool), true);
 
 void cPN_Feather::operator delete(void* ptr)
 {

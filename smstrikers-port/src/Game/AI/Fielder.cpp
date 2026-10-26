@@ -1,4 +1,5 @@
 #include "port/region.h"  // PORT: one binary, three discs
+#include "port/rollback.h"
 #include "Game/AI/Fielder.h"
 #include "Game/MathHelpers.h"
 #include "Game/AI/FielderActions.h"
@@ -3866,8 +3867,7 @@ void cFielder::CleanActionShootToScore()
 
     if (this->mActionShootToScoreVars.captainStsCamera != NULL)
     {
-        cCameraManager::Remove(*this->mActionShootToScoreVars.captainStsCamera);
-        delete this->mActionShootToScoreVars.captainStsCamera;
+        cCameraManager::Release(this->mActionShootToScoreVars.captainStsCamera);
         this->mActionShootToScoreVars.captainStsCamera = NULL;
     }
 
@@ -5046,6 +5046,9 @@ void cFielder::ShouldIWave()
 
             static float fTimer;
             static s8 init;
+            // PORT: the wave timer gates a dialogue draw on the simulation's stream.
+            static const bool s_rollbackState = (PortSimState(&fTimer, sizeof fTimer), PortSimState(&init, sizeof init), true);
+            (void)s_rollbackState;
 
             if (!init)
             {

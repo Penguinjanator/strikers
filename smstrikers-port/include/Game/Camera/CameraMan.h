@@ -34,6 +34,8 @@ public:
     static bool HasCamera(cBaseCamera* pCamera);
     static void PushCamera(cBaseCamera* pCamera);
     static void Remove(const cBaseCamera& camera);
+    // PORT: Remove, then delete once no tick a rollback could restore still names the camera.
+    static void Release(cBaseCamera* camera);
     static void Remove(eCameraType type, bool bDeleteAfterRemoving);
     static void PushCameraWithTransition(cBaseCamera* pCamera, float fDuration, eCameraTransition transition, void (*pCallback)(eCameraMessage));
     static cBaseCamera* PopCameraWithTransition(float fDuration, eCameraTransition transition, void (*pCallback)(eCameraMessage));

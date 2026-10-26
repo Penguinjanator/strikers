@@ -1,4 +1,5 @@
 #include "Game/Physics/PhysicsNet.h"
+#include "port/rollback.h"
 
 #include "NL/nlMemory.h"
 #include "types.h"
@@ -23,6 +24,8 @@ static bool sbTestLowerHorizontalGoalpost = false;
 
 bool PhysicsNet::sbSweepTestEnabled = true;
 float PhysicsNet::sfWallSoftness = 0.03f;
+
+static const bool s_rollbackState = (PortSimState(&PhysicsNet::sfWallSoftness, sizeof PhysicsNet::sfWallSoftness), true);
 
 /**
  * Offset/Address/Size: 0x9A8 | 0x8013AD98 | size: 0x6F8
@@ -60,6 +63,8 @@ PhysicsNet::PhysicsNet(CollisionSpace* space, bool positive_x)
 
     if (NetMesh::s_bAnimatedNetMeshEnabled)
     {
+        // PORT: replays step the live nets; the match keeps its own copy of them per tick.
+        PortSimHeapPauseScope presentation;
         if (positive_x)
         {
             mpNetMesh = new (nlMalloc(sizeof(NetMesh), 8, false)) NetMesh(true);

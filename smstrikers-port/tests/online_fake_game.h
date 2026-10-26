@@ -6,6 +6,8 @@
 #include "../src/platform/online/session.h"
 
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <random>
 #include <vector>
@@ -35,6 +37,10 @@ class Side
     virtual int MayBeginMatch() = 0;
     virtual float ClockRate() = 0;
     virtual int TickInput(uint32_t tick, SlotInput out[ONLINE_MAX_SLOTS]) = 0;
+    virtual uint32_t RollbackTo() = 0;
+    virtual uint32_t SettledTick() = 0;
+    virtual void Rewind(uint32_t tick) = 0;
+    virtual uint32_t ConfirmedTick() = 0;
     virtual void BarrierReached(int kind, uint32_t tick) = 0;
     virtual void BarrierDone(int kind) = 0;
     virtual int MayRunTick(uint32_t tick) = 0;
@@ -67,6 +73,10 @@ class SessionSide : public Side
     {
         return s->TickInput(tick, out);
     }
+    uint32_t RollbackTo() override { return s->RollbackTo(); }
+    uint32_t SettledTick() override { return s->SettledTick(); }
+    void Rewind(uint32_t tick) override { s->Rewind(tick); }
+    uint32_t ConfirmedTick() override { return s->ConfirmedTick(); }
     void BarrierReached(int kind, uint32_t tick) override { s->BarrierReached(kind, tick); }
     void BarrierDone(int kind) override { s->BarrierDone(kind); }
     int MayRunTick(uint32_t tick) override { return s->MayRunTick(tick); }
@@ -148,10 +158,14 @@ class FakeGame
             BeginGame(now);
 
         if (playing)
+            Rollback();
+        if (playing && ending && s->ConfirmedTick() > endTick)
+            Finish();
+        if (playing)
         {
             const float rate = s->ClockRate();
             dueUs += (int64_t)((double)dt * rate);
-            while (dueUs >= kTickUs && playing)
+            while (dueUs >= kTickUs && playing && !ending)
             {
                 if (!MayRun(now, tick))
                 {
@@ -180,6 +194,7 @@ class FakeGame
                         longStalls++;
                 }
                 dueUs -= kTickUs;
+                Save(tick);
                 RunTick(in);
                 tick++;
             }
@@ -197,6 +212,11 @@ class FakeGame
     int humans;
     uint32_t matchTicks;
     uint32_t goalOdds;
+    // A Start edge in the tick input pauses from the next tick, as the game's does; 0 for none.
+    int pausesPerMatch = 0;
+    int pausesLeft = 0;
+    uint16_t lastButtons[ONLINE_MAX_SLOTS] = {};
+    int pausesTaken = 0;
     int64_t flipAtTick;
     bool wander = true;   // false leaves `pads` to the test
     LocalPad pads[4];
@@ -225,10 +245,125 @@ class FakeGame
     int longStalls;
     uint64_t barrierHoldUs;
     uint64_t ticksRun;
+    uint64_t ticksRerun = 0;
+    int rollbacks = 0;
+    uint32_t longestRollback = 0;
     std::vector<MatchResult> results;
     std::vector<int> kickoffDelays;
 
   private:
+    // Everything RunTick reads from the ticks before; what the real game's snapshot covers.
+    struct Snapshot
+    {
+        uint32_t tick = ~0u;
+        uint64_t state;
+        int armedKind;
+        uint32_t freezeTick;
+        int goals;
+        uint8_t cpuSlots;
+        int pausesLeft;
+        uint16_t lastButtons[ONLINE_MAX_SLOTS];
+    };
+    static const int kRing = 64;
+    Snapshot ring[kRing];
+    bool rerunning = false;
+
+  public:
+    // A test arms a barrier from outside the ticks; snapshots from `from` on carry it.
+    void ArmFromOutside(int kind, uint32_t at)
+    {
+        armedKind = kind;
+        freezeTick = at;
+        held = false;
+        for (Snapshot& sn : ring)
+            if (sn.tick != ~0u && sn.tick <= tick && sn.tick + kRing > tick)
+            {
+                sn.armedKind = kind;
+                sn.freezeTick = at;
+            }
+    }
+
+  private:
+    void Save(uint32_t k)
+    {
+        Snapshot& sn = ring[k % kRing];
+        sn.tick = k;
+        sn.state = state;
+        sn.armedKind = armedKind;
+        sn.freezeTick = freezeTick;
+        sn.goals = goals;
+        sn.cpuSlots = cpuSlots;
+        sn.pausesLeft = pausesLeft;
+        std::memcpy(sn.lastButtons, lastButtons, sizeof lastButtons);
+    }
+
+    void Rollback()
+    {
+        const uint32_t to = s->RollbackTo();
+        if (to == ~0u || to >= tick)
+            return;
+        const Snapshot& sn = ring[to % kRing];
+        if (sn.tick != to)
+        {
+            std::printf("fake game: no snapshot for tick %u at tick %u\n", to, tick);
+            std::abort();
+        }
+        state = sn.state;
+        armedKind = sn.armedKind;
+        freezeTick = sn.freezeTick;
+        goals = sn.goals;
+        cpuSlots = sn.cpuSlots;
+        pausesLeft = sn.pausesLeft;
+        std::memcpy(lastButtons, sn.lastButtons, sizeof lastButtons);
+        const uint32_t now = tick;
+        rollbacks++;
+        if (now - to > longestRollback)
+            longestRollback = now - to;
+        rerunning = true;
+        for (tick = to; tick < now && playing; tick++)
+        {
+            if (armedKind != 0 && tick >= freezeTick)
+            {
+                s->Rewind(tick);
+                break;
+            }
+            SlotInput in[ONLINE_MAX_SLOTS];
+            if (!s->TickInput(tick, in))
+            {
+                // Only a match the session has stopped refuses a tick it already gave out.
+                if (s->State().desync == ONLINE_DESYNC_NONE &&
+                    s->State().phase == ONLINE_PHASE_MATCH)
+                {
+                    std::printf("fake game: tick %u refused while running again to %u\n", tick,
+                                now);
+                    std::abort();
+                }
+                tick = now;
+                break;
+            }
+            Save(tick);
+            RunTick(in);
+            ticksRerun++;
+        }
+        rerunning = false;
+    }
+
+    bool ending = false;
+    uint32_t endTick = 0;
+
+    void Finish()
+    {
+        s->MatchEnded();
+        MatchResult r;
+        r.serial = s->State().matchSerial;
+        r.ticks = endTick + 1;
+        r.state = state;
+        r.goals = goals;
+        results.push_back(r);
+        playing = false;
+        ending = false;
+    }
+
     void WanderPads()
     {
         for (int i = 0; i < humans && i < 4; i++)
@@ -263,10 +398,13 @@ class FakeGame
         state = mix64(st.desc.seed);
         armedKind = 1;
         freezeTick = 3;
+        ending = false;
         held = false;
         presenting = false;
         goals = 0;
         cpuSlots = 0;
+        pausesLeft = pausesPerMatch;
+        std::memset(lastButtons, 0, sizeof lastButtons);
         stalling = false;
         kickoffDelays.push_back(s->State().delayTicks);
     }
@@ -275,6 +413,9 @@ class FakeGame
     {
         if (armedKind != 0 && k >= freezeTick)
         {
+            // A freeze holds once all input up to it is in; until then a rollback can undo it.
+            if (!held && s->SettledTick() < freezeTick)
+                return false;
             if (!held)
             {
                 held = true;
@@ -331,7 +472,23 @@ class FakeGame
                                         state >> 48 };
             s->TickComponents(tick, parts, kNames, 4);
         }
-        ticksRun++;
+        if (!rerunning)
+            ticksRun++;
+        for (int i = 0; i < ONLINE_MAX_SLOTS; i++)
+        {
+            const bool edge = (in[i].pad.buttons & 0x1000) != 0 && (lastButtons[i] & 0x1000) == 0;
+            lastButtons[i] = in[i].pad.buttons;
+            if (edge && armedKind == 0 && pausesLeft > 0 && tick > 10 && tick + 60 < matchTicks &&
+                (in[i].kind == ONLINE_SLOT_LOCAL || in[i].kind == ONLINE_SLOT_REMOTE))
+            {
+                pausesLeft--;
+                armedKind = 4;
+                freezeTick = tick + 1;
+                held = false;
+                if (!rerunning)
+                    pausesTaken++;
+            }
+        }
         if (armedKind == 0 && tick > 10 && tick + 60 < matchTicks && goalOdds != 0 &&
             state % goalOdds == 0)
         {
@@ -340,17 +497,14 @@ class FakeGame
             held = false;
             goals++;
         }
+        // The match ends once every machine's input for its last tick is in; a replay can move it.
         if (end || tick + 1 >= matchTicks)
         {
-            s->MatchEnded();
-            MatchResult r;
-            r.serial = s->State().matchSerial;
-            r.ticks = tick + 1;
-            r.state = state;
-            r.goals = goals;
-            results.push_back(r);
-            playing = false;
+            ending = true;
+            endTick = tick;
         }
+        else if (ending && tick <= endTick)
+            ending = false;
     }
 
     uint64_t holdStartUs = 0;

@@ -57,6 +57,8 @@ void SlotPoolBase::BaseFreeBlocks(SlotPoolBase* slotPool, unsigned int slotSize)
     }
     slotPool->m_BlockList = NULL;
     slotPool->m_FreeList = NULL;
+    if (slotPool->m_pPresentation != NULL)
+        BaseFreeBlocks(slotPool->m_pPresentation, slotSize);
 }
 
 /**
@@ -78,6 +80,7 @@ SlotPoolBase::SlotPoolBase()
     m_FreeFn = DefaultSlotPoolFree;
     m_Initial = 0;
     m_Delta = 0;
+    m_pPresentation = NULL;
 }
 
 /**

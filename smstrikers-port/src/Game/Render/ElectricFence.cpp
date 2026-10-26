@@ -16,6 +16,7 @@
 #include "NL/gl/glView.h"
 #include "NL/nlMath.h"
 #include "NL/nlTask.h"
+#include "port/rollback.h"
 
 #include <math.h>
 
@@ -255,6 +256,19 @@ static inline ElectricFenceData* FindElectricFenceData(EmissionController* pEmis
 
 static void RenderElectricFence(EmissionController& ec);
 
+// PORT: a rollback kills the effects it undoes without their finished callback; drop their fences.
+static void ReleaseUndoneElectricFences()
+{
+    ElectricFenceData* node = ElectricFenceData::sActiveElectricFences.m_pStart;
+    while (node != NULL)
+    {
+        ElectricFenceData* next = node->next;
+        if (!EmissionManager::IsStillAlive(node->mpEmissionController))
+            ElectricFenceFinished(*node->mpEmissionController);
+        node = next;
+    }
+}
+
 /**
  * Offset/Address/Size: 0xEAC | 0x8016BEDC | size: 0x420
  */
@@ -326,6 +340,8 @@ void EmitElectricFenceBallEffect(const nlVector3& pos, const nlVector3& dir, uns
     }
 
     groupName = bNoSpark ? "electric_fence_nospark" : "electric_fence";
+    PortSimHeapPauseScope presentation;
+    ReleaseUndoneElectricFences();
 
     if (!EmissionManager::IsPlaying(emitterID, fxGetGroup(groupName)))
     {
@@ -353,6 +369,8 @@ void EmitElectricFenceCharacterEffect(const nlVector3& pos, const nlVector3& dir
     if (g_pGame->mbCaptainShotToScoreOn)
         return;
 
+    PortSimHeapPauseScope presentation;
+    ReleaseUndoneElectricFences();
     if (!EmissionManager::IsPlaying(emitterID, fxGetGroup("electric_fence_character")))
     {
         EmissionController* controller = EmissionManager::Create(fxGetGroup("electric_fence_character"), 0);

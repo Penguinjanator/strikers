@@ -1,4 +1,5 @@
 #include "Game/AI/FielderDesires.h"
+#include "port/rollback.h"
 #include "PowerPC_EABI_Support/Runtime/runtime.h"
 
 #include "Game/AI/AiUtil.h"
@@ -77,6 +78,8 @@ CommonDesireData g_vDesireCommonData[NUM_FIELDERDESIRES] = {
     CommonDesireData(FIELDERDESIRE_RECEIVE_PASS_FROM_RUN),
     CommonDesireData(FIELDERDESIRE_WAIT),
 };
+
+static const bool s_rollbackState = (PortSimState(&g_vDesireCommonData, sizeof g_vDesireCommonData), true);
 
 static const nlVector3 v3Zero = {
     0.0f,
