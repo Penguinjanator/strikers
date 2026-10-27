@@ -837,6 +837,8 @@ SFXPlaySet* cGameSFX::KeepTrack(SFXEmitter* pSFXEmitter, const Audio::SoundAttri
 
     SFXPlaySet* slot = NULL;
 
+    // PORT: tracked sounds outlive a rollback, so the slot and its list entry stay off its heap.
+    PortSimHeapPauseScope presentation;
     SFXPlaySet::m_TrackedSFXSlotPool.Allocate(slot);
 
     slot->type = (unsigned long)-1;
